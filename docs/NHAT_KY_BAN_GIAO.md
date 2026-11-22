@@ -17,3 +17,9 @@
 - **File:** `frontend/ban-chay.html`, `frontend/assets/js/pages/best-sellers.js`, `frontend/assets/js/components/product-card.js`, `frontend/assets/css/customer.css`, `docs/FRONTEND_CHO_BACKEND.md`.
 - **API backend cần có:** `GET /products?sort=best&per_page=20&page={n}` và tham số tùy chọn `category={slug}`; sản phẩm cần có `luot_ban`. Chi tiết tại mục YC2 — Bảng xếp hạng bán chạy.
 - **Tự kiểm tra:** mở `/frontend/ban-chay.html`, đổi các chip danh mục, xem thêm kết quả, kiểm tra thứ hạng và nút Thêm ở 360px, 768px, 1280px.
+
+## 2026-11-22 — Admin đăng nhập, layout và sản phẩm (A9 P1)
+
+- **File:** `frontend/assets/js/admin/admin-layout.js`, `frontend/assets/js/admin/admin-login.js`, `frontend/assets/js/admin/products.js`, `frontend/assets/js/core/mock.js`, `frontend/assets/css/admin.css`, `docs/FRONTEND_CHO_BACKEND.md`.
+- **API backend cần có:** luồng đăng nhập OTP admin, `GET/POST/PUT/DELETE /admin/products`, upload ảnh và xóa hàng loạt; tài khoản khách cần nhận 403. Chi tiết tại mục YC2 — Admin đăng nhập và quản lý sản phẩm.
+- **Tự kiểm tra:** mở `/frontend/admin/login.html`, đăng nhập demo cục bộ qua OTP, thử trang sản phẩm, lọc/tìm, thêm/sửa/xóa/khôi phục dữ liệu mẫu và kiểm tra guard khi chưa đăng nhập.

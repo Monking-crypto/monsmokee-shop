@@ -71,6 +71,11 @@ async function verifyOtp(code) {
     otp.setInvalid(true);
     otpError.textContent = wrong >= 5 ? 'Bạn đã nhập sai tối đa 5 lần. Hãy đăng nhập lại.' : `${error.message} (${wrong}/5 lần)`;
     otp.clear();
+    if (wrong >= 5) {
+      qs('#admin-otp-verify').disabled = true;
+      qs('#admin-otp-resend').disabled = true;
+      qs('#admin-otp').querySelectorAll('input').forEach((input) => { input.disabled = true; });
+    }
   }
 }
 
@@ -81,7 +86,7 @@ qs('#admin-otp-verify').addEventListener('click', () => {
 qs('#admin-otp-resend').addEventListener('click', async () => {
   try {
     await api.post('/admin/auth/otp/resend');
-    wrong = 0; otpError.textContent = ''; otp.clear(); startTimers();
+    otpError.textContent = ''; otp.clear(); startTimers();
   } catch (error) {
     if (error instanceof ApiError && error.status) otpError.textContent = error.message;
   }

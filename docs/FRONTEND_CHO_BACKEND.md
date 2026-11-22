@@ -77,3 +77,10 @@ Thêm các trường sản phẩm `nhom_con`, `huong_vi`, `dong_goi` vào schema
 
 - Trang `ban-chay.html` gọi `GET /products?sort=best&per_page=20&page={n}`; thêm `category={slug}` khi lọc danh mục.
 - Sắp xếp theo `luot_ban` giảm dần và trả `total`, `page`, `per_page`; mỗi sản phẩm phải có `luot_ban` là số nguyên.
+
+## YC2 — Admin đăng nhập và quản lý sản phẩm (A9 P1)
+
+- Đăng nhập admin hai bước: `POST /admin/auth/login`, `POST /admin/auth/verify-otp`, `POST /admin/auth/otp/resend`, `GET /admin/auth/me`, `POST /admin/auth/logout`. OTP bắt buộc mỗi lần đăng nhập, hết hạn sau 5 phút, gửi lại sau 60 giây và tối đa 5 lần nhập sai. Tài khoản khách phải nhận 403.
+- CRUD sản phẩm: `GET/POST /admin/products`, `PUT/DELETE /admin/products/{id}`; hỗ trợ tìm/lọc/phân trang phía giao diện. Bổ sung `POST /admin/products/bulk-delete` hoặc thống nhất endpoint xóa hàng loạt.
+- Upload ảnh: `POST /admin/uploads/product-image`, JPG/PNG/WebP tối đa 2MB. Sản phẩm thuộc đơn hàng không xóa cứng; backend cần ẩn sản phẩm và giữ dữ liệu đơn hàng.
+- Tài khoản demo chỉ cấu hình cục bộ trong `frontend/assets/js/core/mock.secrets.js` (đã ignore); tuyệt đối không đưa thông tin xác thực vào file được commit. Backend mới chịu trách nhiệm xác thực quyền admin và gửi email OTP.

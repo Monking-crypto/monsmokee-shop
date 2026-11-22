@@ -314,8 +314,9 @@ export async function handle(method, path, body = {}) {
   }
   if (route === '/admin/auth/otp/resend' && method === 'POST') {
     if (!store.get('adminPending', false)) return fail(401, 'Phiên đăng nhập đã hết hạn');
+    if (store.get('adminWrong', 0) >= 5) return fail(429, 'Bạn đã nhập sai tối đa 5 lần. Hãy đăng nhập lại.');
     if (Date.now() < store.get('adminResendAt', 0)) return fail(429, 'Vui lòng đợi đủ 60 giây trước khi gửi lại mã.');
-    store.set('adminPendingAt', Date.now()); store.set('adminResendAt', Date.now() + 60000); store.set('adminWrong', 0);
+    store.set('adminPendingAt', Date.now()); store.set('adminResendAt', Date.now() + 60000);
     return ok({}, 'Đã gửi lại mã OTP');
   }
   if (route === '/admin/auth/me') return store.get('adminAuth', false) ? ok({ admin: true }) : fail(401, 'Chưa đăng nhập quản trị');
