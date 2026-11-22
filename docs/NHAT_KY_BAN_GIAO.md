@@ -5,3 +5,9 @@
 - **File:** `frontend/can-han.html`, `frontend/assets/js/pages/near-expiry.js`, `frontend/assets/js/components/product-card.js`, `frontend/assets/css/customer.css`, `docs/FRONTEND_CHO_BACKEND.md`.
 - **API backend cần có:** `GET /products?near_expiry=1&sort=hsd&per_page=20`; mỗi sản phẩm trả `near_expiry_days`, `hsd`, `phan_tram_giam`, `so_luong_ton`. Chi tiết tại mục YC2 — Trang cận hạn trong tài liệu bàn giao.
 - **Tự kiểm tra:** mở `/frontend/can-han.html`, kiểm tra 8 sản phẩm được xếp theo ngày gần nhất, chọn các chip hạn dùng, và thử ở 360px, 768px, 1280px.
+
+## 2026-11-22 — Giỏ hàng và phí giao hàng (A7)
+
+- **File:** `frontend/gio-hang.html`, `frontend/thanh-toan.html`, `frontend/assets/js/pages/cart.js`, `frontend/assets/js/components/delivery-modal.js`, `frontend/assets/js/core/mock.js`, `frontend/assets/css/customer.css`, `docs/FRONTEND_CHO_BACKEND.md`.
+- **API backend cần có:** `GET /cart`, `PUT /cart/items/{id}`, `DELETE /cart/items/{id}`, `DELETE /cart`; địa chỉ giao hàng cần có `distance_km` hoặc API trả phí vận chuyển. Chi tiết dữ liệu tại mục YC2 — Giỏ hàng trong tài liệu bàn giao.
+- **Tự kiểm tra:** mở `/frontend/gio-hang.html`; kiểm tra tăng/giảm, giới hạn tồn kho, xóa món/giỏ có xác nhận, chọn giao hàng/nhận tại cửa hàng, phí ship và điều kiện đơn tối thiểu.

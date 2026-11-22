@@ -136,12 +136,14 @@ function cartData() {
   try { delivery = JSON.parse(localStorage.getItem('ms_delivery') || 'null'); } catch { delivery = null; }
   const fulfillment = localStorage.getItem('ms_fulfillment') || 'delivery';
   const distance = Number(delivery?.distance_km);
-  const phi_ship_tam_tinh = fulfillment === 'pickup' || tam_tinh - giam_gia >= 150000 || distance <= 2.5
-    ? 0
-    : tam_tinh - giam_gia >= 50000 && Number.isFinite(distance) ? 15000 : 0;
+  let phi_ship_tam_tinh = null;
+  if (fulfillment === 'pickup' || tam_tinh - giam_gia >= 150000) phi_ship_tam_tinh = 0;
+  else if (Number.isFinite(distance)) {
+    phi_ship_tam_tinh = distance <= 2.5 ? 0 : tam_tinh - giam_gia >= 50000 ? 15000 : 0;
+  }
   return {
     items, count: items.reduce((sum, item) => sum + item.so_luong, 0),
-    tam_tinh, giam_gia, phi_ship_tam_tinh, tong: tongSauGiam + phi_ship_tam_tinh,
+    tam_tinh, giam_gia, phi_ship_tam_tinh, tong: tongSauGiam + (phi_ship_tam_tinh ?? 0),
   };
 }
 const fridayProgram = () => {
@@ -229,9 +231,11 @@ export async function handle(method, path, body = {}) {
   if (route === '/locations/districts') return ok(params.get('province') === 'quang-binh' ? [{ id: 'dong-hoi', ten: 'TP. Đồng Hới' }, { id: 'bo-trach', ten: 'Huyện Bố Trạch' }] : [{ id: 'dong-ha', ten: 'TP. Đông Hà' }]);
   if (route === '/locations/wards') {
     const wards = params.get('district') === 'dong-hoi'
-      ? ['Nam Lý', 'Đồng Phú', 'Hải Thành', 'Bắc Lý']
-      : ['Phú Hải', 'Lộc Ninh', 'Bảo Ninh'];
-    return ok(wards.map((ten) => ({ id: ten.toLowerCase().replace(/\s/g, '-'), ten })));
+      ? [['Nam Lý', 2.1], ['Đồng Phú', 1.4], ['Hải Thành', 2.4], ['Bắc Lý', 3.2]]
+      : [['Phú Hải', null], ['Lộc Ninh', null], ['Bảo Ninh', null]];
+    return ok(wards.map(([ten, distance_km]) => ({
+      id: ten.toLowerCase().replace(/\s/g, '-'), ten, distance_km,
+    })));
   }
   if (route === '/cart' && method === 'GET') return ok(cartData());
   if (route === '/cart/items' && method === 'POST') {
