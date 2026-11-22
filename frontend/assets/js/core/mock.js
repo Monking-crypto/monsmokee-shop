@@ -82,7 +82,7 @@ const PRODUCTS = SEEDS.map(([ten_san_pham, nhom_con, huong_vi, dong_goi, gia_ban
   return {
     id: i + 1, danh_muc_id, ten_san_pham, nhom_con, huong_vi, dong_goi,
     don_vi_tinh: dong_goi.toLowerCase(), gia_ban, gia_hieu_luc: phan_tram_giam ? Math.round(gia_ban * .95 / 500) * 500 : gia_ban,
-    phan_tram_giam, so_luong_ton: i % 13 === 4 ? 0 : 12 + (i * 7) % 70, luot_ban: 18 + (i * 11) % 100,
+    phan_tram_giam, so_luong_ton: i % 13 === 4 ? 0 : 12 + (i * 7) % 70, luot_ban: 120 + (i * 37) % 1880,
     hinh_anh: 'assets/img/placeholder-product.svg', trang_thai: 'dang_ban',
   };
 });

@@ -72,3 +72,8 @@ Thêm các trường sản phẩm `nhom_con`, `huong_vi`, `dong_goi` vào schema
 - Hỗ trợ `POST /cart/items` (body `{san_pham_id, so_luong}`), `PUT /cart/items/{id}` (body `{so_luong}`), `DELETE /cart/items/{id}` và `DELETE /cart`. Trả envelope API chuẩn; PUT/DELETE trả lại dữ liệu giỏ để frontend cập nhật.
 - Phí giao hàng: 0đ nếu giá trị hàng sau giảm ≥150.000đ hoặc khoảng cách ≤2,5km; 15.000đ nếu giá trị hàng sau giảm từ 50.000đ đến dưới 150.000đ và xa hơn 2,5km; nhận tại cửa hàng 0đ. Dưới 50.000đ không cho đặt giao hàng.
 - Trả `distance_km` cho địa chỉ giao hàng đã chọn (hoặc trả phí giao hàng đã tính trong `GET /cart`). Dữ liệu mẫu hiện dùng khoảng cách ước tính theo phường; backend cần tính khoảng cách thực từ địa chỉ đến cửa hàng.
+
+## YC2 — Bảng xếp hạng bán chạy (A8)
+
+- Trang `ban-chay.html` gọi `GET /products?sort=best&per_page=20&page={n}`; thêm `category={slug}` khi lọc danh mục.
+- Sắp xếp theo `luot_ban` giảm dần và trả `total`, `page`, `per_page`; mỗi sản phẩm phải có `luot_ban` là số nguyên.

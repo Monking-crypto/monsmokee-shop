@@ -45,7 +45,7 @@ export function productCard(product, options = {}) {
 
 function compactCount(value) {
   const count = Number(value) || 0;
-  return count >= 1000 ? `${(count / 1000).toFixed(1).replace(/\.0$/, '')}k` : String(count);
+  return count >= 1000 ? `${(count / 1000).toLocaleString('vi-VN', { maximumFractionDigits: 1 })}k` : String(count);
 }
 
 export const productSkeletons = (count = 5) => Array.from({ length: count }, () =>
