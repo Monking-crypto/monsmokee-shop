@@ -40,3 +40,10 @@ Thêm các trường sản phẩm `nhom_con`, `huong_vi`, `dong_goi` vào schema
 - Tải ảnh sản phẩm: `POST /admin/uploads/product-image` (JPG/PNG/WebP, tối đa 2MB).
 - Siêu sale: `/home` trả `friday_sale.products` rỗng ngoài Thứ 6 theo múi giờ `Asia/Ho_Chi_Minh`; cung cấp API quản trị để bật/tắt chương trình và chọn tối đa 10 sản phẩm.
 - Địa giới giao hàng: `GET /locations/provinces`, `GET /locations/districts?province=...`, `GET /locations/wards?district=...`. Trả danh sách địa giới cập nhật theo dữ liệu thực tế; khu vực giao hiện tại giới hạn nội thành Đồng Hới.
+
+## YC2 — Trang cận hạn (A5)
+
+- Trang `can-han.html` gọi `GET /products?near_expiry=1&sort=hsd&per_page=20`.
+- Chỉ trả sản phẩm đang bán, chưa hết hạn, còn hạn từ 1 đến 10 ngày; mỗi sản phẩm có `near_expiry_days`, `hsd` (ngày `YYYY-MM-DD`), `phan_tram_giam: 50` và `so_luong_ton`.
+- Sắp xếp `near_expiry_days` tăng dần. Ngày HSD chỉ được hiển thị tại trang cận hạn và khối cận hạn trên trang chủ.
+- Dữ liệu sản phẩm mẫu cận hạn cần ít nhất 8 sản phẩm, hạn tự dịch theo ngày hiện tại.

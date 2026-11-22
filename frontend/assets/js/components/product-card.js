@@ -17,6 +17,9 @@ export function productCard(product, options = {}) {
   const urgency = options.nearExpiry
     ? `<span class="expiry-days expiry-days--${product.near_expiry_days <= 3 ? 'urgent' : product.near_expiry_days <= 7 ? 'soon' : 'later'}">Còn ${Number(product.near_expiry_days)} ngày</span>`
     : '';
+  const stock = options.showStock
+    ? `<span class="pc__stock">${out ? 'Hết hàng' : `Còn ${Number(product.so_luong_ton)} sản phẩm`}</span>`
+    : '';
   const rank = options.rank
     ? `<span class="best-rank${options.rank <= 3 ? ' best-rank--top' : ''}" aria-label="Hạng ${options.rank}">${options.rank}</span>`
     : '';
@@ -32,6 +35,7 @@ export function productCard(product, options = {}) {
       ${urgency}
       <span class="pc__unit">${escapeHtml(product.don_vi_tinh || '')}</span>
       ${options.showHsd && product.hsd ? `<span class="pc__hsd">HSD: ${formatDate(product.hsd)}</span>` : ''}
+      ${stock}
       ${sold}
       <div class="pc__foot">
         <div class="shelf-tag${sale ? ' is-sale' : ''}"><span class="shelf-tag__price">${formatVnd(price)}</span>${sale ? `<s class="shelf-tag__old">${formatVnd(product.gia_ban)}</s>` : ''}</div>
