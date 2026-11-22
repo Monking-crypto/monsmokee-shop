@@ -1,7 +1,31 @@
 <!doctype html>
-<html lang='vi'>
-<head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'><title>login - MON SMOKEE</title></head>
-<body>
-<!-- STUB: frontend/admin/login.html. Giai đoạn tiếp theo sẽ bổ sung giao diện và JavaScript ES Module. -->
+<html lang="vi">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Đăng nhập quản trị - MON SMOKEE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/variables.css"><link rel="stylesheet" href="../assets/css/base.css"><link rel="stylesheet" href="../assets/css/components.css"><link rel="stylesheet" href="../assets/css/auth.css"><link rel="stylesheet" href="../assets/css/admin.css">
+</head>
+<body class="admin-login-page">
+<main class="admin-login">
+  <a class="admin-login__brand" href="../index.html"><img src="../assets/img/logo.svg" alt="MON SMOKEE"></a>
+  <p class="admin-login__eyebrow">KHU VỰC QUẢN TRỊ</p>
+  <h1>Đăng nhập quản trị</h1>
+  <div id="admin-login-alert" class="auth__alert auth__alert--error" role="alert" hidden></div>
+  <form id="admin-login-form">
+    <label for="admin-phone">Số điện thoại</label><input id="admin-phone" type="tel" inputmode="numeric" autocomplete="username" required pattern="0[0-9]{9}" maxlength="10">
+    <label for="admin-password">Mật khẩu</label><input id="admin-password" type="password" autocomplete="current-password" required>
+    <button id="admin-login-submit" class="ms-btn ms-btn--green ms-btn--block" type="submit">Tiếp tục</button>
+  </form>
+  <section id="admin-otp-step" hidden>
+    <p class="admin-login__hint">Mã xác thực 6 số đã gửi tới <strong id="admin-otp-email"></strong>.</p>
+    <div id="admin-otp"></div><p id="admin-otp-error" class="field__error" role="alert"></p>
+    <div class="otp-meta"><span>Hết hạn sau <b id="admin-otp-ttl">05:00</b></span>
+      <span><button id="admin-otp-resend" class="link-btn" type="button" disabled>Gửi lại</button> <b id="admin-resend-wait"></b></span></div>
+    <button id="admin-otp-verify" class="ms-btn ms-btn--green ms-btn--block admin-login__verify" type="button">Xác thực và đăng nhập</button>
+  </section>
+</main>
+<script type="module" src="../assets/js/admin/admin-login.js"></script>
 </body>
 </html>
