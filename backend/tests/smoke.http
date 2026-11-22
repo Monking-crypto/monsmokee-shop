@@ -1,17 +1,21 @@
-### MON SMOKEE smoke test - Bước 2 hạ tầng
+### MON SMOKEE smoke test - Đăng ký bước 1
+# Thay số điện thoại/email bằng giá trị chưa có trong CSDL trước khi gửi.
+@testPhone = 0987654321
+@testEmail = thay-email-bang-dia-chi-that@example.com
 
-### 1. Lấy CSRF token
+### Lấy CSRF token
+# @name getCsrf
 GET http://localhost/monsmokee/backend/public/api/csrf
 
-### 2. POST không gửi CSRF - mong đợi 403
-POST http://localhost/monsmokee/backend/public/api/auth/login
+### Đăng ký bước 1 - OTP sẽ nằm trong backend/storage/mail_outbox
+POST http://localhost/monsmokee/backend/public/api/auth/register/start
 Content-Type: application/json
+X-CSRF-Token: {{getCsrf.response.body.data.csrf_token}}
 
-{}
-
-### 3. POST có CSRF - backend bước auth chưa làm nên mong đợi 501
-POST http://localhost/monsmokee/backend/public/api/auth/login
-Content-Type: application/json
-X-CSRF-Token: paste-token-tu-cau-1
-
-{}
+{
+  "ho_ten": "Nguyen Van Test",
+  "so_dien_thoai": "{{testPhone}}",
+  "email": "{{testEmail}}",
+  "mat_khau": "abc12345",
+  "nhap_lai_mat_khau": "abc12345"
+}

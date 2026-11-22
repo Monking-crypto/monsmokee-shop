@@ -46,7 +46,7 @@ final class OtpService
         $latest = $this->pdo->prepare(
             'SELECT TIMESTAMPDIFF(SECOND, ngay_tao, NOW()) AS elapsed_seconds
              FROM otp_xac_thuc
-             WHERE email = ? AND muc_dich = ? AND da_su_dung = 0
+             WHERE email = ? AND muc_dich = ?
              ORDER BY id DESC LIMIT 1'
         );
         $latest->execute([$email, $purpose]);
