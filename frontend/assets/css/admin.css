@@ -1,1 +1,144 @@
-/* frontend/assets/css/admin.css - khung CSS Giai đoạn frontend. */
+/* admin.css - giao diện khu vực quản trị */
+.admin-shell{min-height:100vh}
+.admin-sidebar{position:fixed;z-index:1100;inset:0 auto 0 0;width:256px;padding:18px 12px;background:var(--admin-sidebar);color:#e8f4ec;overflow-y:auto;transition:transform .2s,width .2s}
+.admin-brand{display:flex;align-items:center;gap:12px;padding:8px 10px 22px;color:#fff;font-size:var(--fs-xs);font-weight:800;letter-spacing:.08em}
+.admin-brand:hover{text-decoration:none}
+.admin-brand img{width:142px;height:34px;object-fit:contain;object-position:left;filter:brightness(0) invert(1)}
+.admin-sidebar nav ul{display:grid;gap:4px;margin:0;padding:0;list-style:none}
+.admin-sidebar nav a{display:flex;align-items:center;gap:12px;min-height:44px;padding:0 12px;border-radius:var(--ms-radius-sm);color:#c4d2c8;font-size:var(--fs-sm);font-weight:600}
+.admin-sidebar nav a i{width:20px;text-align:center;font-size:1.1rem}
+.admin-sidebar nav a:hover,.admin-sidebar nav a.is-active{background:#263b2d;color:#fff;text-decoration:none}
+.admin-sidebar nav a.is-active{box-shadow:inset 3px 0 var(--admin-accent)}
+.admin-nav-group__toggle{display:flex;align-items:center;gap:12px;width:100%;min-height:44px;padding:0 12px;border:0;border-radius:var(--ms-radius-sm);background:none;color:#c4d2c8;font:inherit;font-size:var(--fs-sm);font-weight:600;text-align:left;cursor:pointer}
+.admin-nav-group__toggle>i:first-child{width:20px;text-align:center;font-size:1.1rem}
+.admin-nav-group__toggle:hover,.admin-nav-group__toggle.is-active{background:#263b2d;color:#fff}
+.admin-nav-group__chevron{margin-left:auto;font-size:var(--fs-xs)!important;transition:transform .15s}
+.admin-nav-group__toggle[aria-expanded="true"] .admin-nav-group__chevron{transform:rotate(180deg)}
+.admin-subnav{display:grid;gap:2px;margin:2px 0 6px 28px;padding:0;list-style:none}
+.admin-subnav[hidden]{display:none}
+.admin-subnav a{min-height:38px;padding-left:14px;font-size:var(--fs-xs)!important}
+.admin-main{min-height:100vh;margin-left:256px;transition:margin .2s}
+.admin-topbar{position:sticky;z-index:100;top:0;display:flex;align-items:center;gap:14px;min-height:76px;padding:12px 24px;background:#fff;border-bottom:1px solid var(--ms-border)}
+.admin-topbar h1{font-size:var(--fs-lg);font-weight:800}
+.admin-topbar p{margin-top:3px;color:var(--ms-muted);font-size:var(--fs-xs)}
+.admin-role{margin-left:auto;padding:6px 10px;border-radius:var(--ms-radius-pill);background:var(--ms-green-soft);color:var(--ms-green-dark);font-size:var(--fs-xs);font-weight:700;white-space:nowrap}
+.admin-icon-btn{width:42px;height:42px;border:0;border-radius:var(--ms-radius-sm);background:transparent;color:var(--ms-text);font-size:1.5rem;cursor:pointer}
+.admin-icon-btn:hover{background:var(--ms-bg)}
+.admin-logout{display:flex;align-items:center;gap:7px;min-height:40px;padding:0 10px;border:1px solid var(--ms-border);border-radius:var(--ms-radius-sm);background:#fff;color:var(--ms-text);font:inherit;font-size:var(--fs-sm);font-weight:600;cursor:pointer}
+.admin-logout:hover{border-color:var(--ms-red);color:var(--ms-red)}
+.admin-content{max-width:1600px;margin:auto;padding:24px}
+.admin-breadcrumb{margin-bottom:18px;color:var(--ms-muted);font-size:var(--fs-sm)}
+.admin-breadcrumb span{padding:0 7px;color:var(--ms-border)}
+.admin-scrim{display:none}
+.admin-sidebar.is-collapsed{width:76px}
+.admin-sidebar.is-collapsed .admin-brand{justify-content:center;padding-inline:0}
+.admin-sidebar.is-collapsed .admin-brand img{width:40px}
+.admin-sidebar.is-collapsed .admin-brand span,.admin-sidebar.is-collapsed nav a span{display:none}
+.admin-sidebar.is-collapsed nav a{justify-content:center;padding:0}
+.admin-sidebar.is-collapsed .admin-nav-group__toggle{justify-content:center;padding:0}
+.admin-sidebar.is-collapsed .admin-nav-group__toggle span,.admin-sidebar.is-collapsed .admin-nav-group__chevron,.admin-sidebar.is-collapsed .admin-subnav{display:none}
+.admin-shell.is-collapsed .admin-main{margin-left:76px}
+
+/* Trang đang phát triển */
+.admin-placeholder{max-width:760px;margin:8vh auto;padding:36px 28px;background:#fff;border:1px solid var(--ms-border);border-radius:var(--ms-radius);text-align:center}
+.admin-placeholder>i{font-size:2rem;color:var(--ms-green)}
+.admin-placeholder h2{margin:8px 0;font-size:var(--fs-xl)}
+.admin-placeholder p{color:var(--ms-muted)}
+.admin-placeholder ol{max-width:520px;margin:18px auto 0;padding-left:22px;text-align:left;line-height:1.9}
+
+/* Bảng, bộ lọc và trạng thái */
+.admin-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.admin-filters{display:flex;flex-wrap:wrap;gap:8px}
+.admin-filters input,.admin-filters select{min-width:170px;height:42px;padding:0 10px;border:1px solid var(--ms-border);border-radius:var(--ms-radius-sm);background:#fff;font:inherit;font-size:var(--fs-sm)}
+.admin-bulkbar{display:flex;align-items:center;gap:12px;min-height:44px;margin-bottom:10px;font-size:var(--fs-sm)}
+.admin-bulkbar label{display:flex;align-items:center;gap:8px}
+.admin-bulkbar input,.admin-table input[type=checkbox]{width:17px;height:17px;accent-color:var(--ms-green)}
+.admin-button{min-height:36px;padding:0 11px;border:1px solid var(--ms-border);border-radius:var(--ms-radius-sm);background:#fff;color:var(--ms-text);font:inherit;font-size:var(--fs-xs);font-weight:600;cursor:pointer}
+.admin-button:hover:not(:disabled){border-color:var(--ms-green);color:var(--ms-green-dark)}
+.admin-button:disabled{opacity:.5;cursor:not-allowed}
+.admin-button--danger{color:#a6231f}
+.admin-button--danger:hover:not(:disabled){border-color:var(--ms-red);color:var(--ms-red)}
+.admin-table-scroll{overflow:auto;border:1px solid var(--ms-border);border-radius:var(--ms-radius);background:#fff}
+.admin-table{width:100%;border-collapse:collapse;font-size:var(--fs-sm)}
+.admin-table th,.admin-table td{padding:10px 12px;border-bottom:1px solid var(--ms-border);text-align:left;white-space:nowrap}
+.admin-table th{background:#f7faf8;color:#526259;font-size:var(--fs-xs)}
+.admin-table tbody tr:last-child td{border-bottom:0}
+.admin-product-thumb{width:48px;height:48px;object-fit:contain;border-radius:6px;background:var(--ms-green-soft)}
+.admin-table-actions{display:flex;gap:6px}
+.admin-status{display:inline-flex;padding:4px 8px;border-radius:var(--ms-radius-pill);background:var(--ms-green-soft);color:var(--ms-green-dark);font-size:var(--fs-xs);font-weight:700}
+.admin-status.is-hidden{background:#eef0ef;color:#67736b}
+.admin-pagination{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:12px;color:var(--ms-muted);font-size:var(--fs-sm)}
+.admin-table-skeleton{height:420px;border-radius:var(--ms-radius);background:linear-gradient(90deg,#e9eeea 25%,#f4f7f5 50%,#e9eeea 75%);background-size:200% 100%;animation:ms-shimmer 1.4s infinite}
+
+/* Biểu mẫu sản phẩm */
+.admin-modal{position:fixed;z-index:1300;inset:0;display:grid;place-items:center;padding:14px}
+.admin-modal[hidden]{display:none}
+.admin-modal__scrim{position:absolute;inset:0;background:rgba(15,25,20,.55)}
+.admin-modal__panel{position:relative;width:min(760px,100%);max-height:94vh;overflow:auto;padding:24px;background:#fff;border-radius:var(--ms-radius);box-shadow:var(--ms-shadow)}
+.admin-modal__panel h2{margin:0 36px 18px 0;font-size:var(--fs-lg)}
+.admin-modal__close{position:absolute;right:16px;top:12px;width:36px;height:36px;border:0;background:none;font-size:25px;cursor:pointer}
+.admin-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 16px}
+.admin-field{display:grid;align-content:start;gap:5px;font-size:var(--fs-sm);font-weight:600}
+.admin-field input:not([type=checkbox]),.admin-field select,.admin-field textarea{width:100%;min-height:42px;padding:8px 10px;border:1px solid var(--ms-border);border-radius:var(--ms-radius-sm);background:#fff;font:inherit;font-size:var(--fs-sm)}
+.admin-field textarea{resize:vertical}
+.admin-field small{min-height:14px;color:var(--ms-red);font-size:var(--fs-xs);font-weight:400}
+.admin-field--wide{grid-column:1/-1}
+.admin-field--toggle{display:flex;align-items:center;gap:9px}
+.admin-field--toggle input{width:18px;height:18px;accent-color:var(--ms-green)}
+.admin-image-preview{width:100px;height:100px;margin-top:5px;object-fit:contain;background:var(--ms-bg);border-radius:var(--ms-radius-sm)}
+.admin-modal__actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+
+/* Khuyến mãi */
+.admin-promo-card{padding:18px;background:#fff;border:1px solid var(--ms-border);border-radius:var(--ms-radius)}
+.admin-promo-head{display:flex;justify-content:space-between;gap:18px;padding-bottom:16px}
+.admin-promo-head h2{font-size:var(--fs-lg)}
+.admin-promo-head p{margin-top:6px;color:var(--ms-muted);font-size:var(--fs-sm)}
+.admin-eyebrow{color:var(--ms-green-dark)!important;font-size:var(--fs-xs)!important;font-weight:800;letter-spacing:.08em}
+.admin-switch{display:flex;align-items:center;gap:8px;white-space:nowrap;font-size:var(--fs-sm);font-weight:600}
+.admin-switch input{width:18px;height:18px;accent-color:var(--ms-green)}
+.admin-promo-actions{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.admin-promo-actions span{margin-left:auto;color:var(--ms-muted);font-size:var(--fs-sm)}
+
+/* Đăng nhập quản trị */
+.admin-login-page{display:grid;min-height:100vh;place-items:center;padding:20px;background:linear-gradient(145deg,#101d17,#193a28);color:#eef8f0}
+.admin-login{width:min(440px,100%);padding:30px;background:#fff;border-radius:var(--ms-radius);color:var(--ms-text);box-shadow:0 18px 60px rgba(0,0,0,.24)}
+.admin-login__brand{display:inline-block;margin-bottom:20px}
+.admin-login__brand img{width:170px;height:42px;object-fit:contain;object-position:left}
+.admin-login__eyebrow{margin-bottom:6px;color:var(--ms-green-dark);font-size:var(--fs-xs);font-weight:800;letter-spacing:.1em}
+.admin-login h1{margin-bottom:20px;font-size:var(--fs-xl)}
+.admin-login form{display:grid;gap:8px}
+.admin-login form label{margin-top:8px;font-size:var(--fs-sm);font-weight:600}
+.admin-login form input{height:46px;padding:0 12px;border:1px solid var(--ms-border);border-radius:var(--ms-radius-sm);font:inherit}
+.admin-login form button{margin-top:14px}
+.admin-login__hint{margin:8px 0 14px;color:var(--ms-muted);font-size:var(--fs-sm)}
+.admin-login .otp{margin-block:14px}
+.admin-login__verify{margin-top:16px}
+
+@media(max-width:900px){
+  .admin-sidebar{transform:translateX(-100%);width:280px}
+  .admin-sidebar.is-open{transform:translateX(0)}
+  .admin-main,.admin-shell.is-collapsed .admin-main{margin-left:0}
+  .admin-scrim.is-visible{position:fixed;z-index:1050;inset:0;display:block;background:rgba(0,0,0,.4)}
+  .admin-sidebar.is-collapsed{width:280px}
+  .admin-sidebar.is-collapsed .admin-brand{justify-content:flex-start;padding:8px 10px 22px}
+  .admin-sidebar.is-collapsed .admin-brand span,.admin-sidebar.is-collapsed nav a span{display:inline}
+  .admin-sidebar.is-collapsed nav a{justify-content:flex-start;padding:0 12px}
+}
+@media(max-width:640px){
+  .admin-topbar{gap:8px;padding:10px 12px}
+  .admin-topbar h1{font-size:var(--fs-md)}
+  .admin-role{display:none}
+  .admin-logout{padding:0 8px;font-size:0}
+  .admin-logout i{font-size:1rem}
+  .admin-content{padding:16px 12px}
+  .admin-toolbar{align-items:stretch;flex-direction:column}
+  .admin-toolbar>.ms-btn{width:100%}
+  .admin-filters>*{flex:1 1 45%;min-width:0!important}
+  .admin-bulkbar{flex-wrap:wrap}
+  .admin-form-grid{grid-template-columns:1fr}
+  .admin-field--wide{grid-column:auto}
+  .admin-modal__panel{padding:20px 16px}
+  .admin-promo-head{flex-direction:column}
+  .admin-promo-actions{flex-wrap:wrap}
+  .admin-promo-actions span{width:100%;margin-left:0}
+}
