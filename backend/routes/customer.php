@@ -1,9 +1,23 @@
 <?php
 declare(strict_types=1);
 
-/**
- * Khung customer | backend/routes/customer.php
- * TRẠNG THÁI: CHƯA CODE (STUB) hoặc hạ tầng Giai đoạn tiếp theo
- * Quy tắc: dùng PDO prepared statements, Transaction khi cần, Response JSON thống nhất.
- * TODO: triển khai theo use case trong docs/MA_TRAN_USECASE.md và mục 9 của prompt.
- */
+/** @var Router $router */
+$router->get('/api/csrf', static function (Request $request): void {
+    Response::success('CSRF token', [
+        'csrf_token' => Csrf::token(),
+    ]);
+});
+
+$customerMutations = [
+    '/api/auth/register/start',
+    '/api/auth/register/verify',
+    '/api/auth/otp/resend',
+    '/api/auth/login',
+    '/api/auth/logout',
+];
+
+foreach ($customerMutations as $path) {
+    $router->post($path, static function (Request $request): void {
+        Response::notImplemented('Tính năng đang được phát triển');
+    }, [static fn(Request $request): bool => CsrfMiddleware::handle($request)]);
+}

@@ -2,8 +2,27 @@
 declare(strict_types=1);
 
 /**
- * Khung Csrf | backend/core/Csrf.php
- * TRẠNG THÁI: CHƯA CODE (STUB) hoặc hạ tầng Giai đoạn tiếp theo
- * Quy tắc: dùng PDO prepared statements, Transaction khi cần, Response JSON thống nhất.
- * TODO: triển khai theo use case trong docs/MA_TRAN_USECASE.md và mục 9 của prompt.
+ * Tạo và xác thực token CSRF lưu trong phiên.
  */
+final class Csrf
+{
+    private const SESSION_KEY = 'csrf_token';
+
+    public static function token(): string
+    {
+        $token = Session::get(self::SESSION_KEY);
+        if (!is_string($token) || $token === '') {
+            $token = bin2hex(random_bytes(32));
+            Session::set(self::SESSION_KEY, $token);
+        }
+        return $token;
+    }
+
+    public static function validate(?string $token): bool
+    {
+        $sessionToken = Session::get(self::SESSION_KEY);
+        return is_string($sessionToken)
+            && is_string($token)
+            && hash_equals($sessionToken, $token);
+    }
+}

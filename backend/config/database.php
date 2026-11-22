@@ -1,9 +1,12 @@
 <?php
 declare(strict_types=1);
 
-/**
- * Khung database | backend/config/database.php
- * TRẠNG THÁI: CHƯA CODE (STUB) hoặc hạ tầng Giai đoạn tiếp theo
- * Quy tắc: dùng PDO prepared statements, Transaction khi cần, Response JSON thống nhất.
- * TODO: triển khai theo use case trong docs/MA_TRAN_USECASE.md và mục 9 của prompt.
- */
+$env = Env::load(__DIR__ . '/../.env');
+
+return [
+    'host' => (string) ($env['DB_HOST'] ?? '127.0.0.1'),
+    'port' => (string) ($env['DB_PORT'] ?? '3306'),
+    'name' => (string) ($env['DB_NAME'] ?? 'monsmokee'),
+    'user' => (string) ($env['DB_USER'] ?? 'root'),
+    'pass' => (string) ($env['DB_PASS'] ?? ''),
+];

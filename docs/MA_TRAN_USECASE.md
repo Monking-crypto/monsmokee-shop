@@ -14,3 +14,4 @@
 | UC10 | CustomerAdminController.php | /api/admin/customers | STUB |
 | UC11/QT15 | StatisticsController.php | /api/admin/statistics | STUB |
 | UC12/QT13 | PromotionAdminController.php | /api/admin/promotions | STUB |
+| Hạ tầng API | Env, Database, Request, Response, Router, Session, CSRF, Validator | /api/csrf | DONE |

@@ -2,8 +2,21 @@
 declare(strict_types=1);
 
 /**
- * Khung CsrfMiddleware | backend/app/Middleware/CsrfMiddleware.php
- * TRẠNG THÁI: CHƯA CODE (STUB) hoặc hạ tầng Giai đoạn tiếp theo
- * Quy tắc: dùng PDO prepared statements, Transaction khi cần, Response JSON thống nhất.
- * TODO: triển khai theo use case trong docs/MA_TRAN_USECASE.md và mục 9 của prompt.
+ * Kiểm tra CSRF cho mọi POST/PUT/PATCH/DELETE.
  */
+final class CsrfMiddleware
+{
+    public static function handle(Request $request): bool
+    {
+        if (!in_array($request->method, ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
+            return true;
+        }
+
+        $token = $request->header('X-CSRF-Token');
+        if (!is_string($token) || !Csrf::validate($token)) {
+            Response::error('CSRF token không hợp lệ', 403);
+            return false;
+        }
+        return true;
+    }
+}

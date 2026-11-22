@@ -1,9 +1,17 @@
 <?php
 declare(strict_types=1);
 
-/**
- * Khung app | backend/config/app.php
- * TRẠNG THÁI: CHƯA CODE (STUB) hoặc hạ tầng Giai đoạn tiếp theo
- * Quy tắc: dùng PDO prepared statements, Transaction khi cần, Response JSON thống nhất.
- * TODO: triển khai theo use case trong docs/MA_TRAN_USECASE.md và mục 9 của prompt.
- */
+$env = Env::load(__DIR__ . '/../.env');
+
+$appUrl = rtrim((string) ($env['APP_URL'] ?? 'http://localhost/monsmokee'), '/');
+
+return [
+    'env' => (string) ($env['APP_ENV'] ?? 'development'),
+    'url' => $appUrl,
+    'debug' => filter_var($env['APP_DEBUG'] ?? false, FILTER_VALIDATE_BOOLEAN),
+    'timezone' => (string) ($env['TIMEZONE'] ?? 'Asia/Ho_Chi_Minh'),
+    'session' => [
+        'name' => (string) ($env['SESSION_NAME'] ?? 'MONSMOKEESID'),
+        'secure' => str_starts_with($appUrl, 'https://'),
+    ],
+];
