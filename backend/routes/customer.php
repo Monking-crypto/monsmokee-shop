@@ -39,9 +39,13 @@ $router->post(
     [$authController, 'resendRegistrationOtp'],
     [static fn(Request $request): bool => CsrfMiddleware::handle($request)]
 );
+$router->post(
+    '/api/auth/login',
+    [$authController, 'login'],
+    [static fn(Request $request): bool => CsrfMiddleware::handle($request)]
+);
 
 $customerMutations = [
-    '/api/auth/login',
     '/api/auth/logout',
 ];
 

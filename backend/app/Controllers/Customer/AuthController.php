@@ -4,12 +4,14 @@ declare(strict_types=1);
 namespace App\Controllers\Customer;
 
 use App\Services\OtpService;
+use DateTimeImmutable;
 use PDO;
 use PDOException;
 use Request;
 use Response;
 use RuntimeException;
 use Session;
+use Throwable;
 use Validator;
 
 /**
@@ -17,6 +19,8 @@ use Validator;
  */
 final class AuthController
 {
+    private const DUMMY_PASSWORD_HASH = '$2y$10$QBEKRbHMcArA1dK/DR5XOe3KZG0KzC3.d6GF1L12rptaK2vR.uN3i';
+
     public function __construct(
         private PDO $pdo,
         private Validator $validator,
@@ -234,9 +238,174 @@ final class AuthController
             return;
         }
 
-        Session::regenerate();
-        Session::set('auth_user', $result['user']);
+        $this->startCustomerSession($result['user']);
         Response::success('Đăng ký thành công', ['user' => $result['user']], 201);
+    }
+
+    /**
+     * Đăng nhập khách hàng; mật khẩu chỉ được so sánh với hash đã lưu.
+     */
+    public function login(Request $request, array $params = []): void
+    {
+        $input = $request->all();
+        $phone = is_string($input['so_dien_thoai'] ?? null)
+            ? trim($input['so_dien_thoai'])
+            : '';
+        $password = is_string($input['mat_khau'] ?? null)
+            ? $input['mat_khau']
+            : '';
+        $errors = $this->validator->validate(
+            ['so_dien_thoai' => $phone, 'mat_khau' => $password],
+            ['so_dien_thoai' => ['required', 'phone'], 'mat_khau' => ['required']]
+        );
+        if ($errors !== []) {
+            Response::error('Dữ liệu đăng nhập không hợp lệ', 422, $errors);
+            return;
+        }
+
+        $maxFailures = (int) ($this->business['login']['max_fail'] ?? 5);
+        $windowSeconds = (int) ($this->business['login']['lock_minutes'] ?? 15) * 60;
+        $rateKey = 'customer_login:' . hash('sha256', $request->ip() . "\0" . $phone);
+
+        $this->pdo->beginTransaction();
+        try {
+            $createRateRow = $this->pdo->prepare(
+                'INSERT IGNORE INTO rate_limit (khoa, so_lan, bat_dau, khoa_den)
+                 VALUES (?, 0, NOW(), NULL)'
+            );
+            $createRateRow->execute([$rateKey]);
+
+            $rateQuery = $this->pdo->prepare(
+                'SELECT so_lan, bat_dau, khoa_den
+                 FROM rate_limit
+                 WHERE khoa = ?
+                 FOR UPDATE'
+            );
+            $rateQuery->execute([$rateKey]);
+            $rate = $rateQuery->fetch(PDO::FETCH_ASSOC);
+            if ($rate === false) {
+                throw new RuntimeException('Không thể đọc bộ đếm đăng nhập.');
+            }
+
+            $now = new DateTimeImmutable('now');
+            $windowStart = new DateTimeImmutable((string) $rate['bat_dau']);
+            $windowEnd = $windowStart->modify('+' . $windowSeconds . ' seconds');
+            $failureCount = (int) $rate['so_lan'];
+            if ($now >= $windowEnd) {
+                $failureCount = 0;
+                $windowStart = $now;
+                $windowEnd = $windowStart->modify('+' . $windowSeconds . ' seconds');
+            }
+
+            if ($failureCount >= $maxFailures) {
+                $retryAfter = max(1, $windowEnd->getTimestamp() - $now->getTimestamp());
+                $updateLock = $this->pdo->prepare(
+                    'UPDATE rate_limit SET khoa_den = ? WHERE khoa = ?'
+                );
+                $updateLock->execute([$windowEnd->format('Y-m-d H:i:s'), $rateKey]);
+                $this->pdo->commit();
+                $outcome = ['type' => 'rate_limited', 'retry_after' => $retryAfter];
+            } else {
+                if ((int) $rate['so_lan'] !== $failureCount) {
+                    $reset = $this->pdo->prepare(
+                        'UPDATE rate_limit
+                         SET so_lan = 0, bat_dau = ?, khoa_den = NULL
+                         WHERE khoa = ?'
+                    );
+                    $reset->execute([$windowStart->format('Y-m-d H:i:s'), $rateKey]);
+                }
+
+                $userQuery = $this->pdo->prepare(
+                    'SELECT u.id, u.vai_tro_id, u.ho_ten, u.so_dien_thoai, u.email,
+                            u.mat_khau, u.trang_thai, v.ten_vai_tro
+                     FROM nguoi_dung u
+                     JOIN vai_tro v ON v.id = u.vai_tro_id
+                     WHERE u.so_dien_thoai = ?
+                     LIMIT 1
+                     FOR UPDATE'
+                );
+                $userQuery->execute([$phone]);
+                $user = $userQuery->fetch(PDO::FETCH_ASSOC);
+                $hash = $user === false
+                    ? self::DUMMY_PASSWORD_HASH
+                    : (string) $user['mat_khau'];
+                $passwordMatches = password_verify($password, $hash);
+
+                if (
+                    $user === false
+                    || $user['ten_vai_tro'] !== 'Customer'
+                    || ((int) $user['trang_thai'] === 1 && !$passwordMatches)
+                ) {
+                    $failureCount++;
+                    $lockUntil = $failureCount >= $maxFailures
+                        ? $windowEnd->format('Y-m-d H:i:s')
+                        : null;
+                    $recordFailure = $this->pdo->prepare(
+                        'UPDATE rate_limit
+                         SET so_lan = ?, bat_dau = ?, khoa_den = ?
+                         WHERE khoa = ?'
+                    );
+                    $recordFailure->execute([
+                        $failureCount,
+                        $windowStart->format('Y-m-d H:i:s'),
+                        $lockUntil,
+                        $rateKey,
+                    ]);
+                    $this->pdo->commit();
+                    $outcome = ['type' => 'invalid_credentials'];
+                } elseif ((int) $user['trang_thai'] !== 1) {
+                    $this->pdo->commit();
+                    $outcome = ['type' => 'account_locked'];
+                } else {
+                    if (password_needs_rehash((string) $user['mat_khau'], PASSWORD_BCRYPT)) {
+                        $newHash = password_hash($password, PASSWORD_BCRYPT);
+                        $updatePassword = $this->pdo->prepare(
+                            'UPDATE nguoi_dung SET mat_khau = ? WHERE id = ?'
+                        );
+                        $updatePassword->execute([$newHash, (int) $user['id']]);
+                    }
+
+                    $clearFailures = $this->pdo->prepare('DELETE FROM rate_limit WHERE khoa = ?');
+                    $clearFailures->execute([$rateKey]);
+                    $this->pdo->commit();
+                    $outcome = [
+                        'type' => 'success',
+                        'user' => [
+                            'id' => (int) $user['id'],
+                            'ho_ten' => $user['ho_ten'],
+                            'so_dien_thoai' => $user['so_dien_thoai'],
+                            'email' => $user['email'],
+                            'vai_tro' => 'Customer',
+                        ],
+                    ];
+                }
+            }
+        } catch (Throwable $error) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $error;
+        }
+
+        if ($outcome['type'] === 'rate_limited') {
+            Response::error(
+                'Đã đăng nhập sai quá số lần cho phép, vui lòng thử lại sau',
+                429,
+                ['retry_after' => $outcome['retry_after']]
+            );
+            return;
+        }
+        if ($outcome['type'] === 'account_locked') {
+            Response::error('Tài khoản đã bị khóa', 403);
+            return;
+        }
+        if ($outcome['type'] !== 'success') {
+            Response::error('Số điện thoại hoặc mật khẩu không đúng', 401);
+            return;
+        }
+
+        $this->startCustomerSession($outcome['user']);
+        Response::success('Đăng nhập thành công', ['user' => $outcome['user']]);
     }
 
     /**
@@ -348,6 +517,14 @@ final class AuthController
         }
 
         Response::error('Mã OTP không hợp lệ hoặc đã được sử dụng', 422);
+    }
+
+    private function startCustomerSession(array $user): void
+    {
+        Session::regenerate();
+        Session::set('user_id', $user['id']);
+        Session::set('user_role', $user['vai_tro']);
+        Session::set('auth_user', $user);
     }
 
     private function maskEmail(string $email): string

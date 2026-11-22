@@ -1,8 +1,16 @@
 ### MON SMOKEE smoke test - Đăng ký khách hàng
-# Thay số điện thoại/email bằng giá trị chưa có trong CSDL trước khi gửi.
+# Đổi các giá trị test để tránh trùng dữ liệu đang có.
 @testPhone = 0987654321
+@testPassword = abc12345
 @testEmail = thay-email-bang-dia-chi-that@example.com
 @testOtp = thay-bang-6-so-trong-mail_outbox
+@wrongPassword = mat-khau-sai-de-test
+@unknownPhone = 0999999999
+# Chỉ thay hai biến dưới đây trong bộ nhớ của REST Client, không lưu/commit thông tin Admin vào file.
+@adminPhone = thay-bang-SDT-admin-tu-backend-env
+@adminPassword = thay-bang-mat-khau-admin-tu-backend-env
+# Dùng một SĐT hợp lệ chưa có tài khoản để thử giới hạn 6 lần.
+@throttlePhone = thay-bang-SDT-test-chua-dung
 
 ### Lấy CSRF token
 # @name getCsrf
@@ -16,10 +24,10 @@ X-CSRF-Token: {{getCsrf.response.body.data.csrf_token}}
 
 {
   "ho_ten": "Nguyen Van Test",
-  "so_dien_thoai": "0912345678",
-  "email": "1234@gmail.com",
-  "mat_khau": "abc12345",
-  "nhap_lai_mat_khau": "abc12345"
+  "so_dien_thoai": "{{testPhone}}",
+  "email": "{{testEmail}}",
+  "mat_khau": "{{testPassword}}",
+  "nhap_lai_mat_khau": "{{testPassword}}"
 }
 
 ### Gửi lại OTP đăng ký (chỉ thành công sau cooldown 60 giây)
@@ -39,4 +47,111 @@ X-CSRF-Token: {{getCsrf.response.body.data.csrf_token}}
 {
   "email": "{{testEmail}}",
   "otp": "{{testOtp}}"
+}
+
+### Đăng nhập đúng - dùng sau khi đăng ký/xác thực OTP thành công
+# @name customerLoginSuccess
+POST http://localhost/monsmokee/backend/public/api/auth/login
+Content-Type: application/json
+X-CSRF-Token: {{getCsrf.response.body.data.csrf_token}}
+
+{
+  "so_dien_thoai": "{{testPhone}}",
+  "mat_khau": "{{testPassword}}"
+}
+
+### Sai mật khẩu - phải giống response khi sai SĐT
+POST http://localhost/monsmokee/backend/public/api/auth/login
+Content-Type: application/json
+X-CSRF-Token: {{getCsrf.response.body.data.csrf_token}}
+
+{
+  "so_dien_thoai": "{{testPhone}}",
+  "mat_khau": "{{wrongPassword}}"
+}
+
+### SĐT không tồn tại
+POST http://localhost/monsmokee/backend/public/api/auth/login
+Content-Type: application/json
+X-CSRF-Token: {{getCsrf.response.body.data.csrf_token}}
+
+{
+  "so_dien_thoai": "{{unknownPhone}}",
+  "mat_khau": "{{testPassword}}"
+}
+
+### Tài khoản Admin - nhập biến cục bộ, không lưu thông tin thật vào file
+POST http://localhost/monsmokee/backend/public/api/auth/login
+Content-Type: application/json
+X-CSRF-Token: {{getCsrf.response.body.data.csrf_token}}
+
+{
+  "so_dien_thoai": "{{adminPhone}}",
+  "mat_khau": "{{adminPassword}}"
+}
+
+### Sáu lần sai liên tiếp - chạy lần lượt 1 đến 6; lần 6 phải trả 429
+# @name customerLoginFail1
+POST http://localhost/monsmokee/backend/public/api/auth/login
+Content-Type: application/json
+X-CSRF-Token: {{getCsrf.response.body.data.csrf_token}}
+
+{
+  "so_dien_thoai": "{{throttlePhone}}",
+  "mat_khau": "{{wrongPassword}}"
+}
+
+###
+# @name customerLoginFail2
+POST http://localhost/monsmokee/backend/public/api/auth/login
+Content-Type: application/json
+X-CSRF-Token: {{getCsrf.response.body.data.csrf_token}}
+
+{
+  "so_dien_thoai": "{{throttlePhone}}",
+  "mat_khau": "{{wrongPassword}}"
+}
+
+###
+# @name customerLoginFail3
+POST http://localhost/monsmokee/backend/public/api/auth/login
+Content-Type: application/json
+X-CSRF-Token: {{getCsrf.response.body.data.csrf_token}}
+
+{
+  "so_dien_thoai": "{{throttlePhone}}",
+  "mat_khau": "{{wrongPassword}}"
+}
+
+###
+# @name customerLoginFail4
+POST http://localhost/monsmokee/backend/public/api/auth/login
+Content-Type: application/json
+X-CSRF-Token: {{getCsrf.response.body.data.csrf_token}}
+
+{
+  "so_dien_thoai": "{{throttlePhone}}",
+  "mat_khau": "{{wrongPassword}}"
+}
+
+###
+# @name customerLoginFail5
+POST http://localhost/monsmokee/backend/public/api/auth/login
+Content-Type: application/json
+X-CSRF-Token: {{getCsrf.response.body.data.csrf_token}}
+
+{
+  "so_dien_thoai": "{{throttlePhone}}",
+  "mat_khau": "{{wrongPassword}}"
+}
+
+###
+# @name customerLoginFail6
+POST http://localhost/monsmokee/backend/public/api/auth/login
+Content-Type: application/json
+X-CSRF-Token: {{getCsrf.response.body.data.csrf_token}}
+
+{
+  "so_dien_thoai": "{{throttlePhone}}",
+  "mat_khau": "{{wrongPassword}}"
 }
