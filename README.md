@@ -11,30 +11,30 @@ Website tạp hóa MON SMOKEE xây dựng bằng PHP thuần, MySQL và Bootstra
 
 ## Cài đặt cho thành viên mới
 
-1. Cài XAMPP và Composer. Trong XAMPP, bật Apache và MySQL; bảo đảm Composer dùng PHP của XAMPP. Kiểm tra bằng `composer --version` và `C:\xampp\php\php.exe -v`.
-2. Đặt/cloning dự án vào `C:\xampp\htdocs\monsmokee`.
-3. Mở PowerShell/CMD tại thư mục dự án và cài dependency trong đúng thư mục backend:
+1. Cài XAMPP và Composer. Bảo đảm Composer dùng PHP của XAMPP; kiểm tra bằng `composer --version` và `C:\xampp\php\php.exe -v`.
+2. Clone/đặt dự án vào `C:\xampp\htdocs\monsmokee`.
+3. Sao chép `backend/.env.example` thành `backend/.env`, rồi điền cấu hình:
+   - Ứng dụng: `APP_ENV`, `APP_URL`, `APP_DEBUG`, `TIMEZONE`.
+   - MySQL: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS`.
+   - Tài khoản Admin: `ADMIN_PHONE`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NAME`.
+   - Email OTP: để `MAIL_DRIVER=log` khi phát triển cục bộ; nếu dùng SMTP, điền `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `SMTP_FROM_NAME`.
+   - Session: `SESSION_NAME`, `SESSION_LIFETIME_SECONDS`, `SESSION_IDLE_TIMEOUT_SECONDS`.
+   Không commit `backend/.env`; file này chứa thông tin riêng.
+4. Mở PowerShell/CMD tại thư mục dự án và cài dependency trong đúng thư mục backend:
    ```text
    cd backend
    composer install
    cd ..
    ```
-4. Sao chép `backend/.env.example` thành `backend/.env`, rồi điền cấu hình:
-   - Ứng dụng: `APP_ENV`, `APP_URL`, `APP_DEBUG`, `TIMEZONE`.
-   - MySQL: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS`.
-   - Tài khoản Admin: `ADMIN_PHONE`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NAME`.
-   - Email OTP: để `MAIL_DRIVER=log` khi phát triển cục bộ; nếu dùng SMTP, điền `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `SMTP_FROM_NAME`.
-   - Session: `SESSION_NAME`.
-   Không commit `backend/.env`; file này chứa thông tin riêng.
-5. Mở phpMyAdmin và import theo đúng thứ tự:
+5. Mở XAMPP Control Panel và bật Apache cùng MySQL. Mở phpMyAdmin rồi import theo thứ tự:
    1. `database/schema.sql`
    2. `database/seed.sql`
    3. `database/seed_khu_vuc.sql`
    4. Các file trong `database/migrations/`, sắp theo tên tăng dần (ví dụ `001_...sql`, `002_...sql`) và chạy lần lượt.
 
-   Migration `001_otp_dang_nhap_admin.sql` thêm mục đích OTP đăng nhập Admin vào enum `otp_xac_thuc.muc_dich`. Với CSDL mới, chạy sau các file seed theo thứ tự trên; với CSDL đã tồn tại, chọn database `monsmokee` trong phpMyAdmin, mở tab **SQL**, chạy nội dung migration này một lần. **Lưu ý:** `schema.sql` có lệnh xóa và tạo lại database `monsmokee`; không import vào database đang có dữ liệu cần giữ.
+   Migration `001_otp_dang_nhap_admin.sql` thêm mục đích đăng nhập Admin vào enum `otp_xac_thuc.muc_dich`. Có thể chạy lại migration này an toàn. Với CSDL mới, chạy sau các file seed; với CSDL đã tồn tại, chọn database `monsmokee` trong phpMyAdmin, mở tab **SQL** và chạy nội dung migration. **Lưu ý:** `schema.sql` có lệnh xóa và tạo lại database `monsmokee`; không import vào database đang có dữ liệu cần giữ.
 6. Từ thư mục gốc dự án, chạy `php database/seed_admin.php`. Script tạo/cập nhật Admin từ `ADMIN_*` trong `backend/.env`; mật khẩu được băm bcrypt trước khi lưu.
-7. Khởi động Apache và kiểm tra API bằng trình duyệt hoặc lệnh:
+7. Kiểm tra API bằng trình duyệt hoặc lệnh:
    ```text
    http://localhost/monsmokee/backend/public/api/csrf
    ```

@@ -1,9 +1,250 @@
 <?php
 declare(strict_types=1);
 
+namespace App\Controllers\Admin;
+
+use App\Services\OtpService;
+use DateTimeImmutable;
+use PDO;
+use Request;
+use Response;
+use RuntimeException;
+use Session;
+use Throwable;
+use Validator;
+
 /**
- * Khung AdminAuthController | backend/app/Controllers/Admin/AdminAuthController.php
- * TRẠNG THÁI: CHƯA CODE (STUB) hoặc hạ tầng Giai đoạn tiếp theo
- * Quy tắc: dùng PDO prepared statements, Transaction khi cần, Response JSON thống nhất.
- * TODO: triển khai theo use case trong docs/MA_TRAN_USECASE.md và mục 9 của prompt.
+ * Đăng nhập bước một cho tài khoản Admin; phiên Admin chỉ hình thành sau OTP.
  */
+final class AdminAuthController
+{
+    private const DUMMY_PASSWORD_HASH = '$2y$10$QBEKRbHMcArA1dK/DR5XOe3KZG0KzC3.d6GF1L12rptaK2vR.uN3i';
+
+    public function __construct(
+        private PDO $pdo,
+        private Validator $validator,
+        private OtpService $otpService,
+        private array $business
+    ) {
+    }
+
+    public function login(Request $request, array $params = []): void
+    {
+        $input = $request->all();
+        $phone = is_string($input['so_dien_thoai'] ?? null)
+            ? trim($input['so_dien_thoai'])
+            : '';
+        $password = is_string($input['mat_khau'] ?? null)
+            ? $input['mat_khau']
+            : '';
+        $errors = $this->validator->validate(
+            ['so_dien_thoai' => $phone, 'mat_khau' => $password],
+            ['so_dien_thoai' => ['required', 'phone'], 'mat_khau' => ['required']]
+        );
+        if ($errors !== []) {
+            Response::error('Dữ liệu đăng nhập không hợp lệ', 422, $errors);
+            return;
+        }
+
+        $maxFailures = (int) ($this->business['login']['max_fail'] ?? 5);
+        $windowSeconds = (int) ($this->business['login']['lock_minutes'] ?? 15) * 60;
+        $ip = $request->ip();
+        $rateKey = 'admin_login:' . hash('sha256', $ip . "\0" . $phone);
+
+        $this->pdo->beginTransaction();
+        try {
+            $createRateRow = $this->pdo->prepare(
+                'INSERT IGNORE INTO rate_limit (khoa, so_lan, bat_dau, khoa_den)
+                 VALUES (?, 0, NOW(), NULL)'
+            );
+            $createRateRow->execute([$rateKey]);
+
+            $rateQuery = $this->pdo->prepare(
+                'SELECT so_lan, bat_dau
+                 FROM rate_limit
+                 WHERE khoa = ?
+                 FOR UPDATE'
+            );
+            $rateQuery->execute([$rateKey]);
+            $rate = $rateQuery->fetch(PDO::FETCH_ASSOC);
+            if ($rate === false) {
+                throw new RuntimeException('Không thể đọc bộ đếm đăng nhập Admin.');
+            }
+
+            $now = new DateTimeImmutable('now');
+            $windowStart = new DateTimeImmutable((string) $rate['bat_dau']);
+            $windowEnd = $windowStart->modify('+' . $windowSeconds . ' seconds');
+            $failureCount = (int) $rate['so_lan'];
+            if ($now >= $windowEnd) {
+                $failureCount = 0;
+                $windowStart = $now;
+                $windowEnd = $windowStart->modify('+' . $windowSeconds . ' seconds');
+            }
+
+            if ($failureCount >= $maxFailures) {
+                $retryAfter = max(1, $windowEnd->getTimestamp() - $now->getTimestamp());
+                $updateLock = $this->pdo->prepare(
+                    'UPDATE rate_limit SET khoa_den = ? WHERE khoa = ?'
+                );
+                $updateLock->execute([$windowEnd->format('Y-m-d H:i:s'), $rateKey]);
+                $this->pdo->commit();
+                $outcome = ['type' => 'rate_limited', 'retry_after' => $retryAfter];
+            } else {
+                if ((int) $rate['so_lan'] !== $failureCount) {
+                    $reset = $this->pdo->prepare(
+                        'UPDATE rate_limit
+                         SET so_lan = 0, bat_dau = ?, khoa_den = NULL
+                         WHERE khoa = ?'
+                    );
+                    $reset->execute([$windowStart->format('Y-m-d H:i:s'), $rateKey]);
+                }
+
+                $userQuery = $this->pdo->prepare(
+                    'SELECT u.id, u.vai_tro_id, u.ho_ten, u.so_dien_thoai, u.email,
+                            u.mat_khau, u.trang_thai, v.ten_vai_tro
+                     FROM nguoi_dung u
+                     JOIN vai_tro v ON v.id = u.vai_tro_id
+                     WHERE u.so_dien_thoai = ?
+                     LIMIT 1
+                     FOR UPDATE'
+                );
+                $userQuery->execute([$phone]);
+                $user = $userQuery->fetch(PDO::FETCH_ASSOC);
+                $hash = $user === false
+                    ? self::DUMMY_PASSWORD_HASH
+                    : (string) $user['mat_khau'];
+                $passwordMatches = password_verify($password, $hash);
+
+                if ($user === false || !$passwordMatches) {
+                    $failureCount++;
+                    $lockUntil = $failureCount >= $maxFailures
+                        ? $windowEnd->format('Y-m-d H:i:s')
+                        : null;
+                    $recordFailure = $this->pdo->prepare(
+                        'UPDATE rate_limit
+                         SET so_lan = ?, bat_dau = ?, khoa_den = ?
+                         WHERE khoa = ?'
+                    );
+                    $recordFailure->execute([
+                        $failureCount,
+                        $windowStart->format('Y-m-d H:i:s'),
+                        $lockUntil,
+                        $rateKey,
+                    ]);
+                    $this->pdo->commit();
+                    $outcome = ['type' => 'invalid_credentials'];
+                } elseif ($user['ten_vai_tro'] !== 'Admin') {
+                    $this->pdo->commit();
+                    $outcome = ['type' => 'not_admin'];
+                } elseif ((int) $user['trang_thai'] !== 1) {
+                    $this->pdo->commit();
+                    $outcome = ['type' => 'account_locked'];
+                } else {
+                    if (password_needs_rehash((string) $user['mat_khau'], PASSWORD_BCRYPT)) {
+                        $newHash = password_hash($password, PASSWORD_BCRYPT);
+                        $updatePassword = $this->pdo->prepare(
+                            'UPDATE nguoi_dung SET mat_khau = ? WHERE id = ?'
+                        );
+                        $updatePassword->execute([$newHash, (int) $user['id']]);
+                    }
+
+                    $clearFailures = $this->pdo->prepare('DELETE FROM rate_limit WHERE khoa = ?');
+                    $clearFailures->execute([$rateKey]);
+                    $this->pdo->commit();
+                    $outcome = [
+                        'type' => 'admin_credentials_valid',
+                        'user' => [
+                            'id' => (int) $user['id'],
+                            'email' => (string) $user['email'],
+                        ],
+                    ];
+                }
+            }
+        } catch (Throwable $error) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $error;
+        }
+
+        if ($outcome['type'] === 'rate_limited') {
+            Response::error(
+                'Đã đăng nhập sai quá số lần cho phép, vui lòng thử lại sau',
+                429,
+                ['retry_after' => $outcome['retry_after']]
+            );
+            return;
+        }
+        if ($outcome['type'] === 'invalid_credentials') {
+            Response::error('Sai số điện thoại hoặc mật khẩu', 401);
+            return;
+        }
+        if ($outcome['type'] === 'not_admin') {
+            Response::error('Tài khoản không có quyền Admin', 403);
+            return;
+        }
+        if ($outcome['type'] === 'account_locked') {
+            Response::error('Tài khoản Admin đã bị khóa', 403);
+            return;
+        }
+
+        try {
+            $otp = $this->otpService->issue(
+                $outcome['user']['email'],
+                'DANG_NHAP_ADMIN',
+                null,
+                $ip
+            );
+        } catch (RuntimeException $error) {
+            if (str_starts_with($error->getMessage(), 'OTP_RESEND_COOLDOWN:')) {
+                $remaining = (int) substr($error->getMessage(), strlen('OTP_RESEND_COOLDOWN:'));
+                Response::error(
+                    'Vui lòng chờ trước khi yêu cầu mã OTP mới',
+                    429,
+                    ['resend_after_seconds' => $remaining]
+                );
+                return;
+            }
+            if ($error->getMessage() === 'OTP_MAX_SENDS_PER_HOUR') {
+                Response::error('Đã vượt quá số lần gửi OTP cho phép, vui lòng thử lại sau', 429);
+                return;
+            }
+            if ($error->getMessage() === 'OTP_SEND_FAILED') {
+                Response::error('Không thể gửi email OTP lúc này, vui lòng thử lại sau', 500);
+                return;
+            }
+            throw $error;
+        }
+
+        Session::remove('user_id');
+        Session::remove('user_role');
+        Session::remove('auth_user');
+        Session::remove('admin_pending_user_id');
+        Session::remove('admin_pending_started_at');
+        Session::remove('admin_pending_expires_at');
+        Session::regenerate();
+
+        $expiresAt = (new DateTimeImmutable($otp['expires_at']))->getTimestamp();
+        $startedAt = $expiresAt - (int) $otp['expires_in_seconds'];
+        Session::set('admin_pending_user_id', $outcome['user']['id']);
+        Session::set('admin_pending_started_at', $startedAt);
+        Session::set('admin_pending_expires_at', $expiresAt);
+
+        Response::success('Mã OTP đăng nhập Admin đã được gửi qua email', [
+            'requires_otp' => true,
+            'email_masked' => $this->maskEmail($outcome['user']['email']),
+            'expires_in_seconds' => $otp['expires_in_seconds'],
+            'resend_after_seconds' => (int) $this->business['otp']['resend_cooldown_seconds'],
+        ]);
+    }
+
+    private function maskEmail(string $email): string
+    {
+        [$localPart, $domain] = explode('@', $email, 2);
+        $visibleLength = min(2, mb_strlen($localPart));
+        return mb_substr($localPart, 0, $visibleLength)
+            . str_repeat('*', max(3, mb_strlen($localPart) - $visibleLength))
+            . '@'
+            . $domain;
+    }
+}

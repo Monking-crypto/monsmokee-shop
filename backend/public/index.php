@@ -60,6 +60,7 @@ try {
     $router = new Router();
 
     require $backendRoot . '/routes/customer.php';
+    require $backendRoot . '/routes/admin.php';
 
     $router->dispatch($request);
 } catch (Throwable $error) {

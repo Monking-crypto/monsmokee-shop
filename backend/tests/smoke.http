@@ -6,15 +6,25 @@
 @testOtp = thay-bang-6-so-trong-mail_outbox
 @wrongPassword = mat-khau-sai-de-test
 @unknownPhone = 0999999999
-# Chỉ thay hai biến dưới đây trong bộ nhớ của REST Client, không lưu/commit thông tin Admin vào file.
-@adminPhone = thay-bang-SDT-admin-tu-backend-env
-@adminPassword = thay-bang-mat-khau-admin-tu-backend-env
+# Điền hai biến này trong bộ nhớ của REST Client; không lưu/commit thông tin Admin vào file.
+@adminPhone =
+@adminPassword =
 # Dùng một SĐT hợp lệ chưa có tài khoản để thử giới hạn 6 lần.
 @throttlePhone = thay-bang-SDT-test-chua-dung
 
 ### Lấy CSRF token
 # @name getCsrf
 GET http://localhost/monsmokee/backend/public/api/csrf
+
+### Admin đăng nhập bước 1 - OTP lấy từ email Admin trong CSDL, không gửi email lên API
+POST http://localhost/monsmokee/backend/public/api/admin/auth/login
+Content-Type: application/json
+X-CSRF-Token: {{getCsrf.response.body.data.csrf_token}}
+
+{
+  "so_dien_thoai": "{{adminPhone}}",
+  "mat_khau": "{{adminPassword}}"
+}
 
 ### Đăng ký bước 1 - OTP sẽ nằm trong backend/storage/mail_outbox
 # @name registerStart
