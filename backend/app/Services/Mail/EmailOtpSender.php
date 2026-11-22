@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\Services\Mail;
 
 use PHPMailer\PHPMailer\PHPMailer;
+use RuntimeException;
 
 final class EmailOtpSender implements OtpSenderInterface
 {
@@ -21,7 +22,11 @@ final class EmailOtpSender implements OtpSenderInterface
         $mailer->SMTPAuth = true;
         $mailer->Username = $smtp['user'];
         $mailer->Password = $smtp['pass'];
-        $mailer->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+        $mailer->SMTPSecure = match ($smtp['encryption']) {
+            'tls' => PHPMailer::ENCRYPTION_STARTTLS,
+            'ssl' => PHPMailer::ENCRYPTION_SMTPS,
+            default => throw new RuntimeException('MAIL_ENCRYPTION phải là tls hoặc ssl.'),
+        };
         $mailer->CharSet = 'UTF-8';
         $mailer->setFrom($smtp['from'], $smtp['from_name']);
         $mailer->addAddress($email);
