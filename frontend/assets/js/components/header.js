@@ -4,6 +4,7 @@ import { api } from '../core/api.js';
 import { escapeHtml, debounce, toast } from '../core/ui.js';
 import { formatVnd } from '../core/format.js';
 import { initCategoryMenu, toggleCategoryMenu } from './category-menu.js';
+import { mountDeliveryModal, openDeliveryModal } from './delivery-modal.js';
 
 const S = CONFIG.STORE_INFO;
 
@@ -12,25 +13,27 @@ export async function mountHeader(host) {
   host.innerHTML = `
   <div class="topbar"><div class="ms-container">
     <span>Giao hàng nội thành Đồng Hới. Miễn phí đơn từ ${formatVnd(CONFIG.FREESHIP_FROM)}</span>
-    <span>Mở cửa ${escapeHtml(S.hours)} · Hotline ${escapeHtml(S.hotline)}</span>
+    <span>Mở cửa ${escapeHtml(S.hours)}${S.hotline ? ` · Hotline ${escapeHtml(S.hotline)}` : ''}</span>
   </div></div>
   <header class="site-header">
     <div class="ms-container site-header__main">
       <a class="site-header__logo" href="index.html" aria-label="MON SMOKEE, về trang chủ"><img src="assets/img/logo.svg" alt="MON SMOKEE" width="165" height="36"></a>
+      <a class="hdr-home" href="index.html"><i class="bi bi-house-door" aria-hidden="true"></i><span>Trang chủ</span></a>
       <form class="search" role="search" action="san-pham.html" autocomplete="off">
         <i class="bi bi-search" aria-hidden="true"></i>
         <input type="search" name="q" placeholder="Tìm sản phẩm… (gõ không dấu cũng được)" aria-label="Tìm sản phẩm" aria-controls="search-list" aria-expanded="false">
         <ul class="search__list" id="search-list" hidden></ul>
       </form>
+      <button class="hdr-delivery" id="delivery-open" type="button"><i class="bi bi-geo-alt" aria-hidden="true"></i><span id="delivery-label">Giao hàng</span></button>
       <div class="hdr-actions">
-        <div class="hdr-auth-desktop" id="hdr-auth"></div>
         <a class="hdr-link" href="gio-hang.html" aria-label="Giỏ hàng">
           <i class="bi bi-cart3" aria-hidden="true"><span class="ms-count" id="cart-count" hidden>0</span></i><span class="hdr-text">Giỏ hàng</span>
         </a>
+        <div class="hdr-auth-desktop" id="hdr-auth"></div>
       </div>
     </div>
     <div class="catbar"><div class="ms-container">
-      <button class="catbar__btn" id="cat-btn" type="button"><i class="bi bi-list" aria-hidden="true"></i>Danh mục</button>
+      <button class="catbar__btn" id="cat-btn" type="button"><i class="bi bi-list" aria-hidden="true"></i>Danh mục sản phẩm</button>
       <a class="catbar__link catbar__link--sale" href="index.html#sale-thu-6">Siêu sale Thứ 6</a>
       <a class="catbar__link catbar__link--exp" href="index.html#can-han">Cận hạn giảm 50%</a>
       <a class="catbar__link" href="index.html#ban-chay">Bán chạy</a>
@@ -38,6 +41,8 @@ export async function mountHeader(host) {
   </header>`;
   initCategoryMenu(host.querySelector('.site-header'));
   host.querySelector('#cat-btn').addEventListener('click', toggleCategoryMenu);
+  mountDeliveryModal(host);
+  host.querySelector('#delivery-open').addEventListener('click', (event) => openDeliveryModal(event.currentTarget));
   setupSearch(host.querySelector('.search'));
   document.addEventListener('ms:cart', (e) => setCartCount(e.detail.count));
   await Promise.all([renderAuth(host.querySelector('#hdr-auth')), refreshCartCount()]);

@@ -10,7 +10,7 @@ let csrfToken = null;
 async function raw(method, path, body) {
   if (CONFIG.USE_MOCK) {
     const { handle } = await import('./mock.js');
-    const r = handle(method, path, body);
+    const r = await handle(method, path, body);
     return { status: r.status ?? 200, json: r };
   }
   const headers = { Accept: 'application/json' };
@@ -34,7 +34,9 @@ export async function request(method, path, body) {
   if (json?.success) return json.data;
   const msg = json?.message || 'Có lỗi xảy ra';
   if (status === 401 && !/\/auth\/(login|me)/.test(path)) {
-    location.href = `dang-nhap.html?redirect=${encodeURIComponent(location.pathname.split('/').pop() + location.search)}`;
+    const page = path.startsWith('/admin/') ? 'login.html' : 'dang-nhap.html';
+    const target = location.pathname.includes('/admin/') ? location.pathname.split('/').pop() + location.search : location.pathname.split('/').pop() + location.search;
+    location.href = `${page}?redirect=${encodeURIComponent(target)}`;
   } else if (status === 403) toast('Bạn không có quyền thực hiện thao tác này', 'error');
   else if (status === 429) toast(msg || 'Bạn thao tác quá nhanh, vui lòng chờ một lúc', 'error');
   else if (status === 501) notImplemented();
