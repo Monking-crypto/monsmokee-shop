@@ -34,7 +34,7 @@ function renderHome(d) {
     const shown = s.products.slice(0, 5);
     const remaining = Math.max(0, (s.total ?? s.products.length) - shown.length);
     const more = remaining
-      ? `<a class="ms-more-products" aria-label="Xem thêm ${remaining} sản phẩm ${escapeHtml(s.category.ten_danh_muc)}" href="san-pham.html?category=${encodeURIComponent(s.category.slug)}">Xem thêm ${remaining} sản phẩm ${escapeHtml(s.category.ten_danh_muc)} ⌄</a>`
+      ? `<a class="ms-more-products" aria-label="Xem thêm ${remaining} sản phẩm ${escapeHtml(s.category.ten_danh_muc)}" href="san-pham.html?category=${encodeURIComponent(s.category.slug)}">Xem thêm ${remaining} sản phẩm ${escapeHtml(s.category.ten_danh_muc)} <span aria-hidden="true">⌄</span></a>`
       : '';
     parts.push(section('', escapeHtml(s.category.ten_danh_muc), '', rail(shown), more));
   });
