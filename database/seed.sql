@@ -3,6 +3,10 @@ SET NAMES utf8mb4;
 
 INSERT INTO vai_tro (ten_vai_tro) VALUES ('Admin'), ('Customer');
 
+-- Không tạo tài khoản Admin mặc định trong seed.sql.
+-- Tài khoản Admin phải được tạo/cập nhật bằng database/seed_admin.php,
+-- lấy toàn bộ thông tin ADMIN_* từ backend/.env và băm bcrypt trước khi lưu.
+
 INSERT INTO danh_muc (ten_danh_muc, slug, icon, thu_tu) VALUES
 ('Nước giải khát','nuoc-giai-khat','droplet',1),
 ('Mì & thực phẩm khô','mi-thuc-pham-kho','box',2),
