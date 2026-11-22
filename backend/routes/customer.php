@@ -44,13 +44,13 @@ $router->post(
     [$authController, 'login'],
     [static fn(Request $request): bool => CsrfMiddleware::handle($request)]
 );
-
-$customerMutations = [
+$router->get(
+    '/api/auth/me',
+    [$authController, 'me'],
+    [static fn(Request $request): bool => App\Middleware\AuthMiddleware::handle($request)]
+);
+$router->post(
     '/api/auth/logout',
-];
-
-foreach ($customerMutations as $path) {
-    $router->post($path, static function (Request $request): void {
-        Response::notImplemented('Tính năng đang được phát triển');
-    }, [static fn(Request $request): bool => CsrfMiddleware::handle($request)]);
-}
+    [$authController, 'logout'],
+    [static fn(Request $request): bool => CsrfMiddleware::handle($request)]
+);

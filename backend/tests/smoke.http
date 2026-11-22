@@ -60,10 +60,32 @@ X-CSRF-Token: {{getCsrf.response.body.data.csrf_token}}
   "mat_khau": "{{testPassword}}"
 }
 
+### Thông tin phiên đang đăng nhập - phải trả 200
+GET http://localhost/monsmokee/backend/public/api/auth/me
+
+### Đăng xuất lần đầu - phải trả 200
+POST http://localhost/monsmokee/backend/public/api/auth/logout
+X-CSRF-Token: {{getCsrf.response.body.data.csrf_token}}
+
+### Tạo CSRF token cho phiên khách chưa đăng nhập
+# @name csrfAfterLogout
+GET http://localhost/monsmokee/backend/public/api/csrf
+
+### Sau đăng xuất /me phải trả 401
+GET http://localhost/monsmokee/backend/public/api/auth/me
+
+### Đăng xuất lần hai - vẫn phải trả 200
+POST http://localhost/monsmokee/backend/public/api/auth/logout
+X-CSRF-Token: {{csrfAfterLogout.response.body.data.csrf_token}}
+
+### CSRF cho các ca login sai bên dưới (logout đã hủy phiên trước)
+# @name csrfForLoginTests
+GET http://localhost/monsmokee/backend/public/api/csrf
+
 ### Sai mật khẩu - phải giống response khi sai SĐT
 POST http://localhost/monsmokee/backend/public/api/auth/login
 Content-Type: application/json
-X-CSRF-Token: {{getCsrf.response.body.data.csrf_token}}
+X-CSRF-Token: {{csrfForLoginTests.response.body.data.csrf_token}}
 
 {
   "so_dien_thoai": "{{testPhone}}",
@@ -73,7 +95,7 @@ X-CSRF-Token: {{getCsrf.response.body.data.csrf_token}}
 ### SĐT không tồn tại
 POST http://localhost/monsmokee/backend/public/api/auth/login
 Content-Type: application/json
-X-CSRF-Token: {{getCsrf.response.body.data.csrf_token}}
+X-CSRF-Token: {{csrfForLoginTests.response.body.data.csrf_token}}
 
 {
   "so_dien_thoai": "{{unknownPhone}}",
@@ -83,7 +105,7 @@ X-CSRF-Token: {{getCsrf.response.body.data.csrf_token}}
 ### Tài khoản Admin - nhập biến cục bộ, không lưu thông tin thật vào file
 POST http://localhost/monsmokee/backend/public/api/auth/login
 Content-Type: application/json
-X-CSRF-Token: {{getCsrf.response.body.data.csrf_token}}
+X-CSRF-Token: {{csrfForLoginTests.response.body.data.csrf_token}}
 
 {
   "so_dien_thoai": "{{adminPhone}}",
@@ -94,7 +116,7 @@ X-CSRF-Token: {{getCsrf.response.body.data.csrf_token}}
 # @name customerLoginFail1
 POST http://localhost/monsmokee/backend/public/api/auth/login
 Content-Type: application/json
-X-CSRF-Token: {{getCsrf.response.body.data.csrf_token}}
+X-CSRF-Token: {{csrfForLoginTests.response.body.data.csrf_token}}
 
 {
   "so_dien_thoai": "{{throttlePhone}}",
@@ -105,7 +127,7 @@ X-CSRF-Token: {{getCsrf.response.body.data.csrf_token}}
 # @name customerLoginFail2
 POST http://localhost/monsmokee/backend/public/api/auth/login
 Content-Type: application/json
-X-CSRF-Token: {{getCsrf.response.body.data.csrf_token}}
+X-CSRF-Token: {{csrfForLoginTests.response.body.data.csrf_token}}
 
 {
   "so_dien_thoai": "{{throttlePhone}}",
@@ -116,7 +138,7 @@ X-CSRF-Token: {{getCsrf.response.body.data.csrf_token}}
 # @name customerLoginFail3
 POST http://localhost/monsmokee/backend/public/api/auth/login
 Content-Type: application/json
-X-CSRF-Token: {{getCsrf.response.body.data.csrf_token}}
+X-CSRF-Token: {{csrfForLoginTests.response.body.data.csrf_token}}
 
 {
   "so_dien_thoai": "{{throttlePhone}}",
@@ -127,7 +149,7 @@ X-CSRF-Token: {{getCsrf.response.body.data.csrf_token}}
 # @name customerLoginFail4
 POST http://localhost/monsmokee/backend/public/api/auth/login
 Content-Type: application/json
-X-CSRF-Token: {{getCsrf.response.body.data.csrf_token}}
+X-CSRF-Token: {{csrfForLoginTests.response.body.data.csrf_token}}
 
 {
   "so_dien_thoai": "{{throttlePhone}}",
@@ -138,7 +160,7 @@ X-CSRF-Token: {{getCsrf.response.body.data.csrf_token}}
 # @name customerLoginFail5
 POST http://localhost/monsmokee/backend/public/api/auth/login
 Content-Type: application/json
-X-CSRF-Token: {{getCsrf.response.body.data.csrf_token}}
+X-CSRF-Token: {{csrfForLoginTests.response.body.data.csrf_token}}
 
 {
   "so_dien_thoai": "{{throttlePhone}}",
@@ -149,7 +171,7 @@ X-CSRF-Token: {{getCsrf.response.body.data.csrf_token}}
 # @name customerLoginFail6
 POST http://localhost/monsmokee/backend/public/api/auth/login
 Content-Type: application/json
-X-CSRF-Token: {{getCsrf.response.body.data.csrf_token}}
+X-CSRF-Token: {{csrfForLoginTests.response.body.data.csrf_token}}
 
 {
   "so_dien_thoai": "{{throttlePhone}}",

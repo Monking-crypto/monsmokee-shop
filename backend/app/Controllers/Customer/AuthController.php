@@ -409,6 +409,49 @@ final class AuthController
     }
 
     /**
+     * Lấy lại thông tin người dùng từ CSDL thay vì tin dữ liệu session đã cũ.
+     */
+    public function me(Request $request, array $params = []): void
+    {
+        $userId = (int) Session::get('user_id');
+        $query = $this->pdo->prepare(
+            'SELECT u.id, u.ho_ten, u.so_dien_thoai, u.email, u.trang_thai, v.ten_vai_tro
+             FROM nguoi_dung u
+             JOIN vai_tro v ON v.id = u.vai_tro_id
+             WHERE u.id = ?
+             LIMIT 1'
+        );
+        $query->execute([$userId]);
+        $row = $query->fetch(PDO::FETCH_ASSOC);
+
+        if ($row === false || (int) $row['trang_thai'] !== 1) {
+            Session::destroy();
+            Response::error('Phiên đăng nhập không hợp lệ hoặc tài khoản đã bị khóa', 401);
+            return;
+        }
+
+        $user = [
+            'id' => (int) $row['id'],
+            'ho_ten' => $row['ho_ten'],
+            'so_dien_thoai' => $row['so_dien_thoai'],
+            'email' => $row['email'],
+            'vai_tro' => $row['ten_vai_tro'],
+        ];
+        Session::set('user_role', $user['vai_tro']);
+        Session::set('auth_user', $user);
+        Response::success('Thông tin tài khoản hiện tại', ['user' => $user]);
+    }
+
+    /**
+     * Hủy session và cookie; gọi nhiều lần vẫn thành công.
+     */
+    public function logout(Request $request, array $params = []): void
+    {
+        Session::destroy();
+        Response::success('Đăng xuất thành công');
+    }
+
+    /**
      * Gửi lại OTP đăng ký, lấy dữ liệu tạm từ yêu cầu đăng ký ban đầu.
      */
     public function resendRegistrationOtp(Request $request, array $params = []): void

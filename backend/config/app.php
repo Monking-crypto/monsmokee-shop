@@ -13,5 +13,7 @@ return [
     'session' => [
         'name' => (string) ($env['SESSION_NAME'] ?? 'MONSMOKEESID'),
         'secure' => str_starts_with($appUrl, 'https://'),
+        'lifetime_seconds' => (int) ($env['SESSION_LIFETIME_SECONDS'] ?? 7200),
+        'idle_timeout_seconds' => (int) ($env['SESSION_IDLE_TIMEOUT_SECONDS'] ?? 7200),
     ],
 ];
