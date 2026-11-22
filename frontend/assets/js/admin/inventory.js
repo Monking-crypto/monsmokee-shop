@@ -19,7 +19,8 @@ function renderStockIn(products) {
           `<option value="${product.id}">${escapeHtml(product.ten_san_pham)} — tồn ${Number(product.so_luong_ton) || 0}</option>`).join('')}</select></label>
         <label class="admin-field">Số lượng nhập<input name="quantity" type="number" min="1" value="1"></label>
         <label class="admin-field">Giá nhập / đơn vị<input name="cost" type="number" min="0" step="1000" placeholder="Nhập giá dự kiến"></label>
-        <label class="admin-field admin-field--wide">Ghi chú<textarea name="note" rows="3" placeholder="Thông tin lô hàng, hạn sử dụng..."></textarea></label>
+        <label class="admin-field">Ngày hết hạn<input type="date" name="expiry_date" min="${dateValue}"></label>
+        <label class="admin-field admin-field--wide">Ghi chú<textarea name="note" rows="3" placeholder="Thông tin lô hàng nhập"></textarea></label>
         <div class="admin-form-actions admin-field--wide"><button class="ms-btn ms-btn--green" type="submit">Xác nhận nhập kho</button></div>
       </form>
     </section>

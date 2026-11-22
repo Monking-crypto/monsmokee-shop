@@ -1,20 +1,14 @@
 /* auth.css - đăng nhập, đăng ký, quên mật khẩu */
 .auth{min-height:100vh;display:grid;background:var(--ms-bg)}
 @media(min-width:992px){.auth{grid-template-columns:5fr 6fr}}
-.auth__aside{display:none;position:relative;align-items:flex-start!important;justify-content:flex-start!important;gap:28px;padding:48px;background:var(--ms-green);color:#fff;overflow:hidden}
+.auth__aside{display:none;position:relative;align-items:flex-start!important;justify-content:flex-start!important;gap:28px;padding:48px;background:linear-gradient(110deg,rgba(8,50,27,.91),rgba(14,90,41,.65) 62%,rgba(14,90,41,.28)),url('../img/auth-grocery-store.svg') center/cover no-repeat;color:#fff;overflow:hidden}
 @media(min-width:992px){.auth__aside{display:flex;flex-direction:column;justify-content:space-between}}
 .auth__aside img.auth__logo{height:40px;width:auto;filter:brightness(0) invert(1)}
 .auth__aside h2{font-size:var(--fs-2xl);font-weight:800;line-height:1.15;max-width:14ch}
 .auth__perks{list-style:none;margin:24px 0 0;padding:0;display:grid;gap:14px;max-width:34ch}
 .auth__perks li{display:flex;gap:12px;align-items:flex-start;font-size:var(--fs-md)}
 .auth__perks i{flex:none;width:32px;height:32px;display:grid;place-items:center;border-radius:50%;background:rgba(255,255,255,.18)}
-.auth__art{position:absolute;right:-60px;bottom:-60px;width:360px;opacity:.14;pointer-events:none}
 .auth__aside-content{display:grid;gap:18px}
-.auth__sample-product{display:flex;align-items:center;gap:14px;width:min(330px,100%);padding:12px;border:1px solid rgba(255,255,255,.35);border-radius:var(--ms-radius);background:rgba(255,255,255,.12)}
-.auth__sample-product img{width:72px;height:72px;border-radius:var(--ms-radius-sm);background:#fff;object-fit:contain}
-.auth__sample-product div{display:grid;gap:2px}
-.auth__sample-product span{font-size:var(--fs-xs);opacity:.85}
-.auth__sample-product b{display:inline-block;width:max-content;padding:3px 8px;border-radius:5px;background:var(--ms-yellow);color:var(--ms-text)}
 .auth__store-info{font-size:var(--fs-sm);opacity:.9}
 .auth__main{display:flex;align-items:center;justify-content:center;padding:24px 16px}
 .auth__card{width:100%;max-width:440px;padding:28px 24px;background:#fff;border:1px solid var(--ms-border);border-radius:var(--ms-radius)}
