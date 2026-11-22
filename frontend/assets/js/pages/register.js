@@ -9,6 +9,11 @@ import { mountPasswordMeter } from '../components/password-meter.js';
 import { mountOtp } from '../components/otp-input.js';
 
 const MAX_WRONG = 5;
+const storeInfo = qs('#register-store-info');
+if (storeInfo) {
+  const { name, hours, address } = CONFIG.STORE_INFO;
+  storeInfo.textContent = `${name}${address ? ` · ${address}` : ''} · Giờ mở cửa ${hours}`;
+}
 const form = qs('#reg-form'), stepInfo = qs('#step-info'), stepOtp = qs('#step-otp'), alertBox = qs('#reg-alert');
 const f = Object.fromEntries(['ho_ten', 'so_dien_thoai', 'email', 'mat_khau', 'nhap_lai'].map((k) => [k, qs(`[name=${k}]`)]));
 const fieldOf = (input) => input.closest('.field');
