@@ -1,12 +1,12 @@
 // validators.js - phản chiếu Validator.php (mục 11.2)
 export const RE_PHONE = /^0\d{9}$/;
-export const RE_PASSWORD = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+export const RE_PASSWORD = /^(?=.*[a-z])(?=.*\d).{8,}$/;
 export const RE_NAME = /^\p{L}+(?:[\s\p{L}]+)+$/u;
 export const RE_OTP = /^\d{6}$/;
 const RE_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 export const passwordChecks = (v) => ({
-  len: v.length >= 8, lower: /[a-z]/.test(v), upper: /[A-Z]/.test(v), digit: /\d/.test(v), special: /[^A-Za-z0-9]/.test(v),
+  len: v.length >= 8, lower: /[a-z]/.test(v), digit: /\d/.test(v),
 });
 
 /** Mỗi hàm trả về chuỗi lỗi, hoặc '' nếu hợp lệ. */

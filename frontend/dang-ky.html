@@ -15,13 +15,16 @@
 <div class="auth">
   <aside class="auth__aside">
     <a href="index.html"><img class="auth__logo" src="assets/img/logo.svg" alt="MON SMOKEE"></a>
-    <div><h2>Tạo tài khoản, mua sắm nhanh hơn</h2>
+    <div class="auth__aside-content"><h2>MON SMOKEE có gì cho bạn?</h2>
       <ul class="auth__perks">
-        <li><i class="bi bi-lightning-charge" aria-hidden="true"></i>Đặt hàng chỉ vài bước, giỏ hàng được lưu lại</li>
-        <li><i class="bi bi-tag" aria-hidden="true"></i>Săn giá giảm Thứ 6 và hàng cận hạn</li>
-        <li><i class="bi bi-cash-coin" aria-hidden="true"></i>Thanh toán khi nhận hàng, không cần thẻ</li>
-      </ul></div>
-    <img class="auth__art" src="assets/img/placeholder-product.svg" alt="">
+        <li><i class="bi bi-lightning-charge" aria-hidden="true"></i>Mua sắm thiết yếu nhanh chóng</li>
+        <li><i class="bi bi-tag" aria-hidden="true"></i>Ưu đãi mới mỗi tuần</li>
+        <li><i class="bi bi-truck" aria-hidden="true"></i>Giao hàng nội thành Đồng Hới</li>
+        <li><i class="bi bi-shop" aria-hidden="true"></i>Có thể nhận hàng tại cửa hàng</li>
+      </ul>
+      <div class="auth__sample-product"><img src="assets/img/placeholder-product.svg" alt=""><div><strong>Mì ăn liền</strong><span>Giá kệ hàng</span><b>4.000đ</b></div></div>
+      <p class="auth__store-info" id="register-store-info"></p>
+    </div>
   </aside>
   <main class="auth__main">
     <div class="auth__card">
@@ -50,7 +53,7 @@
         <p class="lead">Mã gồm 6 chữ số đã gửi tới <strong id="otp-email"></strong>.</p>
         <div id="otp"></div>
         <p class="field__error" id="otp-err" role="alert"></p>
-        <div class="otp-meta"><span>Mã hết hạn sau <b id="otp-ttl">03:00</b></span>
+        <div class="otp-meta"><span>Mã hết hạn sau <b id="otp-ttl">05:00</b></span>
           <span><button class="link-btn" id="resend" type="button" disabled>Gửi lại mã</button> <b id="resend-wait"></b></span></div>
         <button id="verify-btn" class="ms-btn ms-btn--primary ms-btn--block mt-3" type="button">Xác nhận</button>
         <p class="auth__alt"><button class="link-btn" id="edit-info" type="button">Sửa thông tin đăng ký</button></p>

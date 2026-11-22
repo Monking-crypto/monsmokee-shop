@@ -8,15 +8,35 @@ export async function initCategoryMenu(host) {
   panel.className = 'catmenu';
   panel.hidden = true;
   panel.innerHTML = `<div class="catmenu__scrim" data-close></div>
-    <nav class="catmenu__panel" aria-label="Danh mục sản phẩm"><h2>Danh mục sản phẩm</h2><ul id="catmenu-list"></ul></nav>`;
+    <nav class="catmenu__panel" aria-label="Danh mục sản phẩm">
+      <h2>DANH MỤC SẢN PHẨM</h2><button class="catmenu__close" type="button" aria-label="Đóng danh mục" data-close>×</button>
+      <ul id="catmenu-list"></ul></nav>`;
   host.append(panel);
   panel.addEventListener('click', (e) => { if (e.target.closest('[data-close]') || e.target.closest('a')) closeCategoryMenu(); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeCategoryMenu(); });
   try {
     const cats = await api.get('/categories');
-    panel.querySelector('#catmenu-list').innerHTML = cats.map((c) =>
-      `<li><a href="san-pham.html?category=${encodeURIComponent(c.slug)}"><i class="bi bi-${escapeHtml(c.icon)}" aria-hidden="true"></i>${escapeHtml(c.ten_danh_muc)}</a></li>`).join('');
+    panel.querySelector('#catmenu-list').innerHTML = cats.map((c) => `<li class="catmenu__item">
+      <div class="catmenu__row"><a href="san-pham.html?category=${encodeURIComponent(c.slug)}"><i class="bi bi-${escapeHtml(c.icon)}" aria-hidden="true"></i>${escapeHtml(c.ten_danh_muc)}</a>
+      <button type="button" aria-label="Mở danh mục con ${escapeHtml(c.ten_danh_muc)}" aria-expanded="false"><i class="bi bi-chevron-down" aria-hidden="true"></i></button></div>
+      <ul class="catmenu__children" hidden>${(c.children || []).map((child) =>
+        `<li><a href="san-pham.html?category=${encodeURIComponent(c.slug)}&sub=${encodeURIComponent(child.slug)}">${escapeHtml(child.ten)}</a></li>`).join('')}</ul></li>`).join('');
+    panel.querySelectorAll('.catmenu__row > button').forEach((btn) => btn.addEventListener('click', () => {
+      const children = btn.closest('.catmenu__item').querySelector('.catmenu__children');
+      children.hidden = !children.hidden;
+      btn.setAttribute('aria-expanded', String(!children.hidden));
+    }));
   } catch { panel.querySelector('#catmenu-list').innerHTML = '<li class="ms-muted p-2">Không tải được danh mục</li>'; }
 }
-export const toggleCategoryMenu = () => { panel.hidden = !panel.hidden; };
-export const closeCategoryMenu = () => { if (panel) panel.hidden = true; };
+export const toggleCategoryMenu = () => { if (panel) panel.hidden ? openCategoryMenu() : closeCategoryMenu(); };
+export const openCategoryMenu = () => {
+  if (!panel) return;
+  panel.hidden = false;
+  document.getElementById('cat-btn')?.classList.add('is-menu-open');
+  panel.querySelector('.catmenu__close')?.focus();
+};
+export const closeCategoryMenu = () => {
+  if (!panel) return;
+  panel.hidden = true;
+  document.getElementById('cat-btn')?.classList.remove('is-menu-open');
+};

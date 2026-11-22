@@ -6,14 +6,17 @@ export const CONFIG = {
   USE_MOCK: true,
   STORE_INFO: {
     name: 'MON SMOKEE',
-    address: '(cập nhật) Đồng Hới, Quảng Bình',
+    address: '', // ĐIỀN SAU
     hours: '07:00 – 21:30',
-    hotline: '(cập nhật)',
+    hotline: '', // ĐIỀN SAU
+    businessCode: '', // ĐIỀN SAU
+    onlinePhone: '', // ĐIỀN SAU
+    email: '', // ĐIỀN SAU
   },
   // Phải khớp backend/config/business.php
   FREESHIP_FROM: 150000,
   FREESHIP_MAX_KM: 2.5,
   COD_MIN_ORDER: 50000,
-  OTP_TTL_SECONDS: 180,
+  OTP_TTL_SECONDS: 300,
   OTP_RESEND_SECONDS: 60,
 };
