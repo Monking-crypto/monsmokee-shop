@@ -1,1 +1,82 @@
-/* frontend/assets/css/components.css - khung CSS Giai đoạn frontend. */
+/* components.css - thành phần UI dùng chung */
+
+/* Nút */
+.ms-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 20px;
+  border:1.5px solid transparent;border-radius:var(--ms-radius-sm);font-weight:600;font-size:var(--fs-md);cursor:pointer;
+  transition:background-color .15s,border-color .15s,color .15s;text-decoration:none!important}
+.ms-btn:disabled,.ms-btn[aria-disabled="true"]{opacity:.55;cursor:not-allowed}
+.ms-btn--primary{background:var(--ms-orange);color:#1b1100}
+.ms-btn--primary:hover:not(:disabled){background:var(--ms-orange-dark)}
+.ms-btn--green{background:var(--ms-green);color:#fff}
+.ms-btn--green:hover:not(:disabled){background:var(--ms-green-dark)}
+.ms-btn--ghost{background:transparent;border-color:var(--ms-border);color:var(--ms-text)}
+.ms-btn--ghost:hover:not(:disabled){border-color:var(--ms-green);color:var(--ms-green-dark)}
+.ms-btn--block{width:100%}
+.ms-btn .ms-spinner{width:18px;height:18px;border:2.5px solid currentColor;border-right-color:transparent;border-radius:50%;animation:ms-spin .7s linear infinite}
+@keyframes ms-spin{to{transform:rotate(360deg)}}
+
+/* Badge đếm (giỏ hàng) */
+.ms-count{position:absolute;top:-6px;right:-8px;min-width:20px;height:20px;padding:0 5px;border-radius:var(--ms-radius-pill);
+  background:var(--ms-red);color:#fff;font-size:11px;font-weight:700;line-height:20px;text-align:center}
+.ms-count[hidden]{display:none}
+
+/* Tiêu đề khối */
+.ms-section{margin-block:28px}
+.ms-section__head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+.ms-section__title{font-size:var(--fs-lg);font-weight:800}
+.ms-section__sub{color:var(--ms-muted);font-size:var(--fs-sm)}
+.ms-section__more{font-weight:600;font-size:var(--fs-sm)}
+
+/* Lưới / hàng cuộn ngang sản phẩm */
+.ms-grid{display:grid;gap:12px;grid-template-columns:repeat(2,minmax(0,1fr))}
+@media(min-width:640px){.ms-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(min-width:992px){.ms-grid{grid-template-columns:repeat(5,minmax(0,1fr));gap:14px}}
+.ms-rail{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x proximity;padding-bottom:6px;margin-inline:calc(var(--ms-gap)*-1);padding-inline:var(--ms-gap)}
+.ms-rail>*{flex:0 0 158px;scroll-snap-align:start}
+@media(min-width:992px){.ms-rail{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));overflow:visible;margin-inline:0;padding-inline:0}.ms-rail>*{flex:none}}
+
+/* Thẻ sản phẩm */
+.pc{position:relative;display:flex;flex-direction:column;background:var(--ms-surface);border:1px solid var(--ms-border);
+  border-radius:var(--ms-radius);overflow:hidden;transition:border-color .15s}
+.pc:hover{border-color:var(--ms-green)}
+.pc__media{position:relative;display:block;aspect-ratio:1/1;background:var(--ms-green-soft)}
+.pc__media img{width:100%;height:100%;object-fit:contain;padding:10%}
+.pc__flag{position:absolute;top:8px;left:8px;padding:2px 8px;border-radius:var(--ms-radius-pill);background:var(--ms-red);
+  color:#fff;font-size:var(--fs-xs);font-weight:800}
+.pc__flag--soon{background:var(--ms-muted)}
+.pc__soldout{position:absolute;inset:0;display:grid;place-items:center;background:rgba(255,255,255,.72);
+  font-weight:800;color:var(--ms-red);font-size:var(--fs-md)}
+.pc__body{display:flex;flex-direction:column;gap:2px;padding:10px 10px 12px;flex:1}
+.pc__name{font-size:var(--fs-sm);font-weight:600;color:var(--ms-text);min-height:2.6em;line-height:1.3}
+.pc__name:hover{text-decoration:none;color:var(--ms-green-dark)}
+.pc__unit{font-size:var(--fs-xs);color:var(--ms-muted)}
+.pc__hsd{font-size:var(--fs-xs);font-weight:600;color:var(--ms-orange-dark)}
+.pc__foot{display:flex;align-items:flex-end;justify-content:space-between;gap:8px;margin-top:auto;padding-top:8px}
+
+/* Tem giá kệ hàng - điểm nhấn nhận diện */
+.shelf-tag{position:relative;display:flex;flex-direction:column;line-height:1.15;min-width:0}
+.shelf-tag__price{font-size:var(--fs-md);font-weight:800;color:var(--ms-green-dark);white-space:nowrap}
+.shelf-tag__old{font-size:var(--fs-xs);color:var(--ms-muted)}
+.shelf-tag.is-sale{background:var(--ms-yellow-soft);border:1.5px solid var(--ms-yellow);border-radius:6px;padding:4px 8px 4px 16px}
+.shelf-tag.is-sale::before{content:"";position:absolute;left:5px;top:50%;width:6px;height:6px;margin-top:-3px;border-radius:50%;
+  background:var(--ms-surface);border:1.5px solid var(--ms-yellow)}
+.shelf-tag.is-sale .shelf-tag__price{color:var(--ms-red)}
+
+/* Nút Thêm / bộ chỉnh số lượng */
+.pc__add{flex:none;min-width:56px;height:36px;padding:0 12px;border:0;border-radius:var(--ms-radius-sm);background:var(--ms-orange);
+  color:#1b1100;font-weight:700;font-size:var(--fs-sm);cursor:pointer}
+.pc__add:hover:not(:disabled){background:var(--ms-orange-dark)}
+.pc__add:disabled{background:#e3e8e4;color:#8a978f;cursor:not-allowed}
+.qty{display:inline-flex;align-items:center;height:36px;border:1.5px solid var(--ms-green);border-radius:var(--ms-radius-sm);overflow:hidden}
+.qty button{width:32px;height:100%;border:0;background:var(--ms-green-soft);color:var(--ms-green-dark);font-size:18px;font-weight:700;cursor:pointer}
+.qty output{min-width:28px;text-align:center;font-weight:700;font-size:var(--fs-sm)}
+
+/* Toast */
+.ms-toasts{position:fixed;z-index:1100;left:50%;transform:translateX(-50%);bottom:calc(var(--ms-bottom-nav-h) + 16px);
+  display:flex;flex-direction:column;gap:8px;width:min(92vw,380px);pointer-events:none}
+@media(min-width:992px){.ms-toasts{bottom:24px;left:auto;right:24px;transform:none}}
+.ms-toast{pointer-events:auto;padding:12px 16px;border-radius:var(--ms-radius-sm);background:var(--ms-text);color:#fff;font-size:var(--fs-sm);
+  border-left:4px solid var(--ms-green);animation:ms-toast-in .2s ease-out}
+.ms-toast--error{border-left-color:var(--ms-red)}
+.ms-toast--info{border-left-color:var(--ms-yellow)}
+@keyframes ms-toast-in{from{opacity:0;transform:translateY(8px)}}

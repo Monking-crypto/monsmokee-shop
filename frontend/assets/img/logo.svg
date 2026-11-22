@@ -1,1 +1,8 @@
-<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'><rect width='400' height='300' fill='#f5f5f5'/><text x='200' y='150' text-anchor='middle' fill='#999'>MON SMOKEE</text></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 48" role="img" aria-label="MON SMOKEE">
+  <g transform="translate(2 4)">
+    <path d="M4 14h32l-3.5 18a4 4 0 0 1-4 3.2H11.5a4 4 0 0 1-4-3.2L4 14Z" fill="#1E9E4A"/>
+    <path d="M12 14c0-5 3.5-8 8-8s8 3 8 8" fill="none" stroke="#1E9E4A" stroke-width="3" stroke-linecap="round"/>
+    <path d="M20 29c-4-1-6-4-6-8 4 0 7 2 6 8Zm0 0c4-1 6-4 6-8-4 0-7 2-6 8Z" fill="#fff"/>
+  </g>
+  <text x="50" y="31" font-family="'Be Vietnam Pro',system-ui,sans-serif" font-weight="800" font-size="24" letter-spacing="-.5" fill="#147A38">MON <tspan fill="#FF8A00">SMOKEE</tspan></text>
+</svg>

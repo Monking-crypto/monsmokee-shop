@@ -1,1 +1,66 @@
-/* frontend/assets/css/auth.css - khung CSS Giai đoạn frontend. */
+/* auth.css - đăng nhập, đăng ký, quên mật khẩu */
+.auth{min-height:100vh;display:grid;background:var(--ms-bg)}
+@media(min-width:992px){.auth{grid-template-columns:5fr 6fr}}
+.auth__aside{display:none;position:relative;padding:48px;background:var(--ms-green);color:#fff;overflow:hidden}
+@media(min-width:992px){.auth__aside{display:flex;flex-direction:column;justify-content:space-between}}
+.auth__aside img.auth__logo{height:40px;width:auto;filter:brightness(0) invert(1)}
+.auth__aside h2{font-size:var(--fs-2xl);font-weight:800;line-height:1.15;max-width:14ch}
+.auth__perks{list-style:none;margin:24px 0 0;padding:0;display:grid;gap:14px;max-width:34ch}
+.auth__perks li{display:flex;gap:12px;align-items:flex-start;font-size:var(--fs-md)}
+.auth__perks i{flex:none;width:32px;height:32px;display:grid;place-items:center;border-radius:50%;background:rgba(255,255,255,.18)}
+.auth__art{position:absolute;right:-60px;bottom:-60px;width:360px;opacity:.14;pointer-events:none}
+.auth__main{display:flex;align-items:center;justify-content:center;padding:24px 16px}
+.auth__card{width:100%;max-width:440px;padding:28px 24px;background:#fff;border:1px solid var(--ms-border);border-radius:var(--ms-radius)}
+.auth__mobile-logo{display:block;margin-bottom:20px}
+.auth__mobile-logo img{height:34px}
+@media(min-width:992px){.auth__mobile-logo{display:none}}
+.auth__card h1{font-size:var(--fs-xl);font-weight:800;margin-bottom:4px}
+.auth__card .lead{color:var(--ms-muted);font-size:var(--fs-sm);margin-bottom:20px}
+.auth__alert{padding:10px 12px;margin-bottom:16px;border-radius:var(--ms-radius-sm);font-size:var(--fs-sm);background:var(--ms-yellow-soft);border:1px solid var(--ms-yellow)}
+.auth__alert--error{background:#fdeceb;border-color:#f3b6b3;color:#8e1b17}
+.auth__alt{margin-top:18px;text-align:center;font-size:var(--fs-sm);color:var(--ms-muted)}
+
+/* Trường nhập */
+.field{margin-bottom:16px}
+.field label{display:block;margin-bottom:6px;font-size:var(--fs-sm);font-weight:600}
+.field__box{position:relative}
+.field input[type=text],.field input[type=tel],.field input[type=email],.field input[type=password]{width:100%;height:46px;padding:0 14px;
+  border:1.5px solid var(--ms-border);border-radius:var(--ms-radius-sm);font:inherit;background:#fff}
+.field input:focus{outline:none;border-color:var(--ms-green);box-shadow:0 0 0 3px var(--ms-green-soft)}
+.field.is-valid input{border-color:var(--ms-green)}
+.field.is-invalid input{border-color:var(--ms-red);box-shadow:0 0 0 3px #fdeceb}
+.field__error{min-height:0;margin-top:4px;font-size:var(--fs-xs);color:var(--ms-red)}
+.field__toggle{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:38px;height:38px;border:0;background:none;color:var(--ms-muted);cursor:pointer;border-radius:var(--ms-radius-sm)}
+.field__toggle:hover{color:var(--ms-text)}
+.field label.field--check{display:flex;gap:10px;align-items:flex-start;font-size:var(--fs-sm);font-weight:400}
+.field--check input{margin-top:3px;width:18px;height:18px;flex:none;accent-color:var(--ms-green)}
+.auth__row{display:flex;justify-content:space-between;align-items:center;margin:-4px 0 16px;font-size:var(--fs-sm)}
+
+/* Đo độ mạnh mật khẩu */
+.pwm{margin-top:8px}
+.pwm__bar{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+.pwm__bar span{height:4px;border-radius:2px;background:var(--ms-border)}
+.pwm[data-level="1"] .pwm__bar span:nth-child(-n+1){background:var(--ms-red)}
+.pwm[data-level="2"] .pwm__bar span:nth-child(-n+2){background:var(--ms-orange)}
+.pwm[data-level="3"] .pwm__bar span:nth-child(-n+3){background:var(--ms-yellow)}
+.pwm[data-level="4"] .pwm__bar span{background:var(--ms-green)}
+.pwm__list{list-style:none;margin:8px 0 0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;font-size:var(--fs-xs);color:var(--ms-muted)}
+.pwm__list li::before{content:"○";margin-right:6px}
+.pwm__list li.ok{color:var(--ms-green-dark)}
+.pwm__list li.ok::before{content:"✓"}
+
+/* Ô nhập OTP */
+.otp{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin:16px 0}
+.otp input{width:100%;height:56px;padding:0;text-align:center;font:inherit;font-size:1.5rem;font-weight:700;border:1.5px solid var(--ms-border);border-radius:var(--ms-radius-sm)}
+.otp input:focus{outline:none;border-color:var(--ms-green);box-shadow:0 0 0 3px var(--ms-green-soft)}
+.otp.is-invalid input{border-color:var(--ms-red)}
+.otp-meta{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:var(--fs-sm);color:var(--ms-muted)}
+.otp-meta b{font-variant-numeric:tabular-nums;color:var(--ms-text)}
+.link-btn{border:0;background:none;padding:0;color:var(--ms-green-dark);font:inherit;font-weight:600;cursor:pointer}
+.link-btn:disabled{color:var(--ms-muted);cursor:not-allowed}
+
+/* Thanh tiến trình các bước */
+.steps{display:flex;gap:6px;margin-bottom:20px}
+.steps span{flex:1;height:4px;border-radius:2px;background:var(--ms-border)}
+.steps span.done{background:var(--ms-green)}
+.steps-label{margin-bottom:8px;font-size:var(--fs-xs);color:var(--ms-muted)}

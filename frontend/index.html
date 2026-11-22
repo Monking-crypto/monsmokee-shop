@@ -1,7 +1,57 @@
 <!doctype html>
-<html lang='vi'>
-<head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'><title>index - MON SMOKEE</title></head>
-<body>
-<!-- STUB: frontend/index.html. Giai đoạn tiếp theo sẽ bổ sung giao diện và JavaScript ES Module. -->
+<html lang="vi">
+<head>
+<title>MON SMOKEE - Tạp hóa Đồng Hới, giao nhanh nội thành</title>
+<meta name="description" content="Tạp hóa MON SMOKEE tại Đồng Hới: giao hàng nội thành, nhận tại cửa hàng, thanh toán khi nhận hàng.">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+<link rel="icon" href="assets/img/logo.svg">
+<link rel="stylesheet" href="assets/css/variables.css"><link rel="stylesheet" href="assets/css/base.css"><link rel="stylesheet" href="assets/css/components.css">
+<link rel="stylesheet" href="assets/css/customer.css">
+</head>
+<body class="has-bottom-nav">
+<a class="visually-hidden" href="#main">Bỏ qua tới nội dung chính</a>
+<div id="site-header"></div>
+<main id="main" class="ms-container">
+  <div class="hero">
+    <div id="hero-carousel" class="carousel slide hero__carousel" data-bs-ride="carousel" aria-label="Ưu đãi nổi bật">
+      <div class="carousel-indicators">
+        <button type="button" data-bs-target="#hero-carousel" data-bs-slide-to="0" class="active" aria-current="true" aria-label="Ưu đãi 1"></button>
+        <button type="button" data-bs-target="#hero-carousel" data-bs-slide-to="1" aria-label="Ưu đãi 2"></button>
+        <button type="button" data-bs-target="#hero-carousel" data-bs-slide-to="2" aria-label="Ưu đãi 3"></button>
+      </div>
+      <div class="carousel-inner">
+        <div class="carousel-item active"><div class="hslide hslide--green"><img class="hslide__art" src="assets/img/banner-1.svg" alt="">
+          <div class="hslide__text"><h1 class="hslide__title">Siêu sale Thứ 6, giảm 10%</h1><p class="hslide__sub">10 sản phẩm mỗi tuần. Giá giảm tự động áp dụng khi thêm vào giỏ.</p><a class="ms-btn" href="#sale-thu-6">Xem sản phẩm</a></div></div></div>
+        <div class="carousel-item"><div class="hslide hslide--deep"><img class="hslide__art" src="assets/img/banner-2.svg" alt="">
+          <div class="hslide__text"><h2 class="hslide__title">Đến lấy tại cửa hàng, không phí ship</h2><p class="hslide__sub">Đặt trước, ghé nhận trong giờ mở cửa.</p><a class="ms-btn" href="san-pham.html">Chọn hàng</a></div></div></div>
+        <div class="carousel-item"><div class="hslide hslide--orange"><img class="hslide__art" src="assets/img/banner-3.svg" alt="">
+          <div class="hslide__text"><h2 class="hslide__title">Giao nhanh nội thành Đồng Hới</h2><p class="hslide__sub">Thanh toán khi nhận hàng. Miễn phí giao đơn từ 150.000đ.</p><a class="ms-btn" href="san-pham.html">Mua ngay</a></div></div></div>
+      </div>
+      <button class="carousel-control-prev" type="button" data-bs-target="#hero-carousel" data-bs-slide="prev"><span class="carousel-control-prev-icon" aria-hidden="true"></span><span class="visually-hidden">Trước</span></button>
+      <button class="carousel-control-next" type="button" data-bs-target="#hero-carousel" data-bs-slide="next"><span class="carousel-control-next-icon" aria-hidden="true"></span><span class="visually-hidden">Sau</span></button>
+    </div>
+    <div class="hero__side">
+      <a class="mini mini--yellow" href="#can-han"><strong>Cận hạn giảm 50%</strong><span>Hàng còn dùng tốt, giá rẻ một nửa</span></a>
+      <a class="mini mini--soft" href="san-pham.html"><strong>Freeship từ 150.000đ</strong><span>Hoặc trong bán kính 2,5 km</span></a>
+    </div>
+  </div>
+
+  <div class="policy" aria-label="Chính sách cửa hàng">
+    <div class="policy__item"><i class="bi bi-truck" aria-hidden="true"></i><div><strong>Giao hàng đơn từ 50.000đ</strong><span>Nội thành Đồng Hới</span></div></div>
+    <div class="policy__item"><i class="bi bi-gift" aria-hidden="true"></i><div><strong>Freeship từ 150.000đ</strong><span>Hoặc trong 2,5 km</span></div></div>
+    <div class="policy__item"><i class="bi bi-shop" aria-hidden="true"></i><div><strong>Nhận tại cửa hàng</strong><span>Click &amp; Collect</span></div></div>
+    <div class="policy__item"><i class="bi bi-cash-coin" aria-hidden="true"></i><div><strong>Trả tiền khi nhận hàng</strong><span>COD hoặc tiền mặt tại quầy</span></div></div>
+  </div>
+
+  <div id="home-sections"></div>
+</main>
+<footer id="site-footer"></footer>
+<nav id="bottom-nav"></nav>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" defer></script>
+<script type="module" src="assets/js/pages/home.js"></script>
 </body>
 </html>
