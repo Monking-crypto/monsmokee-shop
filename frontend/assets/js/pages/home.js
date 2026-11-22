@@ -25,10 +25,11 @@ function renderHome(d) {
       <p class="ms-section__sub">${sale.active ? 'Kết thúc lúc 23:59:59 hôm nay' : 'Danh sách được mở bán vào Thứ 6 hằng tuần'}</p></div>
       ${sale.active ? rail(sale.products) : `<div class="ms-state"><strong>Siêu sale mở vào Thứ 6 hằng tuần</strong>Danh sách sản phẩm chưa được công bố. <button class="pc__add pc__add--locked" type="button" disabled aria-disabled="true" title="Chưa mở bán">Chưa mở bán</button></div>`}</section>`);
 
+  const near = d.near_expiry.slice(0, 5);
   parts.push(`<section class="ms-section promo promo--expiry" id="can-han"><div class="ms-section__head"><div><h2 class="ms-section__title">Cận hạn, giảm 50%</h2>
-      <p class="ms-section__sub">Còn dùng tốt, giá rẻ một nửa. Số lượng có hạn.</p></div></div>${d.near_expiry.length ? rail(d.near_expiry, { showHsd: true }) : state('Hôm nay chưa có hàng cận hạn', 'Quay lại sau nhé.')}</section>`);
+      <p class="ms-section__sub">Còn dùng tốt, giá rẻ một nửa. Số lượng có hạn.</p></div></div>${near.length ? rail(near, { showHsd: true }) : state('Hiện chưa có hàng cận hạn', 'Quay lại sau nhé.')}<a class="ms-section__more" href="can-han.html">Xem tất cả hàng cận hạn</a></section>`);
 
-  parts.push(section('ban-chay', 'Bán chạy', 'Được khách mua nhiều nhất', rail(d.best_sellers), '<a class="ms-section__more" href="san-pham.html?sort=best">Xem tất cả</a>'));
+  parts.push(section('ban-chay', 'Bán chạy', 'Được khách mua nhiều nhất', rail(d.best_sellers), '<a class="ms-section__more" href="ban-chay.html">Xem tất cả</a>'));
   parts.push(section('goi-y', 'Gợi ý cho bạn', '', rail(d.suggested)));
   d.sections.forEach((s) => {
     const shown = s.products.slice(0, 5);

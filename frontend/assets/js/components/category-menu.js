@@ -3,17 +3,35 @@ import { api } from '../core/api.js';
 import { escapeHtml } from '../core/ui.js';
 
 let panel;
+let opener;
+let previousOverflow;
+
 export async function initCategoryMenu(host) {
   panel = document.createElement('div');
   panel.className = 'catmenu';
   panel.hidden = true;
   panel.innerHTML = `<div class="catmenu__scrim" data-close></div>
-    <nav class="catmenu__panel" aria-label="Danh mục sản phẩm">
-      <h2>DANH MỤC SẢN PHẨM</h2><button class="catmenu__close" type="button" aria-label="Đóng danh mục" data-close>×</button>
-      <ul id="catmenu-list"></ul></nav>`;
-  host.append(panel);
-  panel.addEventListener('click', (e) => { if (e.target.closest('[data-close]') || e.target.closest('a')) closeCategoryMenu(); });
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeCategoryMenu(); });
+    <section class="catmenu__panel" role="dialog" aria-modal="true" aria-labelledby="catmenu-title" tabindex="-1">
+      <header class="catmenu__header"><h2 id="catmenu-title">Danh mục sản phẩm</h2>
+        <button class="catmenu__close" type="button" aria-label="Đóng danh mục" data-close>×</button></header>
+      <nav aria-label="Danh mục sản phẩm">
+        <ul class="catmenu__quick-links">
+          <li><a href="index.html#sale-thu-6">Siêu sale Thứ 6</a></li>
+          <li><a href="can-han.html">Cận hạn giảm 50%</a></li>
+          <li><a href="ban-chay.html">Bán chạy</a></li>
+        </ul>
+        <ul id="catmenu-list"></ul>
+      </nav></section>`;
+  document.body.append(panel);
+  panel.addEventListener('click', (e) => {
+    if (e.target.closest('[data-close]')) closeCategoryMenu();
+    else if (e.target.closest('a')) closeCategoryMenu();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (panel.hidden) return;
+    if (e.key === 'Escape') closeCategoryMenu();
+    if (e.key === 'Tab') trapFocus(e);
+  });
   try {
     const cats = await api.get('/categories');
     panel.querySelector('#catmenu-list').innerHTML = cats.map((c) => `<li class="catmenu__item">
@@ -31,12 +49,30 @@ export async function initCategoryMenu(host) {
 export const toggleCategoryMenu = () => { if (panel) panel.hidden ? openCategoryMenu() : closeCategoryMenu(); };
 export const openCategoryMenu = () => {
   if (!panel) return;
+  opener = document.getElementById('cat-btn');
+  previousOverflow = document.body.style.overflow;
   panel.hidden = false;
-  document.getElementById('cat-btn')?.classList.add('is-menu-open');
+  document.body.style.overflow = 'hidden';
+  opener?.setAttribute('aria-expanded', 'true');
   panel.querySelector('.catmenu__close')?.focus();
 };
 export const closeCategoryMenu = () => {
   if (!panel) return;
   panel.hidden = true;
-  document.getElementById('cat-btn')?.classList.remove('is-menu-open');
+  document.body.style.overflow = previousOverflow || '';
+  opener?.setAttribute('aria-expanded', 'false');
+  opener?.focus();
+};
+
+function trapFocus(event) {
+  const focusable = [...panel.querySelectorAll('a[href], button:not(:disabled)')];
+  if (!focusable.length) return;
+  const first = focusable[0], last = focusable[focusable.length - 1];
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
 };

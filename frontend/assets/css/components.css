@@ -80,3 +80,17 @@
 .ms-toast--error{border-left-color:var(--ms-red)}
 .ms-toast--info{border-left-color:var(--ms-yellow)}
 @keyframes ms-toast-in{from{opacity:0;transform:translateY(8px)}}
+
+/* Dialog dùng lại cho xác nhận mua hàng và các thao tác quản trị */
+.confirm-dialog{position:fixed;inset:0;z-index:1400;display:grid;place-items:center;padding:16px}
+.confirm-dialog__scrim{position:absolute;inset:0;background:rgba(15,25,20,.55)}
+.confirm-dialog__panel{position:relative;width:min(460px,100%);max-height:90vh;overflow:auto;padding:22px;background:#fff;border-radius:var(--ms-radius);box-shadow:var(--ms-shadow)}
+.confirm-dialog__panel h2{margin-bottom:8px;font-size:var(--fs-lg)}
+.confirm-dialog__panel p{margin-bottom:16px;color:var(--ms-muted)}
+.confirm-dialog__product{display:flex;align-items:center;gap:12px;padding:10px;border:1px solid var(--ms-border);border-radius:var(--ms-radius-sm)}
+.confirm-dialog__product img{width:64px;height:64px;object-fit:contain;background:var(--ms-bg);border-radius:var(--ms-radius-sm)}
+.confirm-dialog__product div{display:grid;gap:4px}
+.confirm-dialog__product span{color:var(--ms-green-dark);font-size:var(--fs-sm);font-weight:700}
+.confirm-dialog__quantity{display:flex;align-items:center;justify-content:space-between;margin-top:16px;font-weight:700}
+.confirm-dialog__quantity input{width:52px;height:100%;border:0;text-align:center;font:inherit}
+.confirm-dialog__actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}

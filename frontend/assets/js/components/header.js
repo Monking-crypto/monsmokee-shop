@@ -35,8 +35,8 @@ export async function mountHeader(host) {
     <div class="catbar"><div class="ms-container">
       <button class="catbar__btn" id="cat-btn" type="button"><i class="bi bi-list" aria-hidden="true"></i>Danh mục sản phẩm</button>
       <a class="catbar__link catbar__link--sale" href="index.html#sale-thu-6">Siêu sale Thứ 6</a>
-      <a class="catbar__link catbar__link--exp" href="index.html#can-han">Cận hạn giảm 50%</a>
-      <a class="catbar__link" href="index.html#ban-chay">Bán chạy</a>
+      <a class="catbar__link catbar__link--exp" href="can-han.html">Cận hạn giảm 50%</a>
+      <a class="catbar__link" href="ban-chay.html">Bán chạy</a>
     </div></div>
   </header>`;
   initCategoryMenu(host.querySelector('.site-header'));
