@@ -214,8 +214,8 @@ function dashboardData() {
   const lowStockAll = products.filter((product) => Number(product.so_luong_ton) <= 10);
   const lowStock = lowStockAll.slice(0, 8);
   const expiring = nearExpiryProducts().slice(0, 8);
-  const revenue7 = Array.from({ length: 7 }, (_, index) => {
-    const date = new Date(); date.setDate(date.getDate() - (6 - index));
+  const revenueForDays = (days) => Array.from({ length: days }, (_, index) => {
+    const date = new Date(); date.setDate(date.getDate() - (days - 1 - index));
     const matching = completed.filter((order) => sameDate(order.created_at, date));
     return { ngay: dateKey(date), doanh_thu: matching.reduce((sum, order) => sum + order.tong, 0) };
   });
@@ -232,7 +232,8 @@ function dashboardData() {
       san_pham_sap_het: lowStockAll.length,
       san_pham_can_han: expiring.length,
     },
-    doanh_thu_7_ngay: revenue7,
+    doanh_thu_7_ngay: revenueForDays(7),
+    doanh_thu_30_ngay: revenueForDays(30),
     top_ban_chay: [...products].sort((a, b) => b.luot_ban - a.luot_ban).slice(0, 5)
       .map((product) => ({ ten_san_pham: product.ten_san_pham, luot_ban: product.luot_ban })),
     don_hang_moi: [...orders].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 10),

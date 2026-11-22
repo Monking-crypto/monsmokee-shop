@@ -79,6 +79,10 @@ if (await requireAdmin()) {
   else if (page === 'promotions') await import('./promotions.js');
   else if (page === 'orders') await import('./orders.js');
   else if (page === 'order-detail') await import('./order-detail.js');
+  else if (page.startsWith('stock-')) await import('./inventory.js');
+  else if (page === 'customers') await import('./customers.js');
+  else if (page === 'statistics') await import('./statistics.js');
+  else if (page === 'account') await import('./account.js');
   else {
     const steps = STEPS[page] || STEPS.overview;
     content.innerHTML = `<div class="admin-breadcrumb">Quản trị <span>/</span> ${escapeHtml(title)}</div>

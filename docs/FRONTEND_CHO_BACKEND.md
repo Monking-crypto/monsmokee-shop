@@ -92,3 +92,12 @@ Thêm các trường sản phẩm `nhom_con`, `huong_vi`, `dong_goi` vào schema
 - `GET /admin/orders?status=&method=&q=&page=&per_page=`, `GET /admin/orders/{id}`, `PATCH /admin/orders/{id}/status` body `{trang_thai}`, `POST /admin/orders/{id}/cancel` body `{ly_do}`, `PATCH /admin/orders/{id}/shipping` body `{phi_ship}`.
 - Trạng thái đơn: `cho_xu_ly`, `dang_giao`, `cho_lay_hang`, `thanh_cong`, `da_huy`; COD chỉ đi `cho_xu_ly → dang_giao → thanh_cong`, nhận tại cửa hàng chỉ đi `cho_xu_ly → cho_lay_hang → thanh_cong`. Phí giao hàng là số nguyên 0–100.000đ.
 - Frontend mock hiện dùng `GET/PUT /admin/promotions/friday` và `POST /admin/promotions/friday/random`. Đề nghị backend xác nhận các route này hay dùng route chuẩn `/admin/promotions` tại mục 7.
+
+## YC2 — Admin kho, khách hàng, thống kê và tài khoản (A9 P3)
+
+- Dashboard mock trả thêm `doanh_thu_30_ngay` để bộ lọc báo cáo chọn 7 hoặc 30 ngày.
+- Màn hình kho dùng `GET /admin/products` và `GET /admin/dashboard` để hiển thị tồn/cảnh báo. Lịch sử giao dịch và tạo phiếu nhập hiện là giao diện mẫu, chưa ghi dữ liệu.
+- Đề nghị backend cung cấp `GET /admin/inventory/movements?type=&q=&page=&per_page=` và `POST /admin/inventory/receipts` cho phiếu nhập; trả danh sách dòng hàng, số lượng, người thao tác và thời gian.
+- Danh sách khách hàng mock hiện tổng hợp từ đơn mẫu. Khi kết nối thật, đề nghị `GET /admin/customers?q=&page=&per_page=`, `GET /admin/customers/{id}` và `PATCH /admin/customers/{id}/status`.
+- Báo cáo dùng doanh thu mẫu 7/30 ngày; đề nghị `GET /admin/reports?from=&to=` trả KPI, doanh thu theo ngày và sản phẩm bán chạy.
+- Trang tài khoản hiện chỉ là bản xem trước. Đề nghị `GET/PATCH /admin/account` và `POST /admin/account/password`; các nút nhập kho, điều chỉnh, xuất, hồ sơ/khóa khách, xuất báo cáo và lưu/cập nhật tài khoản hiện chỉ báo “Tính năng đang được phát triển”, không ghi dữ liệu.

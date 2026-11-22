@@ -29,3 +29,9 @@
 - **File:** `frontend/admin/index.html`, `frontend/assets/js/admin/admin-layout.js`, `frontend/assets/js/admin/dashboard.js`, `frontend/assets/js/admin/categories.js`, `frontend/assets/js/admin/promotions.js`, `frontend/assets/js/admin/orders.js`, `frontend/assets/js/admin/order-detail.js`, `frontend/assets/js/core/mock.js`, `frontend/assets/js/components/confirm-dialog.js`, `frontend/assets/css/admin.css`, `docs/FRONTEND_CHO_BACKEND.md`.
 - **API backend cần có:** `GET /admin/dashboard`, CRUD `/admin/categories`, danh sách/chi tiết/cập nhật trạng thái/hủy/điều chỉnh phí đơn hàng; xác nhận route khuyến mãi tại phần đề nghị thay đổi API.
 - **Tự kiểm tra:** vào các trang Tổng quan, Danh mục, Khuyến mãi, Đơn hàng; kiểm tra chart, CRUD danh mục, chọn tối đa 10 sản phẩm, chuyển trạng thái COD/nhận tại cửa hàng, hủy có lý do và phí tối đa 100.000đ.
+
+## 2026-11-22 — Admin kho, khách hàng, thống kê và tài khoản (A9 P3)
+
+- **File:** `frontend/assets/js/admin/inventory.js`, `frontend/assets/js/admin/customers.js`, `frontend/assets/js/admin/statistics.js`, `frontend/assets/js/admin/account.js`, `frontend/assets/js/admin/admin-layout.js`, `frontend/assets/js/core/mock.js`, `frontend/assets/css/admin.css`, `frontend/admin/thong-ke.html`, `docs/FRONTEND_CHO_BACKEND.md`.
+- **API backend cần có:** `GET /admin/inventory/movements`, `POST /admin/inventory/receipts`, `GET /admin/customers`, `GET/PATCH /admin/customers/{id}/status`, `GET /admin/reports?from=&to=`, `GET/PATCH /admin/account` và `POST /admin/account/password`. Chi tiết tại mục YC2 — Admin kho, khách hàng, thống kê và tài khoản.
+- **Tự kiểm tra:** mở các trang Nhập hàng, Lịch sử kho, Cảnh báo kho, Khách hàng, Thống kê và Tài khoản; thử lọc dữ liệu và kiểm tra các hành động chưa làm chỉ hiển thị thông báo phát triển.
