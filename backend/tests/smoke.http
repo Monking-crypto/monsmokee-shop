@@ -1,0 +1,9 @@
+﻿### MON SMOKEE smoke test
+### Dán các dòng này vào REST Client sau khi backend Giai đoạn 3 hoàn tất
+GET http://localhost/monsmokee/backend/public/api/csrf
+
+PATCH http://localhost/monsmokee/backend/public/api/admin/orders/1/status
+Content-Type: application/json
+X-CSRF-Token: {{csrf}}
+
+{"trang_thai":"DANG_GIAO"}

@@ -1,0 +1,10 @@
+vendor/
+.env
+backend/storage/logs/*
+backend/storage/mail_outbox/*
+backend/storage/rate_limit/*
+backend/uploads/*
+!backend/storage/logs/.gitkeep
+!backend/storage/mail_outbox/.gitkeep
+!backend/storage/rate_limit/.gitkeep
+!backend/uploads/products/.gitkeep
