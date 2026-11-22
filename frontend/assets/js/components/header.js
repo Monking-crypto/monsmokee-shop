@@ -33,7 +33,7 @@ export async function mountHeader(host) {
       </div>
     </div>
     <div class="catbar"><div class="ms-container">
-      <button class="catbar__btn" id="cat-btn" type="button"><i class="bi bi-list" aria-hidden="true"></i>Danh mục sản phẩm</button>
+      <button class="catbar__btn" id="cat-btn" type="button" aria-controls="catmenu-dialog" aria-expanded="false"><i class="bi bi-list" aria-hidden="true"></i>Danh mục sản phẩm</button>
       <a class="catbar__link catbar__link--sale" href="index.html#sale-thu-6">Siêu sale Thứ 6</a>
       <a class="catbar__link catbar__link--exp" href="can-han.html">Cận hạn giảm 50%</a>
       <a class="catbar__link" href="ban-chay.html">Bán chạy</a>

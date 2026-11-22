@@ -63,7 +63,7 @@ export function bindProductCards(root = document) {
     }
     const { confirmed, quantity } = await confirmDialog({
       title: 'Thêm vào giỏ hàng?',
-      message: quantityPlaceholder(product),
+      message: `Bạn có chắc chắn muốn thêm 1 × ${product.ten_san_pham} vào giỏ hàng?`,
       product,
       quantityMessage: (count) => `Bạn có chắc chắn muốn thêm ${count} × ${product.ten_san_pham} vào giỏ hàng?`,
       confirmText: 'Thêm vào giỏ',
@@ -78,8 +78,4 @@ export function bindProductCards(root = document) {
       if (error instanceof ApiError && error.status) toast(error.message, 'error');
     }
   });
-}
-
-function quantityPlaceholder(product) {
-  return `1 × ${product.ten_san_pham}`;
 }

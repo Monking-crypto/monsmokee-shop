@@ -15,7 +15,7 @@ export function confirmDialog({
   if (activeDialog) activeDialog(false);
 
   const returnFocus = document.activeElement;
-  const maxQuantity = product ? Math.max(1, Math.min(99, Number(product.so_luong_ton) || 1)) : 1;
+  const maxQuantity = product ? Math.max(1, Math.min(99, Math.floor(Number(product.so_luong_ton) || 1))) : 1;
   const dialog = document.createElement('div');
   dialog.className = 'confirm-dialog';
   dialog.innerHTML = `<div class="confirm-dialog__scrim" data-cancel></div>
@@ -46,7 +46,7 @@ export function confirmDialog({
       if (settled) return;
       settled = true;
       activeDialog = null;
-      const quantity = Number(dialog.querySelector('input[type="number"]')?.value) || 1;
+      const quantity = quantityInput ? normalizeQuantity() : 1;
       const inputValue = dialog.querySelector('[data-dialog-input]')?.value || '';
       dialog.remove();
       returnFocus?.focus?.();
@@ -67,7 +67,13 @@ export function confirmDialog({
         updateQuantityMessage();
       }
     });
-    quantityInput?.addEventListener('input', updateQuantityMessage);
+    quantityInput?.addEventListener('input', () => {
+      const value = Number(quantityInput.value);
+      if (Number.isFinite(value) && value > maxQuantity) quantityInput.value = String(maxQuantity);
+      else if (Number.isFinite(value) && value < 1) quantityInput.value = '1';
+      updateQuantityMessage();
+    });
+    quantityInput?.addEventListener('change', normalizeQuantity);
     dialogInput?.addEventListener('input', () => {
       if (input?.required) confirmButton.disabled = !dialogInput.value.trim();
     });
@@ -96,8 +102,18 @@ export function confirmDialog({
 
     function updateQuantityMessage() {
       if (quantityMessage && quantityInput) {
-        dialog.querySelector('#confirm-message').textContent = quantityMessage(Number(quantityInput.value) || 1);
+        const value = Number(quantityInput.value);
+        const count = Number.isFinite(value) ? Math.max(1, Math.min(maxQuantity, Math.floor(value))) : 1;
+        dialog.querySelector('#confirm-message').textContent = quantityMessage(count);
       }
+    }
+
+    function normalizeQuantity() {
+      const value = Number(quantityInput.value);
+      const count = Number.isFinite(value) ? Math.max(1, Math.min(maxQuantity, Math.floor(value))) : 1;
+      quantityInput.value = String(count);
+      updateQuantityMessage();
+      return count;
     }
   });
 }

@@ -11,7 +11,7 @@ export async function initCategoryMenu(host) {
   panel.className = 'catmenu';
   panel.hidden = true;
   panel.innerHTML = `<div class="catmenu__scrim" data-close></div>
-    <section class="catmenu__panel" role="dialog" aria-modal="true" aria-labelledby="catmenu-title" tabindex="-1">
+    <section id="catmenu-dialog" class="catmenu__panel" role="dialog" aria-modal="true" aria-labelledby="catmenu-title" tabindex="-1">
       <header class="catmenu__header"><h2 id="catmenu-title">Danh mục sản phẩm</h2>
         <button class="catmenu__close" type="button" aria-label="Đóng danh mục" data-close>×</button></header>
       <nav aria-label="Danh mục sản phẩm">
@@ -46,10 +46,14 @@ export async function initCategoryMenu(host) {
     }));
   } catch { panel.querySelector('#catmenu-list').innerHTML = '<li class="ms-muted p-2">Không tải được danh mục</li>'; }
 }
-export const toggleCategoryMenu = () => { if (panel) panel.hidden ? openCategoryMenu() : closeCategoryMenu(); };
-export const openCategoryMenu = () => {
+export const toggleCategoryMenu = (event) => {
   if (!panel) return;
-  opener = document.getElementById('cat-btn');
+  if (panel.hidden) openCategoryMenu(event?.currentTarget);
+  else closeCategoryMenu();
+};
+export const openCategoryMenu = (trigger = document.activeElement) => {
+  if (!panel) return;
+  opener = trigger instanceof HTMLElement ? trigger : document.getElementById('cat-btn');
   previousOverflow = document.body.style.overflow;
   panel.hidden = false;
   document.body.style.overflow = 'hidden';

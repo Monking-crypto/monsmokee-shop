@@ -1,6 +1,6 @@
 import { api } from '../core/api.js';
 import { escapeHtml, notImplemented, qs } from '../core/ui.js';
-import { formatDate, formatVnd } from '../core/format.js';
+import { formatDate, formatVnd, normalizeKeyword } from '../core/format.js';
 
 const root = qs('#admin-page-content');
 let customers = [];
@@ -8,7 +8,7 @@ let customers = [];
 function render() {
   const query = qs('#customer-search')?.value.trim().toLocaleLowerCase('vi') || '';
   const filtered = customers.filter((customer) =>
-    `${customer.ho_ten} ${customer.so_dien_thoai}`.toLocaleLowerCase('vi').includes(query));
+    normalizeKeyword(`${customer.ho_ten} ${customer.so_dien_thoai}`).includes(normalizeKeyword(query)));
   root.innerHTML = `<div class="admin-breadcrumb">Quản trị <span>/</span> Khách hàng</div>
     <section class="admin-kpis admin-customer-kpis">
       <article class="admin-kpi"><div><span>Tổng khách hàng mẫu</span><strong>${customers.length}</strong></div></article>

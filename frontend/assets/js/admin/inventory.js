@@ -1,6 +1,6 @@
 import { api } from '../core/api.js';
 import { escapeHtml, notImplemented, qs } from '../core/ui.js';
-import { formatDate, formatVnd } from '../core/format.js';
+import { formatDate, formatVnd, normalizeKeyword } from '../core/format.js';
 
 const root = qs('#admin-page-content');
 const page = document.body.dataset.page;
@@ -50,7 +50,7 @@ function renderHistory(products) {
         <input name="query" type="search" aria-label="Tìm sản phẩm" placeholder="Tìm sản phẩm"></div><button class="admin-button" type="submit">Lọc</button>
     </form>
     <div class="admin-table-scroll"><table class="admin-table"><thead><tr><th>Mã phiếu</th><th>Loại giao dịch</th><th>Sản phẩm</th><th>Thay đổi</th><th>Người thao tác</th><th>Thời gian</th></tr></thead>
-      <tbody id="stock-history-rows">${events.map((event) => `<tr data-stock-event data-type="${event.type}" data-name="${escapeHtml(event.product.ten_san_pham.toLocaleLowerCase('vi'))}">
+      <tbody id="stock-history-rows">${events.map((event) => `<tr data-stock-event data-type="${event.type}" data-name="${escapeHtml(normalizeKeyword(event.product.ten_san_pham))}">
         <td>${event.id}</td><td>${event.type}</td><td>${escapeHtml(event.product.ten_san_pham)}</td><td>${event.quantity > 0 ? '+' : ''}${event.quantity}</td>
         <td>${event.actor}</td><td>${formatDate(event.date, true)}</td></tr>`).join('')}</tbody></table></div>
     <div class="admin-pagination"><span>${events.length} giao dịch mẫu</span></div>`;
@@ -58,7 +58,7 @@ function renderHistory(products) {
   qs('#stock-history-filter').addEventListener('submit', (event) => {
     event.preventDefault();
     const type = event.currentTarget.elements.type.value;
-    const query = event.currentTarget.elements.query.value.trim().toLocaleLowerCase('vi');
+    const query = normalizeKeyword(event.currentTarget.elements.query.value);
     root.querySelectorAll('[data-stock-event]').forEach((row) => {
       row.hidden = (type && row.dataset.type !== type) || (query && !row.dataset.name.includes(query));
     });

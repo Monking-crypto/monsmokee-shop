@@ -7,7 +7,7 @@ export function mountBottomNav(host, active = 'home') {
   const cls = (k) => (k === active ? ' class="is-active" aria-current="page"' : '');
   host.innerHTML = `
     <a href="index.html"${cls('home')}><i class="bi bi-house-door"></i>Trang chủ</a>
-    <button type="button" id="bn-cat" aria-label="Danh mục sản phẩm"><i class="bi bi-list"></i>Danh mục</button>
+    <button type="button" id="bn-cat" aria-label="Danh mục sản phẩm" aria-controls="catmenu-dialog" aria-expanded="false"><i class="bi bi-list"></i>Danh mục</button>
     <a href="gio-hang.html"${cls('cart')}><i class="bi bi-cart3"><span class="ms-count" data-cart-badge hidden>0</span></i>Giỏ hàng</a>
     <a href="${document.documentElement.dataset.auth === 'in' ? 'tai-khoan.html' : 'dang-nhap.html'}"${cls('account')}><i class="bi bi-person"></i>Tài khoản</a>`;
   host.querySelector('#bn-cat').addEventListener('click', toggleCategoryMenu);
