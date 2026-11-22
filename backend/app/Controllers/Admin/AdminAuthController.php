@@ -219,6 +219,8 @@ final class AdminAuthController
         Session::remove('user_id');
         Session::remove('user_role');
         Session::remove('auth_user');
+        Session::remove('admin_otp_verified');
+        Session::remove('admin_otp_verified_at');
         Session::remove('admin_pending_user_id');
         Session::remove('admin_pending_started_at');
         Session::remove('admin_pending_expires_at');
@@ -236,6 +238,199 @@ final class AdminAuthController
             'expires_in_seconds' => $otp['expires_in_seconds'],
             'resend_after_seconds' => (int) $this->business['otp']['resend_cooldown_seconds'],
         ]);
+    }
+
+    public function verifyOtp(Request $request, array $params = []): void
+    {
+        $userId = $this->pendingAdminUserId();
+        if ($userId === null) {
+            Response::error('Phiên chờ xác thực OTP không hợp lệ hoặc đã hết hạn', 401);
+            return;
+        }
+
+        $user = $this->findUser($userId);
+        if (
+            $user === false
+            || $user['ten_vai_tro'] !== 'Admin'
+            || (int) $user['trang_thai'] !== 1
+        ) {
+            $this->clearPendingAdmin();
+            Response::error('Tài khoản Admin không còn khả dụng', 403);
+            return;
+        }
+
+        $input = $request->all();
+        $otp = is_string($input['otp'] ?? null) ? trim($input['otp']) : '';
+        $verification = $this->otpService->verify((string) $user['email'], 'DANG_NHAP_ADMIN', $otp);
+        if (!$verification['valid']) {
+            $reason = $verification['reason'] ?? 'OTP_WRONG';
+            $remainingAttempts = (int) ($verification['remaining_attempts'] ?? 0);
+            if (in_array($reason, ['OTP_EXPIRED', 'OTP_INVALIDATED', 'OTP_NOT_FOUND'], true)) {
+                $this->clearPendingAdmin();
+            }
+
+            $message = $reason === 'OTP_EXPIRED'
+                ? 'Mã OTP đã hết hạn, vui lòng đăng nhập lại'
+                : 'Mã OTP không đúng, vui lòng thử lại';
+            Response::error($message, 422, ['remaining_attempts' => $remainingAttempts]);
+            return;
+        }
+
+        Session::remove('user_id');
+        Session::remove('user_role');
+        Session::remove('auth_user');
+        $this->clearPendingAdmin();
+        Session::regenerate();
+        Session::set('user_id', (int) $user['id']);
+        Session::set('user_role', 'Admin');
+        Session::set('admin_otp_verified', true);
+        Session::set('admin_otp_verified_at', time());
+
+        Response::success('Đăng nhập Admin thành công', [
+            'user' => $this->publicUser($user),
+        ]);
+    }
+
+    public function resendOtp(Request $request, array $params = []): void
+    {
+        $userId = $this->pendingAdminUserId();
+        if ($userId === null) {
+            Response::error('Phiên chờ xác thực OTP không hợp lệ hoặc đã hết hạn', 401);
+            return;
+        }
+
+        $user = $this->findUser($userId);
+        if (
+            $user === false
+            || $user['ten_vai_tro'] !== 'Admin'
+            || (int) $user['trang_thai'] !== 1
+        ) {
+            $this->clearPendingAdmin();
+            Response::error('Tài khoản Admin không còn khả dụng', 403);
+            return;
+        }
+
+        try {
+            $otp = $this->otpService->resend(
+                (string) $user['email'],
+                'DANG_NHAP_ADMIN',
+                $request->ip()
+            );
+        } catch (RuntimeException $error) {
+            if ($error->getMessage() === 'OTP_NOT_FOUND') {
+                $this->clearPendingAdmin();
+                Response::error('Không tìm thấy OTP đăng nhập đang chờ xác thực', 401);
+                return;
+            }
+            if (str_starts_with($error->getMessage(), 'OTP_RESEND_COOLDOWN:')) {
+                $remaining = (int) substr($error->getMessage(), strlen('OTP_RESEND_COOLDOWN:'));
+                Response::error(
+                    'Vui lòng chờ trước khi yêu cầu mã OTP mới',
+                    429,
+                    ['resend_after_seconds' => $remaining]
+                );
+                return;
+            }
+            if ($error->getMessage() === 'OTP_MAX_SENDS_PER_HOUR') {
+                Response::error(
+                    'Đã vượt quá số lần gửi OTP cho phép, vui lòng thử lại sau',
+                    429
+                );
+                return;
+            }
+            if ($error->getMessage() === 'OTP_SEND_FAILED') {
+                Response::error('Không thể gửi email OTP lúc này, vui lòng thử lại sau', 500);
+                return;
+            }
+            throw $error;
+        }
+
+        $expiresAt = (new DateTimeImmutable($otp['expires_at']))->getTimestamp();
+        Session::set(
+            'admin_pending_started_at',
+            $expiresAt - (int) $otp['expires_in_seconds']
+        );
+        Session::set('admin_pending_expires_at', $expiresAt);
+
+        Response::success('Đã gửi lại mã OTP đăng nhập Admin', [
+            'email_masked' => $this->maskEmail((string) $user['email']),
+            'expires_in_seconds' => $otp['expires_in_seconds'],
+            'resend_after_seconds' => (int) $this->business['otp']['resend_cooldown_seconds'],
+        ]);
+    }
+
+    public function me(Request $request, array $params = []): void
+    {
+        $user = $this->findUser((int) Session::get('user_id'));
+        if ($user === false || (int) $user['trang_thai'] !== 1) {
+            Session::destroy();
+            Response::error('Phiên Admin không hợp lệ hoặc tài khoản đã bị khóa', 401);
+            return;
+        }
+        if ($user['ten_vai_tro'] !== 'Admin') {
+            Session::destroy();
+            Response::error('Bạn không có quyền truy cập chức năng này', 403);
+            return;
+        }
+
+        Response::success('Thông tin tài khoản Admin hiện tại', [
+            'user' => $this->publicUser($user),
+        ]);
+    }
+
+    private function pendingAdminUserId(): ?int
+    {
+        $userId = Session::get('admin_pending_user_id');
+        $startedAt = Session::get('admin_pending_started_at');
+        $expiresAt = Session::get('admin_pending_expires_at');
+        $now = time();
+
+        if (
+            !is_numeric($userId)
+            || (int) $userId < 1
+            || !is_numeric($startedAt)
+            || !is_numeric($expiresAt)
+            || (int) $startedAt > $now
+            || (int) $expiresAt <= $now
+            || (int) $expiresAt <= (int) $startedAt
+        ) {
+            $this->clearPendingAdmin();
+            return null;
+        }
+
+        return (int) $userId;
+    }
+
+    private function clearPendingAdmin(): void
+    {
+        Session::remove('admin_pending_user_id');
+        Session::remove('admin_pending_started_at');
+        Session::remove('admin_pending_expires_at');
+    }
+
+    private function findUser(int $userId): array|false
+    {
+        $query = $this->pdo->prepare(
+            'SELECT u.id, u.ho_ten, u.so_dien_thoai, u.email, u.trang_thai, v.ten_vai_tro
+             FROM nguoi_dung u
+             JOIN vai_tro v ON v.id = u.vai_tro_id
+             WHERE u.id = ?
+             LIMIT 1'
+        );
+        $query->execute([$userId]);
+        $user = $query->fetch(PDO::FETCH_ASSOC);
+        return $user;
+    }
+
+    private function publicUser(array $user): array
+    {
+        return [
+            'id' => (int) $user['id'],
+            'ho_ten' => $user['ho_ten'],
+            'so_dien_thoai' => $user['so_dien_thoai'],
+            'email' => $user['email'],
+            'vai_tro' => $user['ten_vai_tro'],
+        ];
     }
 
     private function maskEmail(string $email): string

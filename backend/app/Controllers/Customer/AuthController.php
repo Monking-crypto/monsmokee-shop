@@ -565,6 +565,11 @@ final class AuthController
     private function startCustomerSession(array $user): void
     {
         Session::regenerate();
+        Session::remove('admin_pending_user_id');
+        Session::remove('admin_pending_started_at');
+        Session::remove('admin_pending_expires_at');
+        Session::remove('admin_otp_verified');
+        Session::remove('admin_otp_verified_at');
         Session::set('user_id', $user['id']);
         Session::set('user_role', $user['vai_tro']);
         Session::set('auth_user', $user);

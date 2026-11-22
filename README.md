@@ -18,7 +18,7 @@ Website tạp hóa MON SMOKEE xây dựng bằng PHP thuần, MySQL và Bootstra
    - MySQL: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS`.
    - Tài khoản Admin: `ADMIN_PHONE`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NAME`.
    - Email OTP: để `MAIL_DRIVER=log` khi phát triển cục bộ; nếu dùng SMTP, điền `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `SMTP_FROM_NAME`.
-   - Session: `SESSION_NAME`, `SESSION_LIFETIME_SECONDS`, `SESSION_IDLE_TIMEOUT_SECONDS`.
+   - Session: `SESSION_NAME`, `SESSION_LIFETIME_SECONDS`, `SESSION_IDLE_TIMEOUT_SECONDS` (mặc định 2 giờ), `ADMIN_SESSION_IDLE_TIMEOUT_SECONDS` (mặc định 30 phút).
    Không commit `backend/.env`; file này chứa thông tin riêng.
 4. Mở PowerShell/CMD tại thư mục dự án và cài dependency trong đúng thư mục backend:
    ```text

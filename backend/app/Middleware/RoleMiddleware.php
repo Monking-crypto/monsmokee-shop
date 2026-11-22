@@ -22,7 +22,7 @@ final class RoleMiddleware
         $roles = is_array($allowedRoles) ? $allowedRoles : [$allowedRoles];
         $currentRole = Session::get('user_role');
 
-        // Route Admin ở bước sau cần kiểm tra thêm cờ đã xác thực OTP trong session.
+        // Admin routes must use AdminMiddleware to require OTP verification.
         if (!is_string($currentRole) || !in_array($currentRole, $roles, true)) {
             Response::error('Bạn không có quyền truy cập chức năng này', 403);
             return false;

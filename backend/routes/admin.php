@@ -23,3 +23,18 @@ $router->post(
     [$adminAuthController, 'login'],
     [static fn(Request $request): bool => CsrfMiddleware::handle($request)]
 );
+$router->post(
+    '/api/admin/auth/verify-otp',
+    [$adminAuthController, 'verifyOtp'],
+    [static fn(Request $request): bool => CsrfMiddleware::handle($request)]
+);
+$router->post(
+    '/api/admin/auth/otp/resend',
+    [$adminAuthController, 'resendOtp'],
+    [static fn(Request $request): bool => CsrfMiddleware::handle($request)]
+);
+$router->get(
+    '/api/admin/me',
+    [$adminAuthController, 'me'],
+    [static fn(Request $request): bool => App\Middleware\AdminMiddleware::handle($request)]
+);
