@@ -1,21 +1,42 @@
-### MON SMOKEE smoke test - Đăng ký bước 1
+### MON SMOKEE smoke test - Đăng ký khách hàng
 # Thay số điện thoại/email bằng giá trị chưa có trong CSDL trước khi gửi.
 @testPhone = 0987654321
 @testEmail = thay-email-bang-dia-chi-that@example.com
+@testOtp = thay-bang-6-so-trong-mail_outbox
 
 ### Lấy CSRF token
 # @name getCsrf
 GET http://localhost/monsmokee/backend/public/api/csrf
 
 ### Đăng ký bước 1 - OTP sẽ nằm trong backend/storage/mail_outbox
+# @name registerStart
 POST http://localhost/monsmokee/backend/public/api/auth/register/start
 Content-Type: application/json
 X-CSRF-Token: {{getCsrf.response.body.data.csrf_token}}
 
 {
   "ho_ten": "Nguyen Van Test",
-  "so_dien_thoai": "{{testPhone}}",
-  "email": "{{testEmail}}",
+  "so_dien_thoai": "0912345678",
+  "email": "1234@gmail.com",
   "mat_khau": "abc12345",
   "nhap_lai_mat_khau": "abc12345"
+}
+
+### Gửi lại OTP đăng ký (chỉ thành công sau cooldown 60 giây)
+POST http://localhost/monsmokee/backend/public/api/auth/otp/resend
+Content-Type: application/json
+X-CSRF-Token: {{getCsrf.response.body.data.csrf_token}}
+
+{
+  "email": "{{testEmail}}"
+}
+
+### Xác thực OTP đăng ký - thay testOtp bằng mã mới nhất trong mail_outbox
+POST http://localhost/monsmokee/backend/public/api/auth/register/verify
+Content-Type: application/json
+X-CSRF-Token: {{getCsrf.response.body.data.csrf_token}}
+
+{
+  "email": "{{testEmail}}",
+  "otp": "{{testOtp}}"
 }

@@ -29,10 +29,18 @@ $router->post(
     [$authController, 'registerStart'],
     [static fn(Request $request): bool => CsrfMiddleware::handle($request)]
 );
+$router->post(
+    '/api/auth/register/verify',
+    [$authController, 'registerVerify'],
+    [static fn(Request $request): bool => CsrfMiddleware::handle($request)]
+);
+$router->post(
+    '/api/auth/otp/resend',
+    [$authController, 'resendRegistrationOtp'],
+    [static fn(Request $request): bool => CsrfMiddleware::handle($request)]
+);
 
 $customerMutations = [
-    '/api/auth/register/verify',
-    '/api/auth/otp/resend',
     '/api/auth/login',
     '/api/auth/logout',
 ];

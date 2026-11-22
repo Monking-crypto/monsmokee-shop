@@ -134,7 +134,12 @@ final class OtpService
         ];
     }
 
-    public function resend(string $email, string $purpose, ?string $ip = null): array
+    public function resend(
+        string $email,
+        string $purpose,
+        ?string $ip = null,
+        bool $requireTemporaryData = false
+    ): array
     {
         $email = strtolower(trim($email));
         $latest = $this->pdo->prepare(
@@ -145,6 +150,10 @@ final class OtpService
         );
         $latest->execute([$email, $purpose]);
         $row = $latest->fetch(PDO::FETCH_ASSOC);
+        if ($row === false) {
+            throw new RuntimeException('OTP_NOT_FOUND');
+        }
+
         $temporaryData = null;
         if ($row !== false && is_string($row['du_lieu_tam']) && $row['du_lieu_tam'] !== '') {
             $decoded = json_decode($row['du_lieu_tam'], true);
@@ -152,10 +161,39 @@ final class OtpService
                 $temporaryData = $decoded;
             }
         }
+        if ($requireTemporaryData && $temporaryData === null) {
+            throw new RuntimeException('OTP_DATA_NOT_FOUND');
+        }
         return $this->issue($email, $purpose, $temporaryData, $ip);
     }
 
     public function verify(string $email, string $purpose, string $otp): array
+    {
+        $verification = $this->verifyAndConsume(
+            $email,
+            $purpose,
+            $otp,
+            static fn(?array $temporaryData): ?array => $temporaryData
+        );
+        if (!$verification['valid']) {
+            return $verification;
+        }
+
+        return [
+            'valid' => true,
+            'temporary_data' => $verification['temporary_data'],
+        ];
+    }
+
+    /**
+     * Chạy thao tác thành công khi OTP còn hợp lệ, trong cùng transaction với việc tiêu thụ OTP.
+     */
+    public function verifyAndConsume(
+        string $email,
+        string $purpose,
+        string $otp,
+        callable $onValid
+    ): array
     {
         $email = strtolower(trim($email));
         $config = $this->business['otp'];
@@ -208,10 +246,6 @@ final class OtpService
                 ];
             }
 
-            $consume = $this->pdo->prepare(
-                'UPDATE otp_xac_thuc SET da_su_dung = 1 WHERE id = ?'
-            );
-            $consume->execute([(int) $row['id']]);
             $temporaryData = null;
             if (is_string($row['du_lieu_tam']) && $row['du_lieu_tam'] !== '') {
                 $decoded = json_decode($row['du_lieu_tam'], true);
@@ -219,8 +253,18 @@ final class OtpService
                     $temporaryData = $decoded;
                 }
             }
+
+            $result = $onValid($temporaryData);
+            $consume = $this->pdo->prepare(
+                'UPDATE otp_xac_thuc SET da_su_dung = 1 WHERE id = ?'
+            );
+            $consume->execute([(int) $row['id']]);
             $this->pdo->commit();
-            return ['valid' => true, 'temporary_data' => $temporaryData];
+            return [
+                'valid' => true,
+                'temporary_data' => $temporaryData,
+                'result' => $result,
+            ];
         } catch (Throwable $error) {
             if ($this->pdo->inTransaction()) {
                 $this->pdo->rollBack();
