@@ -10,6 +10,7 @@ export function confirmDialog({
   cancelText = 'Hủy',
   product = null,
   quantityMessage = null,
+  input = null,
 } = {}) {
   if (activeDialog) activeDialog(false);
 
@@ -30,9 +31,12 @@ export function confirmDialog({
           <input type="number" min="1" max="${maxQuantity}" value="1" aria-label="Số lượng sản phẩm">
           <button type="button" data-quantity-step="1" aria-label="Tăng số lượng">+</button></span>
       </label>` : ''}
+      ${input ? `<label class="confirm-dialog__text-input">${escapeHtml(input.label)}
+        <textarea data-dialog-input maxlength="${Number(input.maxLength) || 240}" ${input.required ? 'required' : ''} placeholder="${escapeHtml(input.placeholder || '')}"></textarea>
+      </label>` : ''}
       <div class="confirm-dialog__actions">
         <button type="button" class="ms-btn ms-btn--ghost" data-cancel>${escapeHtml(cancelText)}</button>
-        <button type="button" class="ms-btn ms-btn--green" data-confirm>${escapeHtml(confirmText)}</button>
+        <button type="button" class="ms-btn ms-btn--green" data-confirm ${input?.required ? 'disabled' : ''}>${escapeHtml(confirmText)}</button>
       </div>
     </section>`;
 
@@ -43,13 +47,16 @@ export function confirmDialog({
       settled = true;
       activeDialog = null;
       const quantity = Number(dialog.querySelector('input[type="number"]')?.value) || 1;
+      const inputValue = dialog.querySelector('[data-dialog-input]')?.value || '';
       dialog.remove();
       returnFocus?.focus?.();
-      resolve({ confirmed, quantity });
+      resolve({ confirmed, quantity, inputValue });
     };
     activeDialog = finish;
     const panel = dialog.querySelector('.confirm-dialog__panel');
     const quantityInput = dialog.querySelector('input[type="number"]');
+    const dialogInput = dialog.querySelector('[data-dialog-input]');
+    const confirmButton = dialog.querySelector('[data-confirm]');
     dialog.addEventListener('click', (event) => {
       if (event.target.closest('[data-cancel]')) finish(false);
       if (event.target.closest('[data-confirm]')) finish(true);
@@ -61,12 +68,15 @@ export function confirmDialog({
       }
     });
     quantityInput?.addEventListener('input', updateQuantityMessage);
+    dialogInput?.addEventListener('input', () => {
+      if (input?.required) confirmButton.disabled = !dialogInput.value.trim();
+    });
     dialog.addEventListener('keydown', (event) => {
       if (event.key === 'Escape') {
         event.preventDefault();
         finish(false);
       } else if (event.key === 'Tab') {
-        const focusable = [...panel.querySelectorAll('button:not(:disabled), input:not(:disabled)')];
+        const focusable = [...panel.querySelectorAll('button:not(:disabled), input:not(:disabled), textarea:not(:disabled)')];
         const first = focusable[0], last = focusable[focusable.length - 1];
         if (event.shiftKey && document.activeElement === first) {
           event.preventDefault();
@@ -75,14 +85,14 @@ export function confirmDialog({
           event.preventDefault();
           first.focus();
         }
-      } else if (event.key === 'Enter' && !event.target.matches('[data-cancel]')) {
+      } else if (event.key === 'Enter' && !event.target.matches('[data-cancel], textarea')) {
         event.preventDefault();
-        finish(true);
+        if (!confirmButton.disabled) finish(true);
       }
     });
     document.body.append(dialog);
     panel.focus();
-    (quantityInput || panel.querySelector('[data-confirm]')).focus();
+    (quantityInput || dialogInput || confirmButton).focus();
 
     function updateQuantityMessage() {
       if (quantityMessage && quantityInput) {

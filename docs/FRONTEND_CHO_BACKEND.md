@@ -84,3 +84,11 @@ Thêm các trường sản phẩm `nhom_con`, `huong_vi`, `dong_goi` vào schema
 - CRUD sản phẩm: `GET/POST /admin/products`, `PUT/DELETE /admin/products/{id}`; hỗ trợ tìm/lọc/phân trang phía giao diện. Bổ sung `POST /admin/products/bulk-delete` hoặc thống nhất endpoint xóa hàng loạt.
 - Upload ảnh: `POST /admin/uploads/product-image`, JPG/PNG/WebP tối đa 2MB. Sản phẩm thuộc đơn hàng không xóa cứng; backend cần ẩn sản phẩm và giữ dữ liệu đơn hàng.
 - Tài khoản demo chỉ cấu hình cục bộ trong `frontend/assets/js/core/mock.secrets.js` (đã ignore); tuyệt đối không đưa thông tin xác thực vào file được commit. Backend mới chịu trách nhiệm xác thực quyền admin và gửi email OTP.
+
+## YC2 — Admin dashboard, danh mục và đơn hàng (A9 P2)
+
+- `GET /admin/dashboard` trả `kpi` (doanh thu hôm nay/tháng, đơn chờ xử lý/chờ lấy hàng, số sản phẩm sắp hết/cận hạn), `doanh_thu_7_ngay`, `top_ban_chay`, `don_hang_moi`, `canh_bao_kho` (gồm ngày HSD) và `khuyen_mai`.
+- `GET/POST /admin/categories`, `PUT/DELETE /admin/categories/{id}`. Danh mục trả `id`, `ten_danh_muc`, `slug`, `icon`, `thu_tu`, `children: [{ten, slug}]`, `product_count`. Từ chối xóa danh mục còn sản phẩm bằng HTTP 409.
+- `GET /admin/orders?status=&method=&q=&page=&per_page=`, `GET /admin/orders/{id}`, `PATCH /admin/orders/{id}/status` body `{trang_thai}`, `POST /admin/orders/{id}/cancel` body `{ly_do}`, `PATCH /admin/orders/{id}/shipping` body `{phi_ship}`.
+- Trạng thái đơn: `cho_xu_ly`, `dang_giao`, `cho_lay_hang`, `thanh_cong`, `da_huy`; COD chỉ đi `cho_xu_ly → dang_giao → thanh_cong`, nhận tại cửa hàng chỉ đi `cho_xu_ly → cho_lay_hang → thanh_cong`. Phí giao hàng là số nguyên 0–100.000đ.
+- Frontend mock hiện dùng `GET/PUT /admin/promotions/friday` và `POST /admin/promotions/friday/random`. Đề nghị backend xác nhận các route này hay dùng route chuẩn `/admin/promotions` tại mục 7.

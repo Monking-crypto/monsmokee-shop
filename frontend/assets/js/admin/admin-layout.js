@@ -73,8 +73,12 @@ if (await requireAdmin()) {
     </div>
   </div>`;
   const content = qs('#admin-page-content');
-  if (page === 'products') await import('./products.js');
+  if (page === 'overview') await import('./dashboard.js');
+  else if (page === 'categories') await import('./categories.js');
+  else if (page === 'products') await import('./products.js');
   else if (page === 'promotions') await import('./promotions.js');
+  else if (page === 'orders') await import('./orders.js');
+  else if (page === 'order-detail') await import('./order-detail.js');
   else {
     const steps = STEPS[page] || STEPS.overview;
     content.innerHTML = `<div class="admin-breadcrumb">Quản trị <span>/</span> ${escapeHtml(title)}</div>
@@ -103,6 +107,13 @@ if (await requireAdmin()) {
     const query = event.currentTarget.querySelector('input').value.trim();
     location.assign(`san-pham.html${query ? `?q=${encodeURIComponent(query)}` : ''}`);
   });
+  try {
+    const pending = await api.get('/admin/orders?status=cho_xu_ly&page=1&per_page=1');
+    const badge = qs('#admin-pending-count');
+    if (pending.total) { badge.textContent = pending.total > 99 ? '99+' : pending.total; badge.hidden = false; }
+  } catch (error) {
+    if (error?.status === 0) toast('Không tải được số đơn chờ xử lý.', 'error');
+  }
   qs('#admin-logout').addEventListener('click', async () => {
     try { await api.post('/admin/auth/logout'); location.replace('login.html'); }
     catch { toast('Không thể đăng xuất. Vui lòng thử lại.', 'error'); }
