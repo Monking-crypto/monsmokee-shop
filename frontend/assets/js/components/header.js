@@ -1,6 +1,6 @@
 // header.js - topbar + header sticky + thanh danh mục. Dùng: mountHeader(document.getElementById('site-header'))
 import { CONFIG } from '../core/config.js';
-import { api } from '../core/api.js';
+import { api, ApiError } from '../core/api.js';
 import { escapeHtml, debounce, toast } from '../core/ui.js';
 import { formatVnd } from '../core/format.js';
 import { initCategoryMenu, toggleCategoryMenu } from './category-menu.js';
@@ -61,7 +61,11 @@ export async function refreshCartCount() {
 
 async function renderAuth(el) {
   let user = null;
-  try { user = (await api.get('/auth/me')).user; } catch { /* coi như chưa đăng nhập */ }
+  try {
+    user = (await api.get('/auth/me')).user;
+  } catch (error) {
+    if (!(error instanceof ApiError) || error.status !== 401) toast(error.message || 'Không thể kiểm tra phiên đăng nhập.', 'error');
+  }
   document.documentElement.dataset.auth = user ? 'in' : 'out';
   if (!user) {
     el.innerHTML = '<a class="ms-btn ms-btn--ghost" href="dang-nhap.html">Đăng nhập</a><a class="ms-btn ms-btn--green" href="dang-ky.html">Đăng ký</a>';
@@ -76,7 +80,13 @@ async function renderAuth(el) {
   btn.addEventListener('click', () => { pnl.hidden = !pnl.hidden; btn.setAttribute('aria-expanded', String(!pnl.hidden)); });
   document.addEventListener('click', (e) => { if (!e.target.closest('.user-menu')) pnl.hidden = true; });
   el.querySelector('[data-logout]').addEventListener('click', async () => {
-    try { await api.post('/auth/logout'); toast('Đã đăng xuất'); setTimeout(() => location.assign('index.html'), 500); } catch { /* đã báo lỗi */ }
+    try {
+      await api.post('/auth/logout');
+      toast('Đã đăng xuất');
+      setTimeout(() => location.assign('index.html'), 500);
+    } catch (error) {
+      toast(error instanceof ApiError ? error.message : 'Không thể đăng xuất. Vui lòng thử lại.', 'error');
+    }
   });
 }
 

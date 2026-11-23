@@ -1,7 +1,7 @@
 // login.js - trang đăng nhập
 import { api, ApiError } from '../core/api.js';
 import { rules } from '../core/validators.js';
-import { setFieldError, attachPasswordToggle, safeRedirect, showAlert } from '../core/form.js';
+import { setFieldError, attachPasswordToggle, safeRedirect, showAlert, lockButtonForRetry } from '../core/form.js';
 import { setBusy, toast, qs } from '../core/ui.js';
 
 const form = qs('#login-form'), alertBox = qs('#login-alert');
@@ -11,7 +11,11 @@ attachPasswordToggle(pass);
 
 if (redirect) { alertBox.hidden = false; alertBox.className = 'auth__alert'; alertBox.textContent = 'Vui lòng đăng nhập để tiếp tục thanh toán.'; }
 
-api.get('/auth/me').then((d) => { if (d.user) location.replace('index.html'); }).catch(() => {});
+api.get('/auth/me').then((data) => {
+  if (data.user) location.replace('index.html');
+}).catch((error) => {
+  if (error instanceof ApiError && error.status !== 401) showAlert(alertBox, error.message);
+});
 
 phone.addEventListener('blur', () => setFieldError(phone.closest('.field'), rules.so_dien_thoai(phone.value)));
 pass.addEventListener('blur', () => setFieldError(pass.closest('.field'), pass.value ? '' : 'Vui lòng nhập mật khẩu'));
@@ -23,17 +27,29 @@ form.addEventListener('submit', async (e) => {
   setFieldError(pass.closest('.field'), e2);
   if (e1 || e2) return (e1 ? phone : pass).focus();
   const btn = qs('#login-btn');
+  let retryAfter = 0;
   setBusy(btn, true);
   try {
-    await api.post('/auth/login', { so_dien_thoai: phone.value.trim(), mat_khau: pass.value, redirect });
+    await api.post('/auth/login', { so_dien_thoai: phone.value.trim(), mat_khau: pass.value });
     toast('Đăng nhập thành công');
     setTimeout(() => location.assign(safeRedirect(redirect)), 400);
-  } catch (err) {
+  } catch (error) {
+    if (error instanceof ApiError) {
+      let shownFieldError = false;
+      Object.entries(error.errors || {}).forEach(([key, message]) => {
+        const input = key === 'so_dien_thoai' ? phone : key === 'mat_khau' ? pass : null;
+        if (input && typeof message === 'string') {
+          setFieldError(input.closest('.field'), message);
+          shownFieldError = true;
+        }
+      });
+      if (!shownFieldError || error.status !== 422) showAlert(alertBox, error.message);
+      if (error.status === 429) retryAfter = error.retryAfterSeconds || 60;
+    } else {
+      showAlert(alertBox, 'Không thể đăng nhập lúc này. Vui lòng thử lại.');
+    }
+  } finally {
     setBusy(btn, false);
-    if (!(err instanceof ApiError)) return;
-    // 3 loại lỗi theo mục 5.2: sai thông tin chung / tài khoản bị khóa / quá nhiều lần thử
-    if (err.status === 423 || err.status === 403) showAlert(alertBox, err.message || 'Tài khoản đang bị khóa. Vui lòng liên hệ cửa hàng.');
-    else if (err.status === 429) showAlert(alertBox, err.message || 'Bạn đã thử quá nhiều lần. Vui lòng chờ ít phút rồi đăng nhập lại.');
-    else if (err.status) showAlert(alertBox, 'Số điện thoại hoặc mật khẩu chưa đúng.');
+    if (retryAfter) lockButtonForRetry(btn, retryAfter, 'Thử lại');
   }
 });

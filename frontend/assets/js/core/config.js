@@ -1,9 +1,14 @@
 // config.js - cấu hình duy nhất của frontend
+const frontendPath = location.pathname.indexOf('/frontend/');
+const projectPath = frontendPath >= 0 ? location.pathname.slice(0, frontendPath) : '';
+
 export const CONFIG = {
   // Backend dev (cùng origin Apache để dùng PHP Session cookie)
-  API_BASE: '/monsmokee/backend/public/api',
+  API_BASE: `${projectPath}/backend/public/api`,
   // true: dùng dữ liệu mẫu trong mock.js (xem giao diện khi backend chưa xong). Đổi thành false khi backend sẵn sàng.
   USE_MOCK: true,
+  // Auth uses the backend session API while catalog and cart remain mocked.
+  USE_AUTH_MOCK: false,
   STORE_INFO: {
     name: 'MON SMOKEE',
     address: '', // ĐIỀN SAU
