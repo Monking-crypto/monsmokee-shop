@@ -4,6 +4,10 @@
 @customerEmail =
 @customerPassword =
 @customerOtp =
+@wrongResetOtp =
+@resetOtp =
+@newPassword =
+@adminEmail =
 @adminPhone =
 @adminPassword =
 @adminOtp =
@@ -48,32 +52,91 @@ X-CSRF-Token: {{csrf.response.body.data.csrf_token}}
   "otp": "{{customerOtp}}"
 }
 
-### 6. Xem Customer hiện tại - 200
-GET http://localhost/monsmokee/backend/public/api/auth/me
-
-### Customer không được vào Admin - 403
-GET http://localhost/monsmokee/backend/public/api/admin/me
-
-### 7. Logout Customer - 200
-POST http://localhost/monsmokee/backend/public/api/auth/logout
+### 6. Bắt đầu quên mật khẩu Customer - response luôn chung 200
+POST http://localhost/monsmokee/backend/public/api/auth/forgot-password/start
+Content-Type: application/json
 X-CSRF-Token: {{csrf.response.body.data.csrf_token}}
 
+{
+  "email": "{{customerEmail}}"
+}
+
+### Gửi lại ngay - phải trả 429 do cooldown 60 giây
+POST http://localhost/monsmokee/backend/public/api/auth/forgot-password/resend
+Content-Type: application/json
+X-CSRF-Token: {{csrf.response.body.data.csrf_token}}
+
+{
+  "email": "{{customerEmail}}"
+}
+
+### OTP sai 6 chữ số - phải trả 422, không đổi mật khẩu
+POST http://localhost/monsmokee/backend/public/api/auth/forgot-password/verify
+Content-Type: application/json
+X-CSRF-Token: {{csrf.response.body.data.csrf_token}}
+
+{
+  "email": "{{customerEmail}}",
+  "otp": "{{wrongResetOtp}}",
+  "mat_khau": "{{newPassword}}",
+  "nhap_lai_mat_khau": "{{newPassword}}"
+}
+
+### Xác nhận OTP và đổi mật khẩu - phải trả 200, không tự đăng nhập
+POST http://localhost/monsmokee/backend/public/api/auth/forgot-password/verify
+Content-Type: application/json
+X-CSRF-Token: {{csrf.response.body.data.csrf_token}}
+
+{
+  "email": "{{customerEmail}}",
+  "otp": "{{resetOtp}}",
+  "mat_khau": "{{newPassword}}",
+  "nhap_lai_mat_khau": "{{newPassword}}"
+}
+
 ###
-# @name csrfAfterCustomerLogout
+# @name csrfAfterPasswordReset
 GET http://localhost/monsmokee/backend/public/api/csrf
 
-### Sau logout, Customer me - 401
-GET http://localhost/monsmokee/backend/public/api/auth/me
+### Dùng lại OTP đã tiêu thụ - phải trả 422
+POST http://localhost/monsmokee/backend/public/api/auth/forgot-password/verify
+Content-Type: application/json
+X-CSRF-Token: {{csrfAfterPasswordReset.response.body.data.csrf_token}}
 
-### Logout lần hai vẫn thành công - 200
-POST http://localhost/monsmokee/backend/public/api/auth/logout
-X-CSRF-Token: {{csrfAfterCustomerLogout.response.body.data.csrf_token}}
+{
+  "email": "{{customerEmail}}",
+  "otp": "{{resetOtp}}",
+  "mat_khau": "{{newPassword}}",
+  "nhap_lai_mat_khau": "{{newPassword}}"
+}
+
+### Email Admin cũng nhận response chung 200 và không gửi thư
+POST http://localhost/monsmokee/backend/public/api/auth/forgot-password/start
+Content-Type: application/json
+X-CSRF-Token: {{csrfAfterPasswordReset.response.body.data.csrf_token}}
+
+{
+  "email": "{{adminEmail}}"
+}
+
+### 7. Xem Customer hiện tại sau reset - phải trả 401
+GET http://localhost/monsmokee/backend/public/api/auth/me
 
 ###
 # @name csrfForCustomerLogin
 GET http://localhost/monsmokee/backend/public/api/csrf
 
-### 8. Đăng nhập Customer - dùng tài khoản đã đăng ký ở trên
+### Đăng nhập bằng mật khẩu mới - phải trả 200
+POST http://localhost/monsmokee/backend/public/api/auth/login
+Content-Type: application/json
+X-CSRF-Token: {{csrfForCustomerLogin.response.body.data.csrf_token}}
+
+{
+  "so_dien_thoai": "{{customerPhone}}",
+  "mat_khau": "{{newPassword}}"
+}
+
+### Đăng nhập bằng mật khẩu cũ - phải trả 401
 POST http://localhost/monsmokee/backend/public/api/auth/login
 Content-Type: application/json
 X-CSRF-Token: {{csrfForCustomerLogin.response.body.data.csrf_token}}
@@ -83,7 +146,10 @@ X-CSRF-Token: {{csrfForCustomerLogin.response.body.data.csrf_token}}
   "mat_khau": "{{customerPassword}}"
 }
 
-### 9. Logout Customer trước khi thử Admin
+### Customer không được vào Admin - 403
+GET http://localhost/monsmokee/backend/public/api/admin/me
+
+### Logout Customer trước khi thử Admin
 POST http://localhost/monsmokee/backend/public/api/auth/logout
 X-CSRF-Token: {{csrfForCustomerLogin.response.body.data.csrf_token}}
 

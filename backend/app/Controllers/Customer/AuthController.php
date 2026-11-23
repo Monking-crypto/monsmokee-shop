@@ -242,6 +242,174 @@ final class AuthController
         Response::success('Đăng ký thành công', ['user' => $result['user']], 201);
     }
 
+    public function forgotPasswordStart(Request $request, array $params = []): void
+    {
+        $input = $request->all();
+        $email = is_string($input['email'] ?? null)
+            ? strtolower(trim($input['email']))
+            : '';
+        $rateLimit = $this->consumeForgotPasswordSendLimit($email, $request->ip());
+        if (!$rateLimit['allowed']) {
+            $this->respondForgotPasswordGeneric();
+            return;
+        }
+
+        if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $customer = $this->findActiveCustomerByEmail($email);
+            if ($customer !== false) {
+                try {
+                    $this->otpService->issue(
+                        $email,
+                        'QUEN_MAT_KHAU',
+                        null,
+                        $request->ip()
+                    );
+                } catch (RuntimeException $error) {
+                    if (
+                        !str_starts_with($error->getMessage(), 'OTP_RESEND_COOLDOWN:')
+                        && $error->getMessage() !== 'OTP_MAX_SENDS_PER_HOUR'
+                        && $error->getMessage() !== 'OTP_SEND_FAILED'
+                    ) {
+                        throw $error;
+                    }
+                    Logger::error('Forgot-password OTP dispatch failed: ' . $error->getMessage());
+                }
+            }
+        }
+
+        $this->respondForgotPasswordGeneric();
+    }
+
+    public function forgotPasswordVerify(Request $request, array $params = []): void
+    {
+        $input = $request->all();
+        $data = [
+            'email' => is_string($input['email'] ?? null)
+                ? strtolower(trim($input['email']))
+                : '',
+            'otp' => is_string($input['otp'] ?? null) ? trim($input['otp']) : '',
+            'mat_khau' => is_string($input['mat_khau'] ?? null) ? $input['mat_khau'] : '',
+            'nhap_lai_mat_khau' => is_string($input['nhap_lai_mat_khau'] ?? null)
+                ? $input['nhap_lai_mat_khau']
+                : '',
+        ];
+        $errors = $this->validator->validate($data, [
+            'email' => ['required', 'email'],
+            'otp' => ['required', 'otp'],
+            'mat_khau' => ['required', 'password'],
+            'nhap_lai_mat_khau' => ['required'],
+        ]);
+        if ($data['mat_khau'] !== $data['nhap_lai_mat_khau']) {
+            $errors['nhap_lai_mat_khau'] = 'Mật khẩu nhập lại không khớp';
+        }
+        if ($errors !== []) {
+            Response::error('Dữ liệu đặt lại mật khẩu không hợp lệ', 422, $errors);
+            return;
+        }
+
+        $rateLimit = $this->consumeForgotPasswordVerifyLimit($data['email'], $request->ip());
+        if (!$rateLimit['allowed']) {
+            Response::error(
+                'Đã thử quá nhiều lần, vui lòng thử lại sau',
+                429,
+                ['retry_after' => $rateLimit['retry_after']]
+            );
+            return;
+        }
+
+        $newPasswordHash = password_hash($data['mat_khau'], PASSWORD_BCRYPT);
+        $verification = $this->otpService->verifyAndConsume(
+            $data['email'],
+            'QUEN_MAT_KHAU',
+            $data['otp'],
+            function () use ($data, $newPasswordHash): array {
+                $customer = $this->findActiveCustomerByEmail($data['email'], true);
+                if ($customer === false) {
+                    return ['outcome' => 'account_unavailable'];
+                }
+
+                $update = $this->pdo->prepare(
+                    'UPDATE nguoi_dung SET mat_khau = ? WHERE id = ?'
+                );
+                $update->execute([$newPasswordHash, (int) $customer['id']]);
+                return ['outcome' => 'password_updated'];
+            }
+        );
+
+        if (!$verification['valid']) {
+            $this->respondToOtpFailure($verification);
+            return;
+        }
+        if (($verification['result']['outcome'] ?? null) !== 'password_updated') {
+            Response::error('Không tìm thấy tài khoản khách hàng đang hoạt động', 422);
+            return;
+        }
+
+        Session::destroy();
+        Response::success('Đặt lại mật khẩu thành công, vui lòng đăng nhập lại');
+    }
+
+    public function forgotPasswordResend(Request $request, array $params = []): void
+    {
+        $input = $request->all();
+        $email = is_string($input['email'] ?? null)
+            ? strtolower(trim($input['email']))
+            : '';
+        $rateLimit = $this->consumeForgotPasswordSendLimit($email, $request->ip());
+        if (!$rateLimit['allowed']) {
+            Response::error(
+                'Vui lòng chờ trước khi yêu cầu mã xác thực mới',
+                429,
+                ['retry_after' => $rateLimit['retry_after']]
+            );
+            return;
+        }
+
+        if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $customer = $this->findActiveCustomerByEmail($email);
+            if ($customer !== false) {
+                try {
+                    $this->otpService->resend(
+                        $email,
+                        'QUEN_MAT_KHAU',
+                        $request->ip()
+                    );
+                } catch (RuntimeException $error) {
+                    if (str_starts_with($error->getMessage(), 'OTP_RESEND_COOLDOWN:')) {
+                        $retryAfter = (int) substr(
+                            $error->getMessage(),
+                            strlen('OTP_RESEND_COOLDOWN:')
+                        );
+                        Response::error(
+                            'Vui lòng chờ trước khi yêu cầu mã xác thực mới',
+                            429,
+                            ['retry_after' => $retryAfter]
+                        );
+                        return;
+                    }
+                    if ($error->getMessage() === 'OTP_MAX_SENDS_PER_HOUR') {
+                        Response::error(
+                            'Đã vượt quá số lần gửi mã xác thực cho phép',
+                            429
+                        );
+                        return;
+                    }
+                    if ($error->getMessage() === 'OTP_SEND_FAILED') {
+                        Logger::error('Forgot-password OTP resend failed: OTP_SEND_FAILED');
+                    } elseif (!in_array(
+                        $error->getMessage(),
+                        ['OTP_NOT_FOUND', 'OTP_DATA_NOT_FOUND'],
+                        true
+                    )) {
+                        throw $error;
+                    }
+                }
+            }
+        }
+
+        $this->respondForgotPasswordGeneric();
+    }
+
     /**
      * Đăng nhập khách hàng; mật khẩu chỉ được so sánh với hash đã lưu.
      */
@@ -534,6 +702,159 @@ final class AuthController
             'so_dien_thoai' => ['required', 'phone'],
             'email' => ['required', 'email'],
         ]) === [];
+    }
+
+    private function findActiveCustomerByEmail(string $email, bool $forUpdate = false): array|false
+    {
+        $query = $this->pdo->prepare(
+            'SELECT u.id
+             FROM nguoi_dung u
+             JOIN vai_tro v ON v.id = u.vai_tro_id
+             WHERE u.email = ? AND v.ten_vai_tro = ? AND u.trang_thai = 1
+             LIMIT 1' . ($forUpdate ? ' FOR UPDATE' : '')
+        );
+        $query->execute([$email, 'Customer']);
+        return $query->fetch(PDO::FETCH_ASSOC);
+    }
+
+    private function respondForgotPasswordGeneric(): void
+    {
+        Response::success('Nếu email tồn tại, mã xác thực đã được gửi');
+    }
+
+    private function consumeForgotPasswordSendLimit(string $email, string $ip): array
+    {
+        $maxSends = (int) ($this->business['otp']['max_sends_per_hour'] ?? 5);
+        $emailKey = 'forgot_password_send:email:' . hash('sha256', $email);
+        return $this->consumeForgotPasswordRateLimit(
+            [
+                $emailKey,
+                'forgot_password_send:ip:' . hash('sha256', $ip),
+            ],
+            $maxSends,
+            3600,
+            60,
+            $emailKey
+        );
+    }
+
+    private function consumeForgotPasswordVerifyLimit(string $email, string $ip): array
+    {
+        return $this->consumeForgotPasswordRateLimit(
+            [
+                'forgot_password_verify:email:' . hash('sha256', $email),
+                'forgot_password_verify:ip:' . hash('sha256', $ip),
+            ],
+            10,
+            900
+        );
+    }
+
+    private function consumeForgotPasswordRateLimit(
+        array $keys,
+        int $maxAttempts,
+        int $windowSeconds,
+        ?int $cooldownSeconds = null,
+        ?string $cooldownKey = null
+    ): array {
+        sort($keys, SORT_STRING);
+        $this->pdo->beginTransaction();
+        try {
+            $insert = $this->pdo->prepare(
+                'INSERT IGNORE INTO rate_limit (khoa, so_lan, bat_dau, khoa_den)
+                 VALUES (?, 0, NOW(), NULL)'
+            );
+            foreach ($keys as $key) {
+                $insert->execute([$key]);
+            }
+
+            $select = $this->pdo->prepare(
+                'SELECT so_lan, TIMESTAMPDIFF(SECOND, bat_dau, NOW()) AS elapsed_seconds,
+                        GREATEST(TIMESTAMPDIFF(SECOND, NOW(), khoa_den), 0) AS cooldown_seconds
+                 FROM rate_limit
+                 WHERE khoa = ?
+                 FOR UPDATE'
+            );
+            $limits = [];
+            foreach ($keys as $key) {
+                $select->execute([$key]);
+                $row = $select->fetch(PDO::FETCH_ASSOC);
+                if ($row === false) {
+                    throw new RuntimeException('Không thể đọc bộ đếm đặt lại mật khẩu.');
+                }
+                $elapsed = (int) $row['elapsed_seconds'];
+                $limits[] = [
+                    'key' => $key,
+                    'count' => $elapsed >= $windowSeconds ? 0 : (int) $row['so_lan'],
+                    'window_expired' => $elapsed >= $windowSeconds,
+                    'retry_after' => $elapsed >= $windowSeconds
+                        ? 0
+                        : max(1, $windowSeconds - $elapsed),
+                    'cooldown_seconds' => (int) $row['cooldown_seconds'],
+                ];
+            }
+
+            foreach ($limits as $limit) {
+                if ($limit['count'] >= $maxAttempts) {
+                    $this->pdo->commit();
+                    return [
+                        'allowed' => false,
+                        'reason' => 'rate_limited',
+                        'retry_after' => $limit['retry_after'],
+                    ];
+                }
+            }
+            if ($cooldownSeconds !== null && $cooldownKey !== null) {
+                foreach ($limits as $limit) {
+                    if (
+                        $limit['key'] === $cooldownKey
+                        && $limit['cooldown_seconds'] > 0
+                    ) {
+                        $this->pdo->commit();
+                        return [
+                            'allowed' => false,
+                            'reason' => 'cooldown',
+                            'retry_after' => $limit['cooldown_seconds'],
+                        ];
+                    }
+                }
+            }
+
+            $update = $this->pdo->prepare(
+                'UPDATE rate_limit
+                 SET so_lan = ?,
+                     bat_dau = CASE WHEN ? = 1 THEN NOW() ELSE bat_dau END,
+                     khoa_den = ?
+                 WHERE khoa = ?'
+            );
+            foreach ($limits as $limit) {
+                $count = $limit['count'] + 1;
+                if (
+                    $cooldownSeconds !== null
+                    && $limit['key'] === $cooldownKey
+                ) {
+                    $cooldownUntil = date(
+                        'Y-m-d H:i:s',
+                        time() + $cooldownSeconds
+                    );
+                } else {
+                    $cooldownUntil = null;
+                }
+                $update->execute([
+                    $count,
+                    $limit['window_expired'] ? 1 : 0,
+                    $cooldownUntil,
+                    $limit['key'],
+                ]);
+            }
+            $this->pdo->commit();
+            return ['allowed' => true, 'retry_after' => 0];
+        } catch (Throwable $error) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $error;
+        }
     }
 
     private function respondToOtpFailure(array $verification): void

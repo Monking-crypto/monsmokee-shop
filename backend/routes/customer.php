@@ -40,6 +40,21 @@ $router->post(
     [static fn(Request $request): bool => CsrfMiddleware::handle($request)]
 );
 $router->post(
+    '/api/auth/forgot-password/start',
+    [$authController, 'forgotPasswordStart'],
+    [static fn(Request $request): bool => CsrfMiddleware::handle($request)]
+);
+$router->post(
+    '/api/auth/forgot-password/verify',
+    [$authController, 'forgotPasswordVerify'],
+    [static fn(Request $request): bool => CsrfMiddleware::handle($request)]
+);
+$router->post(
+    '/api/auth/forgot-password/resend',
+    [$authController, 'forgotPasswordResend'],
+    [static fn(Request $request): bool => CsrfMiddleware::handle($request)]
+);
+$router->post(
     '/api/auth/login',
     [$authController, 'login'],
     [static fn(Request $request): bool => CsrfMiddleware::handle($request)]

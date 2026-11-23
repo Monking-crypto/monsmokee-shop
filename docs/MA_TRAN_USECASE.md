@@ -6,9 +6,9 @@ Trạng thái bên dưới phản ánh phạm vi backend hiện tại; giao di�
 |---|---|---|---|
 | Đăng ký Customer qua email OTP | `Customer/AuthController.php`, `OtpService.php` | `/api/auth/register/start`, `/api/auth/register/verify`, `/api/auth/otp/resend` | Hoàn thành |
 | Đăng nhập, đăng xuất và xem phiên Customer | `Customer/AuthController.php`, `AuthMiddleware.php` | `/api/auth/login`, `/api/auth/logout`, `/api/auth/me` | Hoàn thành |
+| Quên mật khẩu Customer qua OTP email | `Customer/AuthController.php`, `OtpService.php` | `/api/auth/forgot-password/start`, `/api/auth/forgot-password/verify`, `/api/auth/forgot-password/resend` | Hoàn thành |
 | Đăng nhập Admin hai bước và xem phiên Admin | `Admin/AdminAuthController.php`, `AdminMiddleware.php` | `/api/admin/auth/login`, `/api/admin/auth/verify-otp`, `/api/admin/auth/otp/resend`, `/api/admin/me` | Hoàn thành |
 | Session, CSRF và validation dùng chung | `Session.php`, `Csrf.php`, `Validator.php` | `/api/csrf` | Hoàn thành |
-| Quên/đặt lại mật khẩu | Chưa triển khai | Chưa có API hoàn chỉnh | Chưa làm |
 | UC01/QT1 — sản phẩm | `ProductController.php`, `san-pham.html` | `/api/products` | Chưa làm |
 | UC02/QT2-3 — giỏ hàng | `CartController.php`, `gio-hang.html` | `/api/cart*` | Chưa làm |
 | UC03/QT6 — hồ sơ | `ProfileController.php`, `tai-khoan.html` | `/api/auth/profile` | Chưa làm |

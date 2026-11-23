@@ -238,7 +238,89 @@ Các giá trị `{{...}}` dưới đây là placeholder, cần thay bằng dữ 
 
 **Lỗi:** `401` chưa đăng nhập, tài khoản không tồn tại/bị khóa hoặc session không hợp lệ.
 
-## 8. Đăng nhập Admin — bước 1
+## 8. Bắt đầu quên mật khẩu Customer
+
+### `POST /api/auth/forgot-password/start`
+
+**Headers:** `Content-Type: application/json`, `X-CSRF-Token: {{csrf_token}}`, cookie session.
+**Body:**
+
+```json
+{"email": "{{customer_email}}"}
+```
+
+**Response — 200** — giống nhau dù email không tồn tại, thuộc Admin, hoặc không có Customer đang hoạt động:
+
+```json
+{
+  "success": true,
+  "message": "Nếu email tồn tại, mã xác thực đã được gửi",
+  "data": null,
+  "errors": null
+}
+```
+
+Chỉ Customer đang hoạt động mới nhận OTP.
+**Lỗi:** `403` CSRF không hợp lệ; `500` lỗi hệ thống. Việc email không tồn tại hoặc thuộc Admin không làm thay đổi response 200 chung.
+
+## 9. Xác nhận OTP và đặt mật khẩu Customer mới
+
+### `POST /api/auth/forgot-password/verify`
+
+**Headers:** `Content-Type: application/json`, `X-CSRF-Token: {{csrf_token}}`, cookie session.
+**Body:**
+
+```json
+{
+  "email": "{{customer_email}}",
+  "otp": "{{six_digit_otp_from_email}}",
+  "mat_khau": "{{new_customer_password}}",
+  "nhap_lai_mat_khau": "{{new_customer_password}}"
+}
+```
+
+Mật khẩu mới cần ít nhất 8 ký tự, có chữ thường và số; hai trường mật khẩu phải khớp.
+
+**Response — 200** — OTP đã được tiêu thụ, session hiện tại bị hủy; khách cần đăng nhập lại:
+
+```json
+{
+  "success": true,
+  "message": "Đặt lại mật khẩu thành công, vui lòng đăng nhập lại",
+  "data": null,
+  "errors": null
+}
+```
+
+**Lỗi:** `403` CSRF không hợp lệ; `422` dữ liệu/mật khẩu không hợp lệ, OTP sai/hết hạn/đã dùng, hoặc không còn Customer hoạt động; OTP sai có thể kèm `errors.remaining_attempts`. `429` vượt giới hạn verify theo email/IP. Khi lỗi, mật khẩu không bị đổi.
+
+## 10. Gửi lại OTP quên mật khẩu
+
+### `POST /api/auth/forgot-password/resend`
+
+**Headers:** `Content-Type: application/json`, `X-CSRF-Token: {{csrf_token}}`, cookie session.
+**Body:**
+
+```json
+{"email": "{{customer_email}}"}
+```
+
+**Response — 200** — thông báo chung như API bắt đầu; không tiết lộ email có tài khoản hay không:
+
+```json
+{
+  "success": true,
+  "message": "Nếu email tồn tại, mã xác thực đã được gửi",
+  "data": null,
+  "errors": null
+}
+```
+
+**Lỗi:** `403` CSRF không hợp lệ; `429` cooldown (60 giây) hoặc vượt giới hạn gửi (tối đa 5 lần/giờ theo email và IP); `500` lỗi hệ thống.
+
+Các request verify cũng được giới hạn tối đa 10 lần trong 15 phút theo email và IP; OTP vẫn tự vô hiệu sau 5 lần nhập sai.
+
+## 11. Đăng nhập Admin — bước 1
 
 ### `POST /api/admin/auth/login`
 
@@ -270,7 +352,7 @@ Các giá trị `{{...}}` dưới đây là placeholder, cần thay bằng dữ 
 
 **Lỗi:** `403` CSRF không hợp lệ, tài khoản không phải Admin hoặc Admin bị khóa; `401` SĐT/mật khẩu sai; `422` dữ liệu không hợp lệ; `429` giới hạn đăng nhập/gửi OTP; `500` lỗi gửi email.
 
-## 9. Xác thực OTP Admin — bước 2
+## 12. Xác thực OTP Admin — bước 2
 
 ### `POST /api/admin/auth/verify-otp`
 
@@ -302,7 +384,7 @@ Các giá trị `{{...}}` dưới đây là placeholder, cần thay bằng dữ 
 
 **Lỗi:** `401` không có trạng thái chờ OTP hoặc pending đã hết hạn; `403` tài khoản Admin không còn khả dụng/CSRF không hợp lệ; `422` OTP sai, hết hạn hoặc đã dùng. OTP sai kèm `errors.remaining_attempts`; lần sai thứ 5 làm mất hiệu lực OTP và xóa pending.
 
-## 10. Gửi lại OTP Admin
+## 13. Gửi lại OTP Admin
 
 ### `POST /api/admin/auth/otp/resend`
 
@@ -326,7 +408,7 @@ Các giá trị `{{...}}` dưới đây là placeholder, cần thay bằng dữ 
 
 **Lỗi:** `401` không có pending/OTP chờ; `403` CSRF không hợp lệ hoặc tài khoản Admin không còn khả dụng; `429` cooldown hoặc vượt giới hạn gửi; `500` lỗi gửi email.
 
-## 11. Thông tin Admin hiện tại
+## 14. Thông tin Admin hiện tại
 
 ### `GET /api/admin/me`
 
