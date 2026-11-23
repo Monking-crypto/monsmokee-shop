@@ -17,10 +17,13 @@ const alertBox = qs('#forgot-alert');
 const passwordInput = qs('#forgot-password');
 const repeatInput = qs('#forgot-password-repeat');
 const otpError = qs('#forgot-otp-error');
+const otpStatus = qs('#forgot-otp-status');
 const resendButton = qs('#forgot-resend');
+const resetButton = qs('#forgot-reset-btn');
 let expiryTimer;
 let resendTimer;
 let verifying = false;
+let otpReady = false;
 
 const fieldOf = (input) => input.closest('.field');
 const passwordError = (value) => {
@@ -75,9 +78,39 @@ function startOtpTimers(data = {}) {
   otp.setDisabled(false);
   expiryTimer = countdown(qs('#forgot-otp-ttl'), expiresIn, () => {
     otp.setDisabled(true);
-    otpError.textContent = 'Mã đã hết hạn. Hãy gửi lại mã mới.';
+    setResetFieldsEnabled(false);
+    otpError.textContent = '';
+    setOtpStatus('Mã OTP đã hết hạn. Hãy gửi lại mã mới.', 'error');
   });
   startResendCountdown(resendAfter);
+}
+
+function setOtpStatus(message, state = '') {
+  otpStatus.textContent = message;
+  otpStatus.className = `otp-status${state ? ` otp-status--${state}` : ''}`;
+}
+
+function setResetFieldsEnabled(enabled) {
+  otpReady = enabled;
+  passwordInput.disabled = !enabled;
+  repeatInput.disabled = !enabled;
+  resetButton.disabled = !enabled;
+  if (!enabled) {
+    [passwordInput, repeatInput].forEach((input) => {
+      input.value = '';
+      input.closest('.field').classList.remove('is-invalid', 'is-valid');
+      input.setAttribute('aria-invalid', 'false');
+      input.closest('.field').querySelector('.field__error').textContent = '';
+    });
+  }
+}
+
+function unlockForResetAttempt() {
+  if (otp.value().length !== 6) return;
+  setResetFieldsEnabled(true);
+  otpError.textContent = '';
+  otp.setInvalid(false);
+  setOtpStatus('Đã nhập đủ 6 số. Mã sẽ được xác thực khi bạn đặt lại mật khẩu.', 'ready');
 }
 
 function showFieldErrors(errors) {
@@ -109,6 +142,8 @@ function showResetStep(data) {
   qs('#step-label').textContent = 'Bước 2/2: Xác thực và tạo mật khẩu mới';
   qsa('.steps span').forEach((step, index) => step.classList.toggle('done', index <= 1));
   showAlert(alertBox, '');
+  setResetFieldsEnabled(false);
+  setOtpStatus('Vui lòng nhập đúng mã OTP để mở khóa.');
   otpError.textContent = '';
   otp.clear();
   startOtpTimers(data || {});
@@ -120,17 +155,28 @@ function showEmailStep() {
   resendTimer?.();
   otp.setDisabled(false);
   otp.clear();
-  passwordInput.value = '';
-  repeatInput.value = '';
+  setResetFieldsEnabled(false);
   resetStep.hidden = true;
   emailStep.hidden = false;
   qs('#step-label').textContent = 'Bước 1/2: Xác nhận email';
   qsa('.steps span').forEach((step, index) => step.classList.toggle('done', index === 0));
   showAlert(alertBox, '');
   otpError.textContent = '';
+  setOtpStatus('Vui lòng nhập đúng mã OTP để mở khóa.');
 }
 
-const otp = mountOtp(qs('#forgot-otp'));
+const otp = mountOtp(qs('#forgot-otp'), { onComplete: unlockForResetAttempt });
+setResetFieldsEnabled(false);
+qs('#forgot-otp').addEventListener('input', () => {
+  if (otp.value().length === 6) {
+    unlockForResetAttempt();
+    return;
+  }
+  setResetFieldsEnabled(false);
+  otpError.textContent = '';
+  otp.setInvalid(false);
+  setOtpStatus('Vui lòng nhập đúng mã OTP để mở khóa.');
+});
 
 emailInput.addEventListener('blur', () => setFieldError(fieldOf(emailInput), rules.email(emailInput.value)));
 passwordInput.addEventListener('blur', () => setFieldError(fieldOf(passwordInput), passwordError(passwordInput.value)));
@@ -173,7 +219,7 @@ resetForm.addEventListener('submit', async (event) => {
   const otpValue = otp.value();
   otpError.textContent = '';
   otp.setInvalid(false);
-  if (!RE_OTP.test(otpValue)) {
+  if (!otpReady || !RE_OTP.test(otpValue)) {
     otpError.textContent = 'Vui lòng nhập đủ 6 chữ số của mã xác thực.';
     otp.setInvalid(true);
     invalid.push(qs('#forgot-otp input'));
@@ -201,8 +247,8 @@ resetForm.addEventListener('submit', async (event) => {
     expiryTimer?.();
     resendTimer?.();
     otp.clear();
-    passwordInput.value = '';
-    repeatInput.value = '';
+    otp.setDisabled(true);
+    setResetFieldsEnabled(false);
     resetStep.hidden = true;
     successStep.hidden = false;
     qs('#step-label').textContent = 'Hoàn tất đặt lại mật khẩu';
@@ -210,30 +256,40 @@ resetForm.addEventListener('submit', async (event) => {
     showAlert(alertBox, '');
   } catch (error) {
     if (!(error instanceof ApiError)) {
-      otpError.textContent = 'Không thể xác thực mã lúc này. Vui lòng thử lại.';
+      setOtpStatus('Không thể xác thực mã lúc này. Vui lòng thử lại.', 'error');
       return;
     }
-    const fieldErrors = showFieldErrors(error.errors);
     const remaining = Number(error.errors?.remaining_attempts);
-    if (error.status === 422) {
-      const otpFailure = typeof error.errors?.otp === 'string'
-        || Number.isFinite(remaining)
-        || !fieldErrors;
-      if (otpFailure) {
-        otpError.textContent = Number.isFinite(remaining)
-          ? `${error.message} (còn ${remaining} lần thử)`
-          : error.message;
-        otp.setInvalid(true);
-        otp.clear();
-        if (Number.isFinite(remaining) && remaining <= 0) otp.setDisabled(true);
-        if (/hết hạn|hết hiệu lực/i.test(error.message)) otp.setDisabled(true);
-      }
-    } else if (!fieldErrors) {
+    const hasPasswordErrors = typeof error.errors?.mat_khau === 'string'
+      || typeof error.errors?.nhap_lai_mat_khau === 'string';
+    if (error.status === 422 && !hasPasswordErrors) {
+      setResetFieldsEnabled(false);
+      otpError.textContent = '';
+      otp.setInvalid(true);
+      otp.clear();
+      const expired = /hết hạn|hết hiệu lực/i.test(error.message);
+      setOtpStatus(
+        expired
+          ? 'Mã OTP đã hết hạn hoặc hết hiệu lực. Hãy gửi lại mã mới.'
+          : Number.isFinite(remaining)
+            ? `Mã OTP không chính xác (còn ${remaining} lần thử)`
+            : 'Mã OTP không chính xác',
+        'error',
+      );
+      if (expired || (Number.isFinite(remaining) && remaining <= 0)) otp.setDisabled(true);
+    } else if (error.status === 422) {
+      showFieldErrors(error.errors);
+      setOtpStatus('Mã sẽ được xác thực khi bạn đặt lại mật khẩu.', 'ready');
+    } else {
+      showFieldErrors(error.errors);
       showAlert(alertBox, error.message);
     }
   } finally {
     verifying = false;
     setBusy(button, false);
+    button.disabled = !otpReady;
+    passwordInput.disabled = !otpReady;
+    repeatInput.disabled = !otpReady;
   }
 });
 
@@ -244,6 +300,8 @@ resendButton.addEventListener('click', async () => {
     const data = await api.post('/auth/forgot-password/resend', { email: emailInput.value.trim() });
     otp.clear();
     otp.setInvalid(false);
+    setResetFieldsEnabled(false);
+    setOtpStatus('Vui lòng nhập đúng mã OTP để mở khóa.');
     startOtpTimers(data || {});
     otp.focus();
   } catch (error) {

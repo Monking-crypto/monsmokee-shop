@@ -54,6 +54,7 @@
           <p class="lead">Nhập mã 6 chữ số đã gửi tới <strong id="forgot-email-masked"></strong>.</p>
           <form id="forgot-reset-form" novalidate>
             <div id="forgot-otp" class="otp" aria-label="Mã OTP gồm 6 chữ số"></div>
+            <p id="forgot-otp-status" class="otp-status" role="status" aria-live="polite">Vui lòng nhập đúng mã OTP để mở khóa.</p>
             <p class="field__error" id="forgot-otp-error" role="alert"></p>
             <div class="otp-meta">
               <span>Mã hết hạn sau <b id="forgot-otp-ttl">05:00</b></span>
@@ -61,15 +62,15 @@
             </div>
             <div class="field">
               <label for="forgot-password">Mật khẩu mới</label>
-              <div class="field__box"><input id="forgot-password" name="mat_khau" type="password" autocomplete="new-password" required></div>
+              <div class="field__box"><input id="forgot-password" name="mat_khau" type="password" autocomplete="new-password" required disabled></div>
               <p class="field__error" role="alert"></p>
             </div>
             <div class="field">
               <label for="forgot-password-repeat">Nhập lại mật khẩu mới</label>
-              <div class="field__box"><input id="forgot-password-repeat" name="nhap_lai_mat_khau" type="password" autocomplete="new-password" required></div>
+              <div class="field__box"><input id="forgot-password-repeat" name="nhap_lai_mat_khau" type="password" autocomplete="new-password" required disabled></div>
               <p class="field__error" role="alert"></p>
             </div>
-            <button id="forgot-reset-btn" class="ms-btn ms-btn--primary ms-btn--block" type="submit">Đặt lại mật khẩu</button>
+            <button id="forgot-reset-btn" class="ms-btn ms-btn--primary ms-btn--block" type="submit" disabled>Đặt lại mật khẩu</button>
           </form>
           <p class="auth__alt"><button id="forgot-edit-email" class="link-btn" type="button">Đổi email</button></p>
         </section>
