@@ -38,7 +38,9 @@
 .auth__row{display:flex;justify-content:space-between;align-items:center;margin:-4px 0 16px;font-size:var(--fs-sm)}
 
 /* Đo độ mạnh mật khẩu */
-.pwm{margin-top:8px}
+.register-password-fields{display:grid;gap:16px}
+.register-password-fields .field{margin-bottom:0}
+.pwm{margin:8px 0 16px}
 .pwm__bar{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
 .pwm__bar span{height:4px;border-radius:2px;background:var(--ms-border)}
 .pwm[data-level="1"] .pwm__bar span:nth-child(-n+1){background:var(--ms-orange)}
