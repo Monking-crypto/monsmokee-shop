@@ -9,7 +9,8 @@ Trạng thái bên dưới phản ánh phạm vi backend hiện tại; giao di�
 | Quên mật khẩu Customer qua OTP email | `Customer/AuthController.php`, `OtpService.php` | `/api/auth/forgot-password/start`, `/api/auth/forgot-password/verify`, `/api/auth/forgot-password/resend` | Hoàn thành |
 | Đăng nhập Admin hai bước và xem phiên Admin | `Admin/AdminAuthController.php`, `AdminMiddleware.php` | `/api/admin/auth/login`, `/api/admin/auth/verify-otp`, `/api/admin/auth/otp/resend`, `/api/admin/me` | Hoàn thành |
 | Session, CSRF và validation dùng chung | `Session.php`, `Csrf.php`, `Validator.php` | `/api/csrf` | Hoàn thành |
-| UC01/QT1 — sản phẩm | `ProductController.php`, `san-pham.html` | `/api/products` | Chưa làm |
+| Đọc danh mục công khai | `CategoryController.php` | `/api/categories` | Hoàn thành backend |
+| UC01/QT1 — đọc sản phẩm công khai | `ProductController.php`, `san-pham.html` | `/api/products`, `/api/products/{id}` | Hoàn thành backend |
 | UC02/QT2-3 — giỏ hàng | `CartController.php`, `gio-hang.html` | `/api/cart*` | Chưa làm |
 | UC03/QT6 — hồ sơ | `ProfileController.php`, `tai-khoan.html` | `/api/auth/profile` | Chưa làm |
 | UC04/QT8-9 — thanh toán | `CheckoutController.php`, `thanh-toan.html` | `/api/checkout/*` | Chưa làm |
@@ -21,3 +22,5 @@ Trạng thái bên dưới phản ánh phạm vi backend hiện tại; giao di�
 | UC10 — quản lý khách hàng | `CustomerAdminController.php` | `/api/admin/customers` | Chưa làm |
 | UC11/QT15 — thống kê | `StatisticsController.php` | `/api/admin/statistics` | Chưa làm |
 | UC12/QT13 — khuyến mãi | `PromotionAdminController.php` | `/api/admin/promotions` | Chưa làm |
+
+Khuyến mãi, giỏ hàng và đơn hàng chưa được triển khai trong phần đọc công khai này; giao diện frontend vẫn là phạm vi riêng.

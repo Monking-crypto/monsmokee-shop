@@ -12,6 +12,21 @@
 @adminPassword =
 @adminOtp =
 @wrongAdminOtp = not-a-code
+@categoryId = 1
+@productId = 1
+@searchTerm = sua
+
+### Public catalog: danh sách danh mục
+GET http://localhost/monsmokee/backend/public/api/categories
+
+### Public catalog: danh sách mới nhất, kiểm tra phân trang
+GET http://localhost/monsmokee/backend/public/api/products?page=1&per_page=20&sort=newest
+
+### Public catalog: tìm kiếm, lọc danh mục và sắp xếp giá tăng dần
+GET http://localhost/monsmokee/backend/public/api/products?q={{searchTerm}}&category_id={{categoryId}}&sort=price_asc&page=1&per_page=10
+
+### Public catalog: chi tiết sản phẩm (không trả hạn sử dụng)
+GET http://localhost/monsmokee/backend/public/api/products/{{productId}}
 
 ### 1. Lấy CSRF token; REST Client cần giữ cookie session
 # @name csrf

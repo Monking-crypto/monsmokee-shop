@@ -17,12 +17,17 @@ $authController = new App\Controllers\Customer\AuthController(
     new App\Services\OtpService($database, $otpSender, $businessConfig),
     $businessConfig
 );
+$categoryController = new App\Controllers\Customer\CategoryController($database);
+$productController = new App\Controllers\Customer\ProductController($database);
 
 $router->get('/api/csrf', static function (Request $request): void {
     Response::success('CSRF token', [
         'csrf_token' => Csrf::token(),
     ]);
 });
+$router->get('/api/categories', [$categoryController, 'index']);
+$router->get('/api/products', [$productController, 'index']);
+$router->get('/api/products/{id}', [$productController, 'show']);
 
 $router->post(
     '/api/auth/register/start',

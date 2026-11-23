@@ -1,4 +1,4 @@
-# API Auth MON SMOKEE
+# API MON SMOKEE
 
 Base URL khi chạy XAMPP:
 
@@ -435,3 +435,126 @@ Các request verify cũng được giới hạn tối đa 10 lần trong 15 phú
 ```
 
 **Lỗi:** `401` chưa đăng nhập, session không hợp lệ hoặc tài khoản bị khóa; `403` sai vai trò hoặc session thiếu cờ xác thực OTP. Pending OTP không được xem là đăng nhập.
+
+## 15. Danh mục công khai
+
+### `GET /api/categories`
+
+**Headers:** Không cần CSRF header; session cookie không bắt buộc.
+**Query:** Không có.
+**Body:** Không có.
+
+`danh_muc` hiện không có cột trạng thái hiển thị, vì vậy tất cả danh mục trong bảng được trả về theo `thu_tu`.
+
+**Response — 200**
+
+```json
+{
+  "success": true,
+  "message": "Danh sách danh mục",
+  "data": {
+    "categories": [
+      {
+        "id": 1,
+        "ten_danh_muc": "Nước giải khát",
+        "slug": "nuoc-giai-khat",
+        "icon": "droplet",
+        "thu_tu": 1
+      }
+    ]
+  },
+  "errors": null
+}
+```
+
+**Lỗi:** `500` nếu server không thể truy vấn danh mục.
+
+## 16. Danh sách sản phẩm công khai
+
+### `GET /api/products`
+
+**Headers:** Không cần CSRF header; session cookie không bắt buộc.
+**Query tùy chọn:**
+
+- `page`: trang bắt đầu từ 1, mặc định `1`.
+- `per_page`: mặc định `20`, phạm vi `1`–`50`.
+- `q`: tìm theo tên sản phẩm hoặc tên không dấu, tối đa 100 ký tự.
+- `category_id`: id danh mục cần lọc.
+- `sort`: `newest` (mặc định), `price_asc` hoặc `price_desc`.
+
+**Body:** Không có.
+
+Chỉ sản phẩm có `trang_thai = 1` được trả về. `con_hang` là boolean; API không trả số lượng tồn chính xác.
+
+**Response — 200**
+
+```json
+{
+  "success": true,
+  "message": "Danh sách sản phẩm",
+  "data": {
+    "products": [
+      {
+        "id": 1,
+        "ten_san_pham": "Nước suối 500ml",
+        "gia_ban": 5000,
+        "hinh_anh": "placeholder-product.svg",
+        "danh_muc": {
+          "id": 1,
+          "ten_danh_muc": "Nước giải khát",
+          "slug": "nuoc-giai-khat"
+        },
+        "con_hang": true
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "per_page": 20,
+      "total": 1,
+      "total_pages": 1
+    }
+  },
+  "errors": null
+}
+```
+
+**Lỗi:** `422` page/per_page/category_id/q/sort không hợp lệ; `500` lỗi truy vấn.
+
+## 17. Chi tiết sản phẩm công khai
+
+### `GET /api/products/{id}`
+
+**Headers:** Không cần CSRF header; session cookie không bắt buộc.
+**Path:** `id` là id sản phẩm dương.
+**Body:** Không có.
+
+**Response — 200**
+
+```json
+{
+  "success": true,
+  "message": "Chi tiết sản phẩm",
+  "data": {
+    "product": {
+      "id": 1,
+      "ten_san_pham": "Nước suối 500ml",
+      "mo_ta": "Nước uống đóng chai tiện lợi",
+      "hinh_anh": "placeholder-product.svg",
+      "don_vi_tinh": "chai",
+      "gia_ban": 5000,
+      "danh_muc": {
+        "id": 1,
+        "ten_danh_muc": "Nước giải khát",
+        "slug": "nuoc-giai-khat"
+      },
+      "con_hang": true
+    }
+  },
+  "errors": null
+}
+```
+
+Chỉ sản phẩm đang bán được trả về. Response không chứa số lượng tồn chính xác hoặc hạn sử dụng.
+**Lỗi:** `404` id không hợp lệ, sản phẩm không tồn tại hoặc đã ẩn; `500` lỗi truy vấn.
+
+Khuyến mãi, giỏ hàng và đơn hàng chưa nằm trong phạm vi API công khai ở bước này.
