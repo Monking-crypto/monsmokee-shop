@@ -119,6 +119,9 @@ const store = {
   get: (k, d) => { try { return JSON.parse(localStorage.getItem(`ms_mock_${k}`)) ?? d; } catch { return d; } },
   set: (k, v) => localStorage.setItem(`ms_mock_${k}`, JSON.stringify(v)),
 };
+export function setMockAdminAuthenticated(authenticated) {
+  store.set('adminAuth', Boolean(authenticated));
+}
 const allProducts = () => store.get('products', PRODUCTS);
 const allCategories = () => store.get('categories', CATS).slice().sort((a, b) => (a.thu_tu || a.id) - (b.thu_tu || b.id));
 function cartData() {

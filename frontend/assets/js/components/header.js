@@ -71,10 +71,14 @@ async function renderAuth(el) {
     el.innerHTML = '<a class="ms-btn ms-btn--ghost" href="dang-nhap.html">Đăng nhập</a><a class="ms-btn ms-btn--green" href="dang-ky.html">Đăng ký</a>';
     return;
   }
+  const isAdmin = String(user.vai_tro || '').toLowerCase() === 'admin';
+  const menuLinks = isAdmin
+    ? '<a href="admin/index.html">Trang quản trị</a><a href="admin/tai-khoan.html">Tài khoản quản trị</a>'
+    : '<a href="tai-khoan.html">Tài khoản</a><a href="don-hang.html">Đơn hàng của tôi</a>';
   const initial = escapeHtml((user.ho_ten || '?').trim().split(/\s+/).pop().charAt(0).toUpperCase());
   el.innerHTML = `<div class="user-menu"><button class="hdr-link" type="button" aria-haspopup="true" aria-expanded="false">
       <span class="avatar" aria-hidden="true">${initial}</span><span class="hdr-text">${escapeHtml(user.ho_ten)}</span></button>
-    <div class="user-menu__panel" hidden><a href="tai-khoan.html">Tài khoản</a><a href="don-hang.html">Đơn hàng của tôi</a>
+    <div class="user-menu__panel" hidden>${menuLinks}
     <button type="button" data-logout>Đăng xuất</button></div></div>`;
   const btn = el.querySelector('.hdr-link'), pnl = el.querySelector('.user-menu__panel');
   btn.addEventListener('click', () => { pnl.hidden = !pnl.hidden; btn.setAttribute('aria-expanded', String(!pnl.hidden)); });

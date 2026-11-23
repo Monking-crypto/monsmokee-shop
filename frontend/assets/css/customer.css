@@ -37,7 +37,7 @@ body.has-bottom-nav{padding-bottom:var(--ms-bottom-nav-h)}
 @media(min-width:768px){.hdr-auth-desktop{display:flex;gap:8px}}
 .avatar{display:grid;place-items:center;width:32px;height:32px;border-radius:50%;background:var(--ms-green);color:#fff;font-weight:700;font-size:var(--fs-sm)}
 .user-menu{position:relative}
-.user-menu__panel{position:absolute;right:0;top:calc(100% + 6px);min-width:200px;padding:6px;background:#fff;border:1px solid var(--ms-border);
+.user-menu__panel{position:absolute;z-index:20;right:0;top:calc(100% + 6px);min-width:200px;padding:6px;background:#fff;border:1px solid var(--ms-border);
   border-radius:var(--ms-radius);box-shadow:var(--ms-shadow)}
 .user-menu__panel a,.user-menu__panel button{display:block;width:100%;padding:10px 12px;border:0;background:none;text-align:left;
   color:var(--ms-text);font:inherit;font-size:var(--fs-sm);border-radius:var(--ms-radius-sm);cursor:pointer}
