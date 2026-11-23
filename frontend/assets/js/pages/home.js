@@ -19,11 +19,17 @@ function renderHome(d) {
   const sale = d.friday_sale;
   const parts = [];
 
-  parts.push(`<section class="ms-section promo" id="sale-thu-6"><div class="ms-section__head"><div class="promo__title">
-      <h2 class="ms-section__title">${sale.active ? 'Siêu sale Thứ 6, giảm 10%' : 'Thứ 6 này giảm 10% cho 10 sản phẩm'}</h2>
-      <span class="countdown" id="sale-timer" role="timer" aria-label="${sale.active ? 'Thời gian còn lại của đợt sale' : 'Thời gian tới đợt sale'}"></span></div>
-      <p class="ms-section__sub">${sale.active ? 'Kết thúc lúc 23:59:59 hôm nay' : 'Danh sách được mở bán vào Thứ 6 hằng tuần'}</p></div>
-      ${sale.active ? rail(sale.products) : `<div class="ms-state"><strong>Siêu sale mở vào Thứ 6 hằng tuần</strong>Danh sách sản phẩm chưa được công bố. <button class="pc__add pc__add--locked" type="button" disabled aria-disabled="true" title="Chưa mở bán">Chưa mở bán</button></div>`}</section>`);
+  const saleProducts = (sale.products || []).slice(0, 5);
+  parts.push(`<section class="ms-section home-friday" id="sale-thu-6">
+      <div class="home-friday__lead"><span class="home-friday__tag" aria-hidden="true">-${Number(sale.discount_percent) || 10}%</span><div>
+        <h2>${sale.active ? 'Siêu sale Thứ 6 đang mở bán' : 'Thứ 6 này giảm 10% cho 10 sản phẩm'}</h2>
+        <p>${sale.active ? 'Giá ưu đãi chỉ áp dụng trong hôm nay.' : 'Danh sách được mở bán vào Thứ 6 hằng tuần.'}</p>
+      </div></div>
+      <div class="home-friday__action"><span class="countdown" id="sale-timer" role="timer" aria-live="off" aria-label="${sale.active ? 'Thời gian còn lại của đợt sale' : 'Thời gian tới đợt sale'}"></span>
+        <a class="ms-btn ms-btn--primary" href="sieu-sale-thu-6.html">${sale.active ? 'Xem tất cả' : 'Xem trang Siêu sale'}</a></div>
+      ${sale.active && saleProducts.length ? `<div class="home-friday__products">${rail(saleProducts)}</div>`
+        : sale.active ? '<p class="home-friday__empty">Hôm nay cửa hàng chưa công bố danh sách sản phẩm.</p>' : ''}
+    </section>`);
 
   const near = d.near_expiry.slice(0, 5);
   parts.push(`<section class="ms-section promo promo--expiry" id="can-han"><div class="ms-section__head"><div><h2 class="ms-section__title">Cận hạn, giảm 50%</h2>

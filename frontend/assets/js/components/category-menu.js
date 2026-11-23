@@ -16,7 +16,7 @@ export async function initCategoryMenu(host) {
         <button class="catmenu__close" type="button" aria-label="Đóng danh mục" data-close>×</button></header>
       <nav aria-label="Danh mục sản phẩm">
         <ul class="catmenu__quick-links">
-          <li><a href="index.html#sale-thu-6">Siêu sale Thứ 6</a></li>
+          <li><a href="sieu-sale-thu-6.html">Siêu sale Thứ 6</a></li>
           <li><a href="can-han.html">Cận hạn giảm 50%</a></li>
           <li><a href="ban-chay.html">Bán chạy</a></li>
         </ul>

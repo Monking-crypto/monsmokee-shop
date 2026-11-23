@@ -1,5 +1,15 @@
 # Nhật ký bàn giao frontend
 
+## 2026-11-23 — Cập nhật backend và kiểm tra hợp đồng Siêu sale
+
+- Đã merge `origin/main` tới `8320570` (`Buoc 12: admin quan ly danh muc va san pham, upload anh`); trước đó có `c9a00f9` cho quên mật khẩu Customer và `6fe62b2` cho danh mục/sản phẩm.
+- Backend mới có `POST /api/auth/forgot-password/start`, `/verify`, `/resend`, cùng API public `/api/categories` và `/api/products`.
+- Admin có API danh mục và sản phẩm; route Siêu sale public và route quản trị khuyến mãi chưa được đăng ký.
+- `HomeController` và `PromotionAdminController` hiện vẫn là stub; chưa có `/api/home` hoặc `GET /api/promotions/active`.
+- `backend/config/business.php` xác nhận Siêu sale Thứ 6 giảm 10%, tối đa 10 sản phẩm, ngày ISO weekday 5.
+- Không sửa `backend/` hoặc `database/`; không chạy migration hay lệnh thay đổi DB.
+- Local API không phản hồi khi thử GET trong lượt này; đối chiếu hợp đồng dựa trên routes/controller/docs trong source.
+
 ## 2026-11-22 — Trang Cận hạn riêng (A5)
 
 - **File:** `frontend/can-han.html`, `frontend/assets/js/pages/near-expiry.js`, `frontend/assets/js/components/product-card.js`, `frontend/assets/css/customer.css`, `docs/FRONTEND_CHO_BACKEND.md`.

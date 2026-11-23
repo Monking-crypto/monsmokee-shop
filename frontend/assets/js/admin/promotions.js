@@ -15,6 +15,7 @@ function render() {
   root.innerHTML = `<div class="admin-breadcrumb">Quản trị <span>/</span> Khuyến mãi</div>
     <section class="admin-promo-card"><div class="admin-promo-head"><div><p class="admin-eyebrow">CHƯƠNG TRÌNH ĐẦU TIÊN</p><h2>Siêu sale Thứ 6 — giảm 10%</h2>
       <p>Chọn tối đa 10 sản phẩm. Khách chỉ nhìn thấy ưu đãi vào Thứ 6 (giờ Việt Nam).</p>
+      <a href="../sieu-sale-thu-6.html" target="_blank" rel="noopener">Xem trang khách</a>
       <span class="admin-status ${isFriday && promo.enabled ? '' : 'is-hidden'}">${isFriday && promo.enabled ? 'Đang chạy hôm nay' : 'Chưa tới Thứ 6'}</span></div>
       <label class="admin-switch"><input id="promo-enabled" type="checkbox" ${promo.enabled ? 'checked' : ''}><span>Chương trình đang bật</span></label></div>
       <div class="admin-promo-actions"><button id="promo-random" class="admin-button" type="button">Chọn ngẫu nhiên 10</button>

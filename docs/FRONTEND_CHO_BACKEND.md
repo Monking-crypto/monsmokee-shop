@@ -38,7 +38,7 @@ Thêm các trường sản phẩm `nhom_con`, `huong_vi`, `dong_goi` vào schema
 
 - CRUD quản trị sản phẩm: `GET/POST/PUT/DELETE /admin/products`.
 - Tải ảnh sản phẩm: `POST /admin/uploads/product-image` (JPG/PNG/WebP, tối đa 2MB).
-- Siêu sale: `/home` trả `friday_sale.products` rỗng ngoài Thứ 6 theo múi giờ `Asia/Ho_Chi_Minh`; cung cấp API quản trị để bật/tắt chương trình và chọn tối đa 10 sản phẩm.
+- Siêu sale: frontend hiện giả lập `GET /promotions/friday-sale` bằng mock, giữ trường `active`, `server_time`, `starts_at`, `ends_at`, `next_start`, `discount_percent`, `max_products`, `products`. Backend mới nhất chưa có route khách hàng cho Siêu sale; kế hoạch bước 14 được thông báo là `GET /api/promotions/active`, cần thống nhất đường dẫn trước khi nối API thật.
 - Địa giới giao hàng: `GET /locations/provinces`, `GET /locations/districts?province=...`, `GET /locations/wards?district=...`. Trả danh sách địa giới cập nhật theo dữ liệu thực tế; khu vực giao hiện tại giới hạn nội thành Đồng Hới.
 
 ## YC2 — Trang cận hạn (A5)
@@ -101,3 +101,13 @@ Thêm các trường sản phẩm `nhom_con`, `huong_vi`, `dong_goi` vào schema
 - Danh sách khách hàng mock hiện tổng hợp từ đơn mẫu. Khi kết nối thật, đề nghị `GET /admin/customers?q=&page=&per_page=`, `GET /admin/customers/{id}` và `PATCH /admin/customers/{id}/status`.
 - Báo cáo dùng doanh thu mẫu 7/30 ngày; đề nghị `GET /admin/reports?from=&to=` trả KPI, doanh thu theo ngày và sản phẩm bán chạy.
 - Trang tài khoản hiện chỉ là bản xem trước. Đề nghị `GET/PATCH /admin/account` và `POST /admin/account/password`; các nút nhập kho, điều chỉnh, xuất, hồ sơ/khóa khách, xuất báo cáo và lưu/cập nhật tài khoản hiện chỉ báo “Tính năng đang được phát triển”, không ghi dữ liệu.
+
+## Siêu sale Thứ 6 — hợp đồng chờ backend
+
+- Frontend mock gọi `GET /promotions/friday-sale`; khi nối backend, dùng endpoint đã thống nhất (kế hoạch backend hiện được thông báo là `GET /api/promotions/active`).
+- Response cần có `active`, `server_time` (ISO 8601, múi giờ `Asia/Ho_Chi_Minh`), `starts_at`, `ends_at`, `next_start`, `discount_percent`, `max_products` và `products`.
+- Khi ngoài khung Thứ 6, `active=false` và `products=[]`; không tiết lộ danh sách sắp mở bán. Thứ 6 nhưng chưa công bố danh sách: `active=true`, `products=[]`.
+- Quy tắc chương trình: mỗi Thứ 6 00:00:00–23:59:59 giờ Việt Nam, tối đa 10 sản phẩm, giảm 10%; nếu đồng thời cận hạn thì chỉ áp dụng mức giảm cao hơn.
+- Mỗi sản phẩm cần tối thiểu `id`, `ten_san_pham`, `hinh_anh`, `gia_goc`, `phan_tram_giam`, `gia_ban_hieu_luc`, `danh_muc`; chỉ trả số lượng tồn khi backend có dữ liệu thật (`so_luong_ton` hoặc `con_hang`).
+- Backend cần trả giá có hiệu lực nhất quán khi thêm sale item vào giỏ; không cộng dồn khuyến mãi.
+- Hiện chưa có route public/admin promotion hoặc Home API trong `backend/routes/`; tới khi backend công bố API, giao diện tiếp tục dùng mock.

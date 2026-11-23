@@ -104,16 +104,86 @@ function nearExpiryProducts() {
 const vietnamParts = (date = new Date()) => Object.fromEntries(new Intl.DateTimeFormat('en-US', {
   timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: 'numeric', day: 'numeric',
 }).formatToParts(date).filter((part) => part.type !== 'literal').map((part) => [part.type, Number(part.value)]));
-const getFridayActive = () => new Date().toLocaleDateString('en-US', { timeZone: 'Asia/Ho_Chi_Minh', weekday: 'short' }) === 'Fri' || localStorage.getItem('ms_dev_friday') === '1';
-function nextFridayStart() {
-  const { year, month, day } = vietnamParts();
+const vietnamIso = (timestamp) => new Date(timestamp + 7 * 60 * 60 * 1000).toISOString().replace('Z', '+07:00');
+function fridayDates(now = new Date()) {
+  const { year, month, day } = vietnamParts(now);
   const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
-  const daysUntilFriday = (5 - weekday + 7) % 7 || 7;
-  return new Date(Date.UTC(year, month - 1, day + daysUntilFriday, -7)).toISOString();
+  const daysSinceFriday = (weekday - 5 + 7) % 7;
+  const currentFriday = Date.UTC(year, month - 1, day - daysSinceFriday, -7);
+  const activeFriday = weekday === 5;
+  const startsAt = activeFriday ? currentFriday : currentFriday + 7 * 86400000;
+  const endsAt = startsAt + 86400000 - 1000;
+  return {
+    activeFriday,
+    startsAt,
+    endsAt,
+    nextStart: activeFriday ? startsAt + 7 * 86400000 : startsAt,
+    lastFridayEnd: currentFriday + 86400000 - 1000,
+  };
 }
-function endOfFriday() {
-  const { year, month, day } = vietnamParts();
-  return new Date(Date.UTC(year, month - 1, day + 1, -7) - 1000).toISOString();
+function fridaySaleWindow(now = new Date()) {
+  const dates = fridayDates(now);
+  const override = localStorage.getItem('ms_dev_friday');
+  if (override === 'ended') {
+    return { active: false, ended: true, ...dates };
+  }
+  if (override === '1' || override === 'empty') {
+    let schedule;
+    try { schedule = JSON.parse(localStorage.getItem('ms_mock_friday_window') || 'null'); } catch { schedule = null; }
+    if (!schedule || schedule.mode !== override || !Number.isFinite(schedule.endsAt)) {
+      schedule = { mode: override, startsAt: now.getTime() - 60000, endsAt: now.getTime() + 15 * 60000 };
+      localStorage.setItem('ms_mock_friday_window', JSON.stringify(schedule));
+    }
+    if (now.getTime() < schedule.endsAt) {
+      return {
+        active: true,
+        ended: false,
+        startsAt: schedule.startsAt,
+        endsAt: schedule.endsAt,
+        nextStart: dates.nextStart,
+      };
+    }
+    return { active: false, ended: true, ...dates };
+  }
+  const inSaleWindow = dates.activeFriday && now.getTime() <= dates.endsAt;
+  return {
+    active: inSaleWindow,
+    ended: !dates.activeFriday && now.getTime() >= dates.lastFridayEnd
+      && now.getTime() - dates.lastFridayEnd <= 60000,
+    ...dates,
+  };
+}
+const getFridayActive = () => fridaySaleWindow().active;
+function fridaySaleData() {
+  const window = fridaySaleWindow();
+  const products = allProducts().filter((product) => product.trang_thai !== 'an');
+  const promo = fridayProgram() || { id: 'friday-sale', enabled: true, productIds: [] };
+  if (!promo.productIds.length) {
+    promo.productIds = [...products].filter((product) => product.so_luong_ton > 0)
+      .sort(() => Math.random() - .5).slice(0, 10).map((product) => product.id);
+    saveFridayProgram(promo);
+  }
+  const nearExpiryIds = new Set(nearExpiryProducts().map((product) => Number(product.id)));
+  const saleProducts = window.active && promo.enabled && localStorage.getItem('ms_dev_friday') !== 'empty'
+    ? products.filter((product) => promo.productIds.includes(product.id)).slice(0, 10)
+      .map((product) => {
+        const category = allCategories().find((item) => Number(item.id) === Number(product.danh_muc_id));
+        return withSale(product, nearExpiryIds.has(Number(product.id)) ? 50 : 10, {
+          danh_muc: category ? { id: category.id, ten_danh_muc: category.ten_danh_muc, slug: category.slug } : null,
+        });
+      })
+    : [];
+  return {
+    active: window.active,
+    ended: window.ended,
+    server_time: vietnamIso(Date.now()),
+    starts_at: vietnamIso(window.startsAt),
+    ends_at: vietnamIso(window.endsAt),
+    next_start: vietnamIso(window.nextStart),
+    discount_percent: 10,
+    max_products: 10,
+    products: saleProducts,
+  };
 }
 const store = {
   get: (k, d) => { try { return JSON.parse(localStorage.getItem(`ms_mock_${k}`)) ?? d; } catch { return d; } },
@@ -126,7 +196,8 @@ const allProducts = () => store.get('products', PRODUCTS);
 const allCategories = () => store.get('categories', CATS).slice().sort((a, b) => (a.thu_tu || a.id) - (b.thu_tu || b.id));
 function cartData() {
   const quantities = store.get('cart', {});
-  const products = allProducts();
+  const saleProducts = new Map(fridaySaleData().products.map((product) => [Number(product.id), product]));
+  const products = allProducts().map((product) => saleProducts.get(Number(product.id)) || product);
   const items = Object.entries(quantities).flatMap(([id, amount]) => {
     const product = products.find((entry) => entry.id === Number(id));
     const so_luong = Number(amount) || 0;
@@ -250,22 +321,11 @@ const fail = (status, message, errors = null) => ({ success: false, status, mess
 function home() {
   const products = allProducts().filter((p) => p.trang_thai !== 'an');
   const categories = allCategories();
-  const active = getFridayActive();
-  const promo = fridayProgram() || { id: 'friday-sale', enabled: true, productIds: [] };
-  if (!promo.productIds.length) {
-    promo.productIds = [...products].filter((p) => p.so_luong_ton > 0).sort(() => Math.random() - .5).slice(0, 10).map((p) => p.id);
-    saveFridayProgram(promo);
-  }
-  const selected = products.filter((p) => promo.productIds.includes(p.id)).slice(0, 10);
+  const fridaySale = fridaySaleData();
   const near = nearExpiryProducts();
   return {
     categories,
-    friday_sale: {
-      active: active && promo.enabled,
-      enabled: promo.enabled,
-      next_start: nextFridayStart(), ends_at: endOfFriday(),
-      products: active && promo.enabled ? selected.map((p) => withSale(p, 10)) : [],
-    },
+    friday_sale: fridaySale,
     near_expiry: near,
     best_sellers: [...products].sort((a, b) => b.luot_ban - a.luot_ban).slice(0, 10),
     suggested: products.filter((p) => p.so_luong_ton > 0).slice(10, 20),
@@ -309,6 +369,7 @@ export async function handle(method, path, body = {}) {
   const params = new URLSearchParams(query);
   if (route === '/csrf') return ok({ token: 'mock' });
   if (route === '/home') return ok(home());
+  if (route === '/promotions/friday-sale' && method === 'GET') return ok(fridaySaleData());
   if (route === '/categories') return ok(allCategories());
   if (route === '/products' && method === 'GET') return ok(listProducts(params));
   if (route === '/locations/provinces') return ok([{ id: 'quang-binh', ten: 'Quảng Bình' }, { id: 'quang-tri', ten: 'Quảng Trị' }]);

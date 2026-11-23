@@ -7,9 +7,12 @@ import { confirmDialog } from './confirm-dialog.js';
 const productRecords = new Map();
 
 export function productCard(product, options = {}) {
-  productRecords.set(Number(product.id), product);
+  const recordKey = `${product.id}:${product.gia_hieu_luc ?? product.gia_ban}:${product.phan_tram_giam}`;
+  productRecords.set(recordKey, product);
   const sale = Number(product.phan_tram_giam) > 0;
-  const out = Number(product.so_luong_ton) <= 0;
+  const hasStock = product.so_luong_ton !== undefined && product.so_luong_ton !== null
+    && product.so_luong_ton !== '' && Number.isFinite(Number(product.so_luong_ton));
+  const out = hasStock ? Number(product.so_luong_ton) <= 0 : product.con_hang === false;
   const price = product.gia_hieu_luc ?? product.gia_ban;
   const flag = product.sap_dien_ra
     ? '<span class="pc__flag pc__flag--soon">Sắp diễn ra</span>'
@@ -18,7 +21,7 @@ export function productCard(product, options = {}) {
     ? `<span class="expiry-days expiry-days--${product.near_expiry_days <= 3 ? 'urgent' : product.near_expiry_days <= 7 ? 'soon' : 'later'}">Còn ${Number(product.near_expiry_days)} ngày</span>`
     : '';
   const stock = options.showStock
-    ? `<span class="pc__stock">${out ? 'Hết hàng' : `Còn ${Number(product.so_luong_ton)} sản phẩm`}</span>`
+    ? `<span class="pc__stock">${out ? 'Hết hàng' : hasStock ? `Còn ${Number(product.so_luong_ton)} sản phẩm` : product.con_hang ? 'Còn hàng' : ''}</span>`
     : '';
   const rank = options.rank
     ? `<span class="best-rank${options.rank <= 3 ? ' best-rank--top' : ''}" aria-label="Hạng ${options.rank}">${options.rank}</span>`
@@ -26,7 +29,7 @@ export function productCard(product, options = {}) {
   const sold = options.showSold ? `<span class="best-sold">Đã bán ${compactCount(product.luot_ban)}</span>` : '';
   const cls = ['pc', options.nearExpiry && 'pc--near-expiry', options.rank && 'pc--ranked', options.rank <= 3 && 'pc--rank-top', out && 'is-out-of-stock'].filter(Boolean).join(' ');
   const href = `chi-tiet-san-pham.html?id=${encodeURIComponent(product.id)}`;
-  return `<article class="${cls}" data-id="${escapeHtml(product.id)}">
+  return `<article class="${cls}" data-id="${escapeHtml(product.id)}" data-product-key="${escapeHtml(recordKey)}" data-category-key="${escapeHtml(options.categoryKey || '')}">
     ${rank}
     <a class="pc__media" href="${href}" tabindex="-1" aria-hidden="true">
       <img src="${escapeHtml(product.hinh_anh || 'assets/img/placeholder-product.svg')}" alt="" loading="lazy" width="200" height="200">${flag}${out ? '<span class="pc__soldout">Hết hàng</span>' : ''}</a>
@@ -56,7 +59,7 @@ export function bindProductCards(root = document) {
     const button = event.target.closest('[data-add]');
     if (!button || button.disabled) return;
     const card = button.closest('.pc');
-    const product = productRecords.get(Number(card?.dataset.id));
+    const product = productRecords.get(card?.dataset.productKey);
     if (!product) {
       toast('Không tìm thấy thông tin sản phẩm. Vui lòng tải lại trang.', 'error');
       return;
