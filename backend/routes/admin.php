@@ -1,9 +1,40 @@
 <?php
 declare(strict_types=1);
 
-/**
- * Khung admin | backend/routes/admin.php
- * TRẠNG THÁI: CHƯA CODE (STUB) hoặc hạ tầng Giai đoạn tiếp theo
- * Quy tắc: dùng PDO prepared statements, Transaction khi cần, Response JSON thống nhất.
- * TODO: triển khai theo use case trong docs/MA_TRAN_USECASE.md và mục 9 của prompt.
- */
+/** @var Router $router */
+$adminDatabaseConfig = require dirname(__DIR__) . '/config/database.php';
+$adminBusinessConfig = require dirname(__DIR__) . '/config/business.php';
+$adminMailConfig = require dirname(__DIR__) . '/config/mail.php';
+$adminDatabase = Database::connection($adminDatabaseConfig);
+$adminOtpSender = match ($adminMailConfig['driver']) {
+    'log' => new App\Services\Mail\LogOtpSender(),
+    'smtp' => new App\Services\Mail\EmailOtpSender($adminMailConfig),
+    default => throw new RuntimeException('MAIL_DRIVER phải là log hoặc smtp.'),
+};
+$adminAuthController = new App\Controllers\Admin\AdminAuthController(
+    $adminDatabase,
+    new Validator(),
+    new App\Services\OtpService($adminDatabase, $adminOtpSender, $adminBusinessConfig),
+    $adminBusinessConfig
+);
+
+$router->post(
+    '/api/admin/auth/login',
+    [$adminAuthController, 'login'],
+    [static fn(Request $request): bool => CsrfMiddleware::handle($request)]
+);
+$router->post(
+    '/api/admin/auth/verify-otp',
+    [$adminAuthController, 'verifyOtp'],
+    [static fn(Request $request): bool => CsrfMiddleware::handle($request)]
+);
+$router->post(
+    '/api/admin/auth/otp/resend',
+    [$adminAuthController, 'resendOtp'],
+    [static fn(Request $request): bool => CsrfMiddleware::handle($request)]
+);
+$router->get(
+    '/api/admin/me',
+    [$adminAuthController, 'me'],
+    [static fn(Request $request): bool => App\Middleware\AdminMiddleware::handle($request)]
+);

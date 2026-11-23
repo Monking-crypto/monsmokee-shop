@@ -13,7 +13,7 @@ return [
   ],
   'otp' => [
     'length' => 6,
-    'ttl_seconds' => 180,
+    'ttl_seconds' => 300,
     'max_wrong_attempts' => 5,
     'resend_cooldown_seconds' => 60,
     'max_sends_per_hour' => 5,

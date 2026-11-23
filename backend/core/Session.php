@@ -12,26 +12,40 @@ final class Session
             return;
         }
 
+        $lifetime = max(0, (int) ($config['lifetime_seconds'] ?? 7200));
+        $customerIdleTimeout = max(1, (int) ($config['idle_timeout_seconds'] ?? 7200));
+        $adminIdleTimeout = max(1, (int) ($config['admin_idle_timeout_seconds'] ?? 1800));
         session_name((string) ($config['name'] ?? 'MONSMOKEESID'));
         session_set_cookie_params([
-            'lifetime' => 2 * 60 * 60,
+            'lifetime' => $lifetime,
             'path' => '/',
             'domain' => '',
-            'secure' => $config['secure'] ?? false,
+            'secure' => (bool) ($config['secure'] ?? false),
             'httponly' => true,
             'samesite' => 'Lax',
         ]);
-        ini_set('session.gc_maxlifetime', '7200');
+        ini_set(
+            'session.gc_maxlifetime',
+            (string) max($customerIdleTimeout, $adminIdleTimeout)
+        );
         session_start();
 
         $now = time();
         if (!isset($_SESSION['created_at'])) {
             $_SESSION['created_at'] = $now;
         }
-        if ($now - (int) $_SESSION['created_at'] > 2 * 60 * 60) {
+        $isVerifiedAdmin = ($_SESSION['user_role'] ?? null) === 'Admin'
+            && ($_SESSION['admin_otp_verified'] ?? false) === true;
+        $idleTimeout = $isVerifiedAdmin ? $adminIdleTimeout : $customerIdleTimeout;
+        $lastActivity = (int) ($_SESSION['last_activity'] ?? $_SESSION['created_at']);
+        $lifetimeExpired = $lifetime > 0 && $now - (int) $_SESSION['created_at'] >= $lifetime;
+        $idleExpired = $now - $lastActivity >= $idleTimeout;
+        if ($lifetimeExpired || $idleExpired) {
             session_unset();
+            session_regenerate_id(true);
             $_SESSION['created_at'] = $now;
         }
+        $_SESSION['last_activity'] = $now;
     }
 
     public static function get(string $key, mixed $default = null): mixed

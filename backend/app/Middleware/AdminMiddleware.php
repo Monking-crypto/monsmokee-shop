@@ -1,9 +1,29 @@
 <?php
 declare(strict_types=1);
 
-/**
- * Khung AdminMiddleware | backend/app/Middleware/AdminMiddleware.php
- * TRẠNG THÁI: CHƯA CODE (STUB) hoặc hạ tầng Giai đoạn tiếp theo
- * Quy tắc: dùng PDO prepared statements, Transaction khi cần, Response JSON thống nhất.
- * TODO: triển khai theo use case trong docs/MA_TRAN_USECASE.md và mục 9 của prompt.
- */
+namespace App\Middleware;
+
+use Request;
+use Response;
+use Session;
+
+final class AdminMiddleware
+{
+    public static function handle(Request $request): bool
+    {
+        if (!AuthMiddleware::isAuthenticated()) {
+            Response::error('Vui lòng đăng nhập để tiếp tục', 401);
+            return false;
+        }
+
+        if (
+            Session::get('user_role') !== 'Admin'
+            || Session::get('admin_otp_verified') !== true
+        ) {
+            Response::error('Bạn không có quyền truy cập chức năng này', 403);
+            return false;
+        }
+
+        return true;
+    }
+}

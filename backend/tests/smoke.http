@@ -1,17 +1,163 @@
-### MON SMOKEE smoke test - Bước 2 hạ tầng
+### Giá trị cá nhân/test: điền cục bộ, không commit thông tin thật
+@customerName = Test Customer
+@customerPhone =
+@customerEmail =
+@customerPassword =
+@customerOtp =
+@adminPhone =
+@adminPassword =
+@adminOtp =
+@wrongAdminOtp = not-a-code
 
-### 1. Lấy CSRF token
+### 1. Lấy CSRF token; REST Client cần giữ cookie session
+# @name csrf
 GET http://localhost/monsmokee/backend/public/api/csrf
 
-### 2. POST không gửi CSRF - mong đợi 403
+### 2. Chưa đăng nhập vào Admin me - 401
+GET http://localhost/monsmokee/backend/public/api/admin/me
+
+### 3. Bắt đầu đăng ký Customer
+POST http://localhost/monsmokee/backend/public/api/auth/register/start
+Content-Type: application/json
+X-CSRF-Token: {{csrf.response.body.data.csrf_token}}
+
+{
+  "ho_ten": "{{customerName}}",
+  "so_dien_thoai": "{{customerPhone}}",
+  "email": "{{customerEmail}}",
+  "mat_khau": "{{customerPassword}}",
+  "nhap_lai_mat_khau": "{{customerPassword}}"
+}
+
+### 4. Gửi lại OTP đăng ký (chỉ chạy sau khi cooldown 60 giây; dùng OTP mới nhất)
+POST http://localhost/monsmokee/backend/public/api/auth/otp/resend
+Content-Type: application/json
+X-CSRF-Token: {{csrf.response.body.data.csrf_token}}
+
+{
+  "email": "{{customerEmail}}"
+}
+
+### 5. Xác nhận đăng ký; thành công trả 201 và đăng nhập Customer
+POST http://localhost/monsmokee/backend/public/api/auth/register/verify
+Content-Type: application/json
+X-CSRF-Token: {{csrf.response.body.data.csrf_token}}
+
+{
+  "email": "{{customerEmail}}",
+  "otp": "{{customerOtp}}"
+}
+
+### 6. Xem Customer hiện tại - 200
+GET http://localhost/monsmokee/backend/public/api/auth/me
+
+### Customer không được vào Admin - 403
+GET http://localhost/monsmokee/backend/public/api/admin/me
+
+### 7. Logout Customer - 200
+POST http://localhost/monsmokee/backend/public/api/auth/logout
+X-CSRF-Token: {{csrf.response.body.data.csrf_token}}
+
+###
+# @name csrfAfterCustomerLogout
+GET http://localhost/monsmokee/backend/public/api/csrf
+
+### Sau logout, Customer me - 401
+GET http://localhost/monsmokee/backend/public/api/auth/me
+
+### Logout lần hai vẫn thành công - 200
+POST http://localhost/monsmokee/backend/public/api/auth/logout
+X-CSRF-Token: {{csrfAfterCustomerLogout.response.body.data.csrf_token}}
+
+###
+# @name csrfForCustomerLogin
+GET http://localhost/monsmokee/backend/public/api/csrf
+
+### 8. Đăng nhập Customer - dùng tài khoản đã đăng ký ở trên
 POST http://localhost/monsmokee/backend/public/api/auth/login
 Content-Type: application/json
+X-CSRF-Token: {{csrfForCustomerLogin.response.body.data.csrf_token}}
+
+{
+  "so_dien_thoai": "{{customerPhone}}",
+  "mat_khau": "{{customerPassword}}"
+}
+
+### 9. Logout Customer trước khi thử Admin
+POST http://localhost/monsmokee/backend/public/api/auth/logout
+X-CSRF-Token: {{csrfForCustomerLogin.response.body.data.csrf_token}}
+
+###
+# @name csrfForAdmin
+GET http://localhost/monsmokee/backend/public/api/csrf
+
+### 10. Admin đăng nhập bước 1; OTP gửi tới email lấy từ CSDL
+POST http://localhost/monsmokee/backend/public/api/admin/auth/login
+Content-Type: application/json
+X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
+
+{
+  "so_dien_thoai": "{{adminPhone}}",
+  "mat_khau": "{{adminPassword}}"
+}
+
+### Pending OTP chưa phải đăng nhập - Admin me và Customer me đều 401
+GET http://localhost/monsmokee/backend/public/api/admin/me
+
+###
+GET http://localhost/monsmokee/backend/public/api/auth/me
+
+### Resend ngay trong cooldown 60 giây - 429
+POST http://localhost/monsmokee/backend/public/api/admin/auth/otp/resend
+Content-Type: application/json
+X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
 
 {}
 
-### 3. POST có CSRF - backend bước auth chưa làm nên mong đợi 501
-POST http://localhost/monsmokee/backend/public/api/auth/login
+### OTP sai - 422, response có remaining_attempts
+POST http://localhost/monsmokee/backend/public/api/admin/auth/verify-otp
 Content-Type: application/json
-X-CSRF-Token: paste-token-tu-cau-1
+X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
+
+{
+  "otp": "{{wrongAdminOtp}}"
+}
+
+### OTP đúng - 200, nhập mã mới nhất từ email/outbox
+POST http://localhost/monsmokee/backend/public/api/admin/auth/verify-otp
+Content-Type: application/json
+X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
+
+{
+  "otp": "{{adminOtp}}"
+}
+
+### 11. Admin đã xác thực OTP - 200
+GET http://localhost/monsmokee/backend/public/api/admin/me
+
+### Dùng lại OTP sau khi pending bị xóa - 401
+POST http://localhost/monsmokee/backend/public/api/admin/auth/verify-otp
+Content-Type: application/json
+X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
+
+{
+  "otp": "{{adminOtp}}"
+}
+
+### 12. Logout Admin - 200
+POST http://localhost/monsmokee/backend/public/api/auth/logout
+X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
+
+###
+# @name csrfAfterAdminLogout
+GET http://localhost/monsmokee/backend/public/api/csrf
+
+### Sau logout, Admin me - 401
+GET http://localhost/monsmokee/backend/public/api/admin/me
+
+### Resend khi không có pending - 401
+POST http://localhost/monsmokee/backend/public/api/admin/auth/otp/resend
+Content-Type: application/json
+X-CSRF-Token: {{csrfAfterAdminLogout.response.body.data.csrf_token}}
 
 {}
