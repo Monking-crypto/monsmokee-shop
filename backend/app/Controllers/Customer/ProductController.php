@@ -62,7 +62,7 @@ final class ProductController
             return;
         }
 
-        $conditions = ['s.trang_thai = 1'];
+        $conditions = ['s.trang_thai = 1', 'd.trang_thai = 1'];
         $values = [];
         if ($categoryId !== null) {
             $conditions[] = 's.danh_muc_id = ?';
@@ -77,7 +77,10 @@ final class ProductController
         $where = implode(' AND ', $conditions);
 
         $count = $this->pdo->prepare(
-            'SELECT COUNT(*) FROM san_pham s WHERE ' . $where
+            'SELECT COUNT(*)
+             FROM san_pham s
+             JOIN danh_muc d ON d.id = s.danh_muc_id
+             WHERE ' . $where
         );
         $count->execute($values);
         $total = (int) $count->fetchColumn();
@@ -145,7 +148,7 @@ final class ProductController
                     d.id AS danh_muc_id, d.ten_danh_muc, d.slug AS danh_muc_slug
              FROM san_pham s
              JOIN danh_muc d ON d.id = s.danh_muc_id
-             WHERE s.id = ? AND s.trang_thai = 1
+             WHERE s.id = ? AND s.trang_thai = 1 AND d.trang_thai = 1
              LIMIT 1'
         );
         $query->execute([$id]);

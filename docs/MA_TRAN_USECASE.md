@@ -15,8 +15,8 @@ Trạng thái bên dưới phản ánh phạm vi backend hiện tại; giao di�
 | UC03/QT6 — hồ sơ | `ProfileController.php`, `tai-khoan.html` | `/api/auth/profile` | Chưa làm |
 | UC04/QT8-9 — thanh toán | `CheckoutController.php`, `thanh-toan.html` | `/api/checkout/*` | Chưa làm |
 | UC05/QT10-11 — đơn hàng/đánh giá | `OrderController.php`, `ReviewController.php` | `/api/orders*` | Chưa làm |
-| UC06/QT13 — quản lý danh mục | `CategoryAdminController.php` | `/api/admin/categories` | Chưa làm |
-| UC07/QT13 — quản lý sản phẩm | `ProductAdminController.php` | `/api/admin/products` | Chưa làm |
+| UC06/QT13 — quản lý danh mục | `CategoryAdminController.php` | `/api/admin/categories` | Hoàn thành backend |
+| UC07/QT13 — quản lý sản phẩm | `ProductAdminController.php` | `/api/admin/products` | Hoàn thành backend |
 | UC08/QT14 — quản lý đơn hàng | `OrderAdminController.php` | `/api/admin/orders` | Chưa làm |
 | UC09/QT14-15 — tồn kho | `InventoryAdminController.php` | `/api/admin/inventory` | Chưa làm |
 | UC10 — quản lý khách hàng | `CustomerAdminController.php` | `/api/admin/customers` | Chưa làm |
@@ -24,3 +24,5 @@ Trạng thái bên dưới phản ánh phạm vi backend hiện tại; giao di�
 | UC12/QT13 — khuyến mãi | `PromotionAdminController.php` | `/api/admin/promotions` | Chưa làm |
 
 Khuyến mãi, giỏ hàng và đơn hàng chưa được triển khai trong phần đọc công khai này; giao diện frontend vẫn là phạm vi riêng.
+
+Danh mục hỗ trợ tạo/sửa/ẩn/hiện; sản phẩm hỗ trợ quản lý, ẩn/hiện, xóa mềm theo lịch sử giao dịch và tải ảnh. Tồn kho cùng hạn sử dụng chỉ được cập nhật qua chức năng phiếu nhập kho (chưa làm).

@@ -444,7 +444,7 @@ Các request verify cũng được giới hạn tối đa 10 lần trong 15 phú
 **Query:** Không có.
 **Body:** Không có.
 
-`danh_muc` hiện không có cột trạng thái hiển thị, vì vậy tất cả danh mục trong bảng được trả về theo `thu_tu`.
+Danh mục có `trang_thai = 1` mới được trả về theo `thu_tu`; danh mục bị ẩn cùng các sản phẩm thuộc danh mục đó không xuất hiện trong API công khai.
 
 **Response — 200**
 
@@ -558,3 +558,120 @@ Chỉ sản phẩm đang bán được trả về. Response không chứa số l
 **Lỗi:** `404` id không hợp lệ, sản phẩm không tồn tại hoặc đã ẩn; `500` lỗi truy vấn.
 
 Khuyến mãi, giỏ hàng và đơn hàng chưa nằm trong phạm vi API công khai ở bước này.
+
+## 18. Quản lý danh mục Admin
+
+Tất cả API trong mục này yêu cầu cookie session Admin đã đăng nhập và xác thực OTP. Mọi request ghi dữ liệu phải gửi `X-CSRF-Token` lấy từ `GET /api/csrf`, cookie session và `Content-Type: application/json`.
+
+### `GET /api/admin/categories`
+
+Trả tất cả danh mục, gồm cả danh mục ẩn, với `id`, `ten_danh_muc`, `slug`, `icon`, `thu_tu`, `trang_thai`.
+
+**Response — 200**
+
+```json
+{
+  "success": true,
+  "message": "Danh sách danh mục",
+  "data": {
+    "categories": [
+      {
+        "id": 1,
+        "ten_danh_muc": "Nước giải khát",
+        "slug": "nuoc-giai-khat",
+        "icon": "droplet",
+        "thu_tu": 1,
+        "trang_thai": 1
+      }
+    ]
+  },
+  "errors": null
+}
+```
+
+### `POST /api/admin/categories`
+
+**Body:**
+
+```json
+{"ten_danh_muc": "Đồ khô", "icon": "basket", "thu_tu": 6}
+```
+
+Tên là bắt buộc và không trùng; slug được tạo từ tên. `icon` và `thu_tu` tùy chọn.
+**Response — 201:** `{"success":true,"message":"Đã tạo danh mục","data":{"id":12},"errors":null}`
+
+### `PUT /api/admin/categories/{id}`
+
+**Body:** giống API tạo danh mục. Tên mới không được trùng; slug được cập nhật theo tên.
+**Response — 200:** `{"success":true,"message":"Đã cập nhật danh mục","data":{"id":12},"errors":null}`
+
+### `PATCH /api/admin/categories/{id}/visibility`
+
+**Body:** `{"trang_thai": 0}` để ẩn, `{"trang_thai": 1}` để hiện. Không có API xóa danh mục; danh mục có sản phẩm chỉ được ẩn.
+**Response — 200:** `{"success":true,"message":"Đã cập nhật trạng thái danh mục","data":{"id":12,"trang_thai":0},"errors":null}`
+
+## 19. Quản lý sản phẩm Admin
+
+Các API yêu cầu Admin đã xác thực OTP, cookie session và CSRF cho `POST`, `PUT`, `PATCH`, `DELETE`. Sản phẩm có thể được tạo/cập nhật với `ten_san_pham`, `danh_muc_id`, `gia_ban` (số nguyên VND dương), `don_vi_tinh` và `mo_ta`. Nội dung HTML bị loại bỏ trước khi lưu. Trường tồn kho, hạn sử dụng và các trường trạng thái nội bộ không được nhận từ payload cập nhật; sản phẩm mới bắt đầu với tồn kho `0`. Thay ảnh qua endpoint upload riêng.
+
+### `GET /api/admin/products`
+
+**Query tùy chọn:** `page` (mặc định 1), `per_page` (mặc định 20, tối đa 50), `q`, `category_id`, `trang_thai` (`0` hoặc `1`). Không lọc trạng thái thì trả cả sản phẩm đang bán và đang ẩn.
+**Response — 200:** `data.products` kèm `data.pagination`; mỗi sản phẩm có `id`, `danh_muc_id`, `ten_danh_muc`, `ten_san_pham`, `mo_ta`, `hinh_anh`, `don_vi_tinh`, `gia_ban`, `so_luong_ton`, `muc_ton_toi_thieu`, `trang_thai`, thông tin giảm cận hạn, `luot_ban`, `ngay_tao`, `ngay_cap_nhat`. Hạn sử dụng không thuộc bảng sản phẩm; API không trả hạn sử dụng.
+
+### `GET /api/admin/products/{id}`
+
+Trả chi tiết cùng các trường sản phẩm như danh sách; `404` nếu không tồn tại.
+
+### `POST /api/admin/products`
+
+**Body:**
+
+```json
+{
+  "ten_san_pham": "Bánh quy mẫu",
+  "danh_muc_id": 1,
+  "gia_ban": 25000,
+  "don_vi_tinh": "gói",
+  "mo_ta": "Mô tả sản phẩm"
+}
+```
+
+**Response — 201:** `{"success":true,"message":"Đã tạo sản phẩm","data":{"id":25},"errors":null}`
+
+### `PUT /api/admin/products/{id}`
+
+Nhận các trường dữ liệu giống API tạo sản phẩm; không thay đổi tồn kho hoặc hạn sử dụng.
+**Response — 200:** `{"success":true,"message":"Đã cập nhật sản phẩm","data":{"id":25},"errors":null}`
+
+### `PATCH /api/admin/products/{id}/visibility`
+
+**Body:** `{"trang_thai": 0}` để ẩn, `{"trang_thai": 1}` để hiện.
+**Response — 200:** `{"success":true,"message":"Đã cập nhật trạng thái sản phẩm","data":{"id":25,"trang_thai":0},"errors":null}`
+
+### `DELETE /api/admin/products/{id}`
+
+Nếu sản phẩm xuất hiện trong chi tiết đơn hàng hoặc phiếu nhập, sản phẩm được ẩn và response `200` có `data.deleted = false`. Nếu chưa có giao dịch đó, sản phẩm được xóa thật và response `200` có `data.deleted = true`. Nếu còn liên kết dữ liệu khác khiến xóa không an toàn, trả `409`.
+
+### `POST /api/admin/products/{id}/image`
+
+Gửi `multipart/form-data` với trường tệp `image`, cookie Admin và `X-CSRF-Token` (không tự đặt `Content-Type` để client tạo multipart boundary). Chỉ nhận JPEG, PNG hoặc WebP; kích thước tối đa 2 MB. Loại tệp được kiểm bằng `finfo`, tên lưu ngẫu nhiên trong `backend/uploads/products/`; ảnh cũ do API này quản lý được xóa sau khi thay thế thành công.
+
+**Response — 200:**
+
+```json
+{
+  "success": true,
+  "message": "Đã cập nhật ảnh sản phẩm",
+  "data": {
+    "id": 25,
+    "hinh_anh": "uploads/products/0123456789abcdef0123456789abcdef.webp",
+    "url": "http://localhost/monsmokee/backend/uploads/products/0123456789abcdef0123456789abcdef.webp"
+  },
+  "errors": null
+}
+```
+
+**Lỗi chung:** `401` chưa đăng nhập; `403` không phải Admin/OTP chưa xác thực hoặc CSRF sai; `404` danh mục/sản phẩm không tồn tại; `409` tên danh mục trùng hoặc xóa sản phẩm bị cản bởi liên kết; `413` tệp vượt giới hạn cấu hình PHP; `422` dữ liệu không hợp lệ hoặc ảnh sai loại/kích thước; `500` lỗi hệ thống.
+
+Mọi thao tác ghi thành công được ghi vào `backend/storage/logs/admin_audit.log` dưới dạng thời gian, Admin ID, hành động, loại bản ghi và ID; không ghi payload, mật khẩu hay OTP.

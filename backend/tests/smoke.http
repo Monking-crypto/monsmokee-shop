@@ -15,6 +15,9 @@
 @categoryId = 1
 @productId = 1
 @searchTerm = sua
+@newCategoryName =
+@newProductName =
+@adminImagePath =
 
 ### Public catalog: danh sách danh mục
 GET http://localhost/monsmokee/backend/public/api/categories
@@ -215,6 +218,119 @@ X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
 
 ### 11. Admin đã xác thực OTP - 200
 GET http://localhost/monsmokee/backend/public/api/admin/me
+
+### Admin: danh sách tất cả danh mục, gồm danh mục ẩn
+GET http://localhost/monsmokee/backend/public/api/admin/categories
+
+### Admin: tạo danh mục kiểm thử
+# @name createAdminCategory
+POST http://localhost/monsmokee/backend/public/api/admin/categories
+Content-Type: application/json
+X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
+
+{
+  "ten_danh_muc": "{{newCategoryName}}",
+  "icon": "basket",
+  "thu_tu": 99
+}
+
+### Admin: sửa danh mục vừa tạo
+PUT http://localhost/monsmokee/backend/public/api/admin/categories/{{createAdminCategory.response.body.data.id}}
+Content-Type: application/json
+X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
+
+{
+  "ten_danh_muc": "{{newCategoryName}} updated",
+  "icon": "basket",
+  "thu_tu": 99
+}
+
+### Admin: ẩn rồi hiện danh mục; không có API xóa danh mục
+PATCH http://localhost/monsmokee/backend/public/api/admin/categories/{{createAdminCategory.response.body.data.id}}/visibility
+Content-Type: application/json
+X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
+
+{"trang_thai": 0}
+
+###
+PATCH http://localhost/monsmokee/backend/public/api/admin/categories/{{createAdminCategory.response.body.data.id}}/visibility
+Content-Type: application/json
+X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
+
+{"trang_thai": 1}
+
+### Admin: tạo sản phẩm (tồn kho được khởi tạo bằng 0)
+# @name createAdminProduct
+POST http://localhost/monsmokee/backend/public/api/admin/products
+Content-Type: application/json
+X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
+
+{
+  "ten_san_pham": "{{newProductName}}",
+  "danh_muc_id": {{createAdminCategory.response.body.data.id}},
+  "gia_ban": 25000,
+  "don_vi_tinh": "gói",
+  "mo_ta": "Sản phẩm dùng để kiểm thử quản trị"
+}
+
+### Admin: tìm và lọc sản phẩm
+GET http://localhost/monsmokee/backend/public/api/admin/products?q={{newProductName}}&category_id={{createAdminCategory.response.body.data.id}}&trang_thai=1&page=1&per_page=20
+
+### Admin: chi tiết sản phẩm
+GET http://localhost/monsmokee/backend/public/api/admin/products/{{createAdminProduct.response.body.data.id}}
+
+### Admin: cập nhật sản phẩm (không gửi tồn kho hoặc hạn sử dụng)
+PUT http://localhost/monsmokee/backend/public/api/admin/products/{{createAdminProduct.response.body.data.id}}
+Content-Type: application/json
+X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
+
+{
+  "ten_san_pham": "{{newProductName}}",
+  "danh_muc_id": {{createAdminCategory.response.body.data.id}},
+  "gia_ban": 26000,
+  "don_vi_tinh": "gói",
+  "mo_ta": "Mô tả đã cập nhật"
+}
+
+### Admin: ẩn sản phẩm; API công khai phải trả 404
+PATCH http://localhost/monsmokee/backend/public/api/admin/products/{{createAdminProduct.response.body.data.id}}/visibility
+Content-Type: application/json
+X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
+
+{"trang_thai": 0}
+
+###
+GET http://localhost/monsmokee/backend/public/api/products/{{createAdminProduct.response.body.data.id}}
+
+### Admin: hiện sản phẩm trước khi thử upload và xóa
+PATCH http://localhost/monsmokee/backend/public/api/admin/products/{{createAdminProduct.response.body.data.id}}/visibility
+Content-Type: application/json
+X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
+
+{"trang_thai": 1}
+
+### Admin: upload ảnh JPEG/PNG/WebP nhỏ hơn 2 MB; điền đường dẫn file cục bộ
+POST http://localhost/monsmokee/backend/public/api/admin/products/{{createAdminProduct.response.body.data.id}}/image
+X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
+Content-Type: multipart/form-data; boundary=----SmokeBoundary
+
+------SmokeBoundary
+Content-Disposition: form-data; name="image"; filename="smoke-image.webp"
+Content-Type: image/webp
+
+< {{adminImagePath}}
+------SmokeBoundary--
+
+### Admin: xóa cứng sản phẩm kiểm thử chưa có đơn hàng/phiếu nhập
+DELETE http://localhost/monsmokee/backend/public/api/admin/products/{{createAdminProduct.response.body.data.id}}
+X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
+
+### Admin: ẩn danh mục kiểm thử sau khi xóa sản phẩm
+PATCH http://localhost/monsmokee/backend/public/api/admin/categories/{{createAdminCategory.response.body.data.id}}/visibility
+Content-Type: application/json
+X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
+
+{"trang_thai": 0}
 
 ### Dùng lại OTP sau khi pending bị xóa - 401
 POST http://localhost/monsmokee/backend/public/api/admin/auth/verify-otp

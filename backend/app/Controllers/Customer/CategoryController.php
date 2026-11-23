@@ -18,6 +18,7 @@ final class CategoryController
         $query = $this->pdo->query(
             'SELECT id, ten_danh_muc, slug, icon, thu_tu
              FROM danh_muc
+             WHERE trang_thai = 1
              ORDER BY thu_tu ASC, ten_danh_muc ASC, id ASC'
         );
         $categories = array_map(

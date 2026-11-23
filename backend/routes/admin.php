@@ -17,6 +17,12 @@ $adminAuthController = new App\Controllers\Admin\AdminAuthController(
     new App\Services\OtpService($adminDatabase, $adminOtpSender, $adminBusinessConfig),
     $adminBusinessConfig
 );
+$categoryAdminController = new App\Controllers\Admin\CategoryAdminController($adminDatabase);
+$productAdminController = new App\Controllers\Admin\ProductAdminController($adminDatabase);
+$requireVerifiedAdmin = static fn(Request $request): bool =>
+    App\Middleware\AdminMiddleware::handle($request);
+$requireAdminCsrf = static fn(Request $request): bool =>
+    CsrfMiddleware::handle($request);
 
 $router->post(
     '/api/admin/auth/login',
@@ -36,5 +42,53 @@ $router->post(
 $router->get(
     '/api/admin/me',
     [$adminAuthController, 'me'],
-    [static fn(Request $request): bool => App\Middleware\AdminMiddleware::handle($request)]
+    [$requireVerifiedAdmin]
+);
+$router->get('/api/admin/categories', [$categoryAdminController, 'index'], [$requireVerifiedAdmin]);
+$router->post(
+    '/api/admin/categories',
+    [$categoryAdminController, 'create'],
+    [$requireVerifiedAdmin, $requireAdminCsrf]
+);
+$router->put(
+    '/api/admin/categories/{id}',
+    [$categoryAdminController, 'update'],
+    [$requireVerifiedAdmin, $requireAdminCsrf]
+);
+$router->patch(
+    '/api/admin/categories/{id}/visibility',
+    [$categoryAdminController, 'updateVisibility'],
+    [$requireVerifiedAdmin, $requireAdminCsrf]
+);
+
+$router->get('/api/admin/products', [$productAdminController, 'index'], [$requireVerifiedAdmin]);
+$router->get(
+    '/api/admin/products/{id}',
+    [$productAdminController, 'show'],
+    [$requireVerifiedAdmin]
+);
+$router->post(
+    '/api/admin/products',
+    [$productAdminController, 'create'],
+    [$requireVerifiedAdmin, $requireAdminCsrf]
+);
+$router->put(
+    '/api/admin/products/{id}',
+    [$productAdminController, 'update'],
+    [$requireVerifiedAdmin, $requireAdminCsrf]
+);
+$router->patch(
+    '/api/admin/products/{id}/visibility',
+    [$productAdminController, 'updateVisibility'],
+    [$requireVerifiedAdmin, $requireAdminCsrf]
+);
+$router->delete(
+    '/api/admin/products/{id}',
+    [$productAdminController, 'delete'],
+    [$requireVerifiedAdmin, $requireAdminCsrf]
+);
+$router->post(
+    '/api/admin/products/{id}/image',
+    [$productAdminController, 'uploadImage'],
+    [$requireVerifiedAdmin, $requireAdminCsrf]
 );

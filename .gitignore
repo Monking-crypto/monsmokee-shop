@@ -7,4 +7,5 @@ backend/uploads/*
 !backend/storage/logs/.gitkeep
 !backend/storage/mail_outbox/.gitkeep
 !backend/storage/rate_limit/.gitkeep
+!backend/uploads/.htaccess
 !backend/uploads/products/.gitkeep
