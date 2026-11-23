@@ -119,7 +119,6 @@ if (await requireAdmin()) {
     if (error?.status === 0) toast('Không tải được số đơn chờ xử lý.', 'error');
   }
   qs('#admin-logout').addEventListener('click', async () => {
-    try { await api.post('/admin/auth/logout'); location.replace('login.html'); }
-    catch { toast('Không thể đăng xuất. Vui lòng thử lại.', 'error'); }
+    toast('Backend chưa cung cấp API đăng xuất Admin.', 'error');
   });
 }

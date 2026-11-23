@@ -14,8 +14,10 @@
   <h1>Đăng nhập quản trị</h1>
   <div id="admin-login-alert" class="auth__alert auth__alert--error" role="alert" hidden></div>
   <form id="admin-login-form">
-    <label for="admin-phone">Số điện thoại</label><input id="admin-phone" type="tel" inputmode="numeric" autocomplete="username" required pattern="0[0-9]{9}" maxlength="10">
-    <label for="admin-password">Mật khẩu</label><input id="admin-password" type="password" autocomplete="current-password" required>
+    <label for="admin-phone">Số điện thoại</label><input id="admin-phone" type="tel" inputmode="numeric" autocomplete="username" required pattern="0[0-9]{9}" maxlength="10" aria-describedby="admin-phone-error">
+    <p id="admin-phone-error" class="field__error" role="alert"></p>
+    <label for="admin-password">Mật khẩu</label><input id="admin-password" type="password" autocomplete="current-password" required aria-describedby="admin-password-error">
+    <p id="admin-password-error" class="field__error" role="alert"></p>
     <button id="admin-login-submit" class="ms-btn ms-btn--green ms-btn--block" type="submit">Tiếp tục</button>
   </form>
   <section id="admin-otp-step" hidden>
