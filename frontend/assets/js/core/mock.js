@@ -16,7 +16,8 @@ const CATS = [
   ['trung', 'Trứng', 'egg', ['Trứng gà', 'Trứng vịt', 'Trứng cút']],
   ['kem', 'Kem', 'snow', ['Kem que', 'Kem hộp', 'Kem ốc quế']],
 ].map(([slug, ten_danh_muc, icon, children], i) => ({
-  id: i + 1, ten_danh_muc, slug, icon, children: children.map((ten, j) => ({ ten, slug: `nhom-${i + 1}-${j + 1}` })),
+  id: i + 1, ten_danh_muc, slug, icon, thu_tu: i + 1,
+  children: children.map((ten, j) => ({ ten, slug: `nhom-${i + 1}-${j + 1}` })),
 }));
 
 const SEEDS = [
@@ -26,6 +27,7 @@ const SEEDS = [
   ['Snack rong biển', 'Snack', 'Rong biển', 'Gói', 18000], ['Bánh bông lan', 'Bánh ngọt', 'Vani', 'Hộp', 28000],
   ['Mì tôm gói', 'Mì ăn liền', 'Tôm', 'Gói', 4000], ['Hủ tiếu khô', 'Hủ tiếu', 'Nam vang', 'Gói', 19000],
   ['Miến dong', 'Miến', 'Dong riềng', 'Gói', 22000], ['Phở bò ăn liền', 'Phở và bún ăn liền', 'Bò', 'Ly', 12000],
+  ['Thùng mì tôm', 'Mì ăn liền', 'Tôm', 'Thùng', 96000],
   ['Nui xoắn', 'Nui', 'Lúa mì', 'Gói', 16000], ['Mì Ý spaghetti', 'Mì Ý', 'Lúa mì', 'Gói', 25000],
   ['Mì trộn cay', 'Mì ăn liền', 'Cay', 'Gói', 6500], ['Bún riêu ăn liền', 'Phở và bún ăn liền', 'Cua', 'Ly', 14000],
   ['Bia lon lager', 'Bia lon', 'Lager', 'Lon', 18000], ['Bia chai vàng', 'Bia chai', 'Lager', 'Chai', 22000],
@@ -35,6 +37,7 @@ const SEEDS = [
   ['Sữa tươi có đường', 'Sữa tươi', 'Có đường', 'Hộp', 32000], ['Sữa đặc', 'Sữa đặc', 'Ngọt', 'Lon', 28000],
   ['Sữa chua uống', 'Sữa chua', 'Dâu', 'Lốc', 26000], ['Sữa bột dinh dưỡng', 'Sữa bột', 'Vani', 'Hộp', 125000],
   ['Sữa tươi không đường', 'Sữa tươi', 'Không đường', 'Hộp', 34000], ['Sữa chua nha đam', 'Sữa chua', 'Nha đam', 'Hũ', 8000],
+  ['Thùng sữa tươi', 'Sữa tươi', 'Có đường', 'Thùng', 360000],
   ['Sữa tiệt trùng', 'Sữa tươi', 'Ít đường', 'Lốc', 36000], ['Sữa đặc nhỏ', 'Sữa đặc', 'Ngọt', 'Lon', 18000],
   ['Nước suối 500ml', 'Nước suối', 'Tinh khiết', 'Chai', 5000], ['Nước ngọt cola', 'Nước ngọt', 'Cola', 'Lon', 12000],
   ['Trà xanh chai', 'Trà', 'Trà xanh', 'Chai', 10000], ['Nước cam', 'Nước trái cây', 'Cam', 'Hộp', 11000],
@@ -80,12 +83,24 @@ const PRODUCTS = SEEDS.map(([ten_san_pham, nhom_con, huong_vi, dong_goi, gia_ban
   return {
     id: i + 1, danh_muc_id, ten_san_pham, nhom_con, huong_vi, dong_goi,
     don_vi_tinh: dong_goi.toLowerCase(), gia_ban, gia_hieu_luc: phan_tram_giam ? Math.round(gia_ban * .95 / 500) * 500 : gia_ban,
-    phan_tram_giam, so_luong_ton: i % 13 === 4 ? 0 : 12 + (i * 7) % 70, luot_ban: 18 + (i * 11) % 100,
+    phan_tram_giam, so_luong_ton: i % 13 === 4 ? 0 : 12 + (i * 7) % 70, luot_ban: 120 + (i * 37) % 1880,
     hinh_anh: 'assets/img/placeholder-product.svg', trang_thai: 'dang_ban',
   };
 });
 
 const withSale = (p, pct, extra = {}) => ({ ...p, phan_tram_giam: pct, gia_hieu_luc: Math.round(p.gia_ban * (1 - pct / 100) / 500) * 500, ...extra });
+const isoDateAfterDays = (days) => {
+  const date = new Date();
+  date.setHours(12, 0, 0, 0);
+  date.setDate(date.getDate() + days);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+};
+function nearExpiryProducts() {
+  return allProducts().filter((p) => p.trang_thai !== 'an').slice(0, 8).map((p, index) => {
+    const days = index + 1;
+    return withSale(p, 50, { near_expiry_days: days, hsd: isoDateAfterDays(days) });
+  });
+}
 const vietnamParts = (date = new Date()) => Object.fromEntries(new Intl.DateTimeFormat('en-US', {
   timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: 'numeric', day: 'numeric',
 }).formatToParts(date).filter((part) => part.type !== 'literal').map((part) => [part.type, Number(part.value)]));
@@ -104,7 +119,38 @@ const store = {
   get: (k, d) => { try { return JSON.parse(localStorage.getItem(`ms_mock_${k}`)) ?? d; } catch { return d; } },
   set: (k, v) => localStorage.setItem(`ms_mock_${k}`, JSON.stringify(v)),
 };
+export function setMockAdminAuthenticated(authenticated) {
+  store.set('adminAuth', Boolean(authenticated));
+}
 const allProducts = () => store.get('products', PRODUCTS);
+const allCategories = () => store.get('categories', CATS).slice().sort((a, b) => (a.thu_tu || a.id) - (b.thu_tu || b.id));
+function cartData() {
+  const quantities = store.get('cart', {});
+  const products = allProducts();
+  const items = Object.entries(quantities).flatMap(([id, amount]) => {
+    const product = products.find((entry) => entry.id === Number(id));
+    const so_luong = Number(amount) || 0;
+    if (!product || so_luong <= 0) return [];
+    const don_gia = product.gia_hieu_luc ?? product.gia_ban;
+    return [{ san_pham: product, so_luong, don_gia, thanh_tien: don_gia * so_luong }];
+  });
+  const tam_tinh = items.reduce((sum, item) => sum + item.san_pham.gia_ban * item.so_luong, 0);
+  const tongSauGiam = items.reduce((sum, item) => sum + item.thanh_tien, 0);
+  const giam_gia = tam_tinh - tongSauGiam;
+  let delivery = null;
+  try { delivery = JSON.parse(localStorage.getItem('ms_delivery') || 'null'); } catch { delivery = null; }
+  const fulfillment = localStorage.getItem('ms_fulfillment') || 'delivery';
+  const distance = Number(delivery?.distance_km);
+  let phi_ship_tam_tinh = null;
+  if (fulfillment === 'pickup' || tam_tinh - giam_gia >= 150000) phi_ship_tam_tinh = 0;
+  else if (Number.isFinite(distance)) {
+    phi_ship_tam_tinh = distance <= 2.5 ? 0 : tam_tinh - giam_gia >= 50000 ? 15000 : 0;
+  }
+  return {
+    items, count: items.reduce((sum, item) => sum + item.so_luong, 0),
+    tam_tinh, giam_gia, phi_ship_tam_tinh, tong: tongSauGiam + (phi_ship_tam_tinh ?? 0),
+  };
+}
 const fridayProgram = () => {
   const programs = store.get('promotions', null);
   if (Array.isArray(programs)) return programs.find((program) => program.id === 'friday-sale') || null;
@@ -120,12 +166,90 @@ const saveFridayProgram = (updated) => {
   store.set('promotions', programs);
   return updated;
 };
-const categoryOf = (id) => CATS.find((c) => c.id === Number(id));
+function adminCategories() {
+  const products = allProducts();
+  return allCategories().map((category) => ({
+    ...category,
+    product_count: products.filter((product) => Number(product.danh_muc_id) === Number(category.id)).length,
+  }));
+}
+function sampleOrders() {
+  const products = allProducts();
+  const statuses = ['cho_xu_ly', 'dang_giao', 'cho_lay_hang', 'thanh_cong', 'thanh_cong', 'da_huy', 'cho_xu_ly', 'dang_giao', 'cho_lay_hang', 'thanh_cong'];
+  return statuses.map((status, index) => {
+    const first = products[index % products.length], second = products[(index + 9) % products.length];
+    const method = index % 2 ? 'cod' : 'click_collect';
+    const items = [first, second].map((product, row) => {
+      const so_luong = 1 + ((index + row) % 3);
+      const don_gia = product.gia_hieu_luc ?? product.gia_ban;
+      return { san_pham: product, so_luong, don_gia, thanh_tien: so_luong * don_gia };
+    });
+    const subtotal = items.reduce((sum, item) => sum + item.san_pham.gia_ban * item.so_luong, 0);
+    const discount = items.reduce((sum, item) => sum + (item.san_pham.gia_ban - item.don_gia) * item.so_luong, 0);
+    const shipping_fee = method === 'click_collect' ? 0 : (index % 3 ? 15000 : 0);
+    return {
+      id: 1001 + index, ma_don_hang: `MS${new Date().toISOString().slice(0, 10).replace(/-/g, '')}${String(index + 1).padStart(3, '0')}`,
+      khach_hang: { ho_ten: `Khách mẫu ${String(index + 1).padStart(2, '0')}`, so_dien_thoai: `09000000${String(index + 1).padStart(2, '0')}` },
+      hinh_thuc_nhan: method, trang_thai: status, items, tam_tinh: subtotal, giam_gia: discount,
+      phi_ship: shipping_fee, tong: subtotal - discount + shipping_fee,
+      dia_chi: method === 'click_collect' ? 'Nhận tại cửa hàng' : '12 Lê Lợi, TP. Đồng Hới',
+      gio_hen_lay: method === 'click_collect' ? new Date(Date.now() + (index + 1) * 3600000).toISOString() : null,
+      ly_do_huy: status === 'da_huy' ? 'Khách yêu cầu hủy' : '',
+      created_at: new Date(Date.now() - index * 2 * 3600000).toISOString(),
+    };
+  });
+}
+function allOrders() {
+  const saved = store.get('orders', null);
+  if (Array.isArray(saved)) return saved;
+  const orders = sampleOrders();
+  store.set('orders', orders);
+  return orders;
+}
+function dashboardData() {
+  const orders = allOrders(), products = allProducts(), today = new Date();
+  const dateKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  const sameDate = (value, date) => {
+    const current = new Date(value);
+    return current.getFullYear() === date.getFullYear() && current.getMonth() === date.getMonth() && current.getDate() === date.getDate();
+  };
+  const completed = orders.filter((order) => order.trang_thai === 'thanh_cong');
+  const lowStockAll = products.filter((product) => Number(product.so_luong_ton) <= 10);
+  const lowStock = lowStockAll.slice(0, 8);
+  const expiring = nearExpiryProducts().slice(0, 8);
+  const revenueForDays = (days) => Array.from({ length: days }, (_, index) => {
+    const date = new Date(); date.setDate(date.getDate() - (days - 1 - index));
+    const matching = completed.filter((order) => sameDate(order.created_at, date));
+    return { ngay: dateKey(date), doanh_thu: matching.reduce((sum, order) => sum + order.tong, 0) };
+  });
+  const promo = fridayProgram();
+  return {
+    kpi: {
+      doanh_thu_hom_nay: completed.filter((order) => sameDate(order.created_at, today)).reduce((sum, order) => sum + order.tong, 0),
+      doanh_thu_thang: completed.filter((order) => {
+        const date = new Date(order.created_at);
+        return date.getFullYear() === today.getFullYear() && date.getMonth() === today.getMonth();
+      }).reduce((sum, order) => sum + order.tong, 0),
+      don_cho_xu_ly: orders.filter((order) => order.trang_thai === 'cho_xu_ly').length,
+      don_cho_lay_hang: orders.filter((order) => order.trang_thai === 'cho_lay_hang').length,
+      san_pham_sap_het: lowStockAll.length,
+      san_pham_can_han: expiring.length,
+    },
+    doanh_thu_7_ngay: revenueForDays(7),
+    doanh_thu_30_ngay: revenueForDays(30),
+    top_ban_chay: [...products].sort((a, b) => b.luot_ban - a.luot_ban).slice(0, 5)
+      .map((product) => ({ ten_san_pham: product.ten_san_pham, luot_ban: product.luot_ban })),
+    don_hang_moi: [...orders].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 10),
+    canh_bao_kho: { sap_het: lowStock, can_han: expiring },
+    khuyen_mai: { ten: 'Siêu sale Thứ 6', dang_chay: getFridayActive() && promo.enabled, enabled: promo.enabled },
+  };
+}
 const ok = (data = null, message = '') => ({ success: true, message, data, errors: null });
 const fail = (status, message, errors = null) => ({ success: false, status, message, data: null, errors });
 
 function home() {
   const products = allProducts().filter((p) => p.trang_thai !== 'an');
+  const categories = allCategories();
   const active = getFridayActive();
   const promo = fridayProgram() || { id: 'friday-sale', enabled: true, productIds: [] };
   if (!promo.productIds.length) {
@@ -133,12 +257,9 @@ function home() {
     saveFridayProgram(promo);
   }
   const selected = products.filter((p) => promo.productIds.includes(p.id)).slice(0, 10);
-  const near = products.filter((p) => [3, 8, 12, 14].includes(p.id)).map((p, i) => {
-    const d = new Date(); d.setDate(d.getDate() + 3 + i * 2);
-    return withSale(p, 50, { hsd: d.toISOString().slice(0, 10) });
-  });
+  const near = nearExpiryProducts();
   return {
-    categories: CATS,
+    categories,
     friday_sale: {
       active: active && promo.enabled,
       enabled: promo.enabled,
@@ -148,31 +269,32 @@ function home() {
     near_expiry: near,
     best_sellers: [...products].sort((a, b) => b.luot_ban - a.luot_ban).slice(0, 10),
     suggested: products.filter((p) => p.so_luong_ton > 0).slice(10, 20),
-    sections: CATS.slice(0, 13).map((c) => ({ category: c, products: products.filter((p) => p.danh_muc_id === c.id).slice(0, 8), total: products.filter((p) => p.danh_muc_id === c.id).length })),
+    sections: categories.map((c) => ({ category: c, products: products.filter((p) => p.danh_muc_id === c.id).slice(0, 8), total: products.filter((p) => p.danh_muc_id === c.id).length })),
   };
 }
 
 function listProducts(params) {
   const q = normalizeKeyword(params.get('q') || '');
-  const cat = CATS.find((c) => c.slug === params.get('category'));
+  const categories = allCategories();
+  const cat = categories.find((c) => c.slug === params.get('category'));
   const sub = params.get('sub') || '';
-  let list = allProducts().filter((p) => p.trang_thai !== 'an'
+  let list = (params.get('near_expiry') === '1' ? nearExpiryProducts() : allProducts()).filter((p) => p.trang_thai !== 'an'
     && (!q || normalizeKeyword(p.ten_san_pham).includes(q))
     && (!cat || p.danh_muc_id === cat.id)
     && (!sub || normalizeKeyword(p.nhom_con) === normalizeKeyword(cat?.children.find((x) => x.slug === sub)?.ten || sub))
     && (!params.get('in_stock') || p.so_luong_ton > 0)
     && (!params.get('discount') || p.phan_tram_giam > 0)
     && (!params.get('flavor') || p.huong_vi === params.get('flavor'))
-    && (!params.get('pack') || p.dong_goi === params.get('pack'))
-    && (!params.get('min_price') || p.gia_ban >= Number(params.get('min_price')))
-    && (!params.get('max_price') || p.gia_ban <= Number(params.get('max_price'))));
+    && (!params.get('pack') || p.dong_goi === params.get('pack')));
   const sort = params.get('sort');
   if (sort === 'price_asc') list.sort((a, b) => a.gia_ban - b.gia_ban);
   else if (sort === 'price_desc') list.sort((a, b) => b.gia_ban - a.gia_ban);
   else if (sort === 'best') list.sort((a, b) => b.luot_ban - a.luot_ban);
-  else if (sort === 'name_asc') list.sort((a, b) => a.ten_san_pham.localeCompare(b.ten_san_pham, 'vi'));
+  else if (sort === 'hsd') list.sort((a, b) => a.near_expiry_days - b.near_expiry_days);
   else if (sort === 'newest') list.sort((a, b) => b.id - a.id);
-  return { items: list, total: list.length, page: 1, per_page: 24 };
+  const page = Math.max(1, Number(params.get('page')) || 1);
+  const perPage = Math.min(20, Math.max(1, Number(params.get('per_page')) || 24));
+  return { items: list.slice((page - 1) * perPage, page * perPage), total: list.length, page, per_page: perPage };
 }
 
 let adminSecrets;
@@ -187,25 +309,44 @@ export async function handle(method, path, body = {}) {
   const params = new URLSearchParams(query);
   if (route === '/csrf') return ok({ token: 'mock' });
   if (route === '/home') return ok(home());
-  if (route === '/categories') return ok(CATS);
+  if (route === '/categories') return ok(allCategories());
   if (route === '/products' && method === 'GET') return ok(listProducts(params));
   if (route === '/locations/provinces') return ok([{ id: 'quang-binh', ten: 'Quảng Bình' }, { id: 'quang-tri', ten: 'Quảng Trị' }]);
   if (route === '/locations/districts') return ok(params.get('province') === 'quang-binh' ? [{ id: 'dong-hoi', ten: 'TP. Đồng Hới' }, { id: 'bo-trach', ten: 'Huyện Bố Trạch' }] : [{ id: 'dong-ha', ten: 'TP. Đông Hà' }]);
   if (route === '/locations/wards') {
     const wards = params.get('district') === 'dong-hoi'
-      ? ['Nam Lý', 'Đồng Phú', 'Hải Thành', 'Bắc Lý']
-      : ['Phú Hải', 'Lộc Ninh', 'Bảo Ninh'];
-    return ok(wards.map((ten) => ({ id: ten.toLowerCase().replace(/\s/g, '-'), ten })));
+      ? [['Nam Lý', 2.1], ['Đồng Phú', 1.4], ['Hải Thành', 2.4], ['Bắc Lý', 3.2]]
+      : [['Phú Hải', null], ['Lộc Ninh', null], ['Bảo Ninh', null]];
+    return ok(wards.map(([ten, distance_km]) => ({
+      id: ten.toLowerCase().replace(/\s/g, '-'), ten, distance_km,
+    })));
   }
-  if (route === '/cart') { const c = store.get('cart', {}); return ok({ items: c, count: Object.values(c).reduce((s, n) => s + n, 0) }); }
+  if (route === '/cart' && method === 'GET') return ok(cartData());
   if (route === '/cart/items' && method === 'POST') {
-    const c = store.get('cart', {}); c[body.san_pham_id] = (c[body.san_pham_id] || 0) + (body.so_luong || 1); store.set('cart', c);
-    return ok({ count: Object.values(c).reduce((s, n) => s + n, 0) });
+    const all = allProducts(), product = all.find((item) => item.id === Number(body.san_pham_id));
+    const quantity = Number(body.so_luong);
+    if (!product) return fail(404, 'Không tìm thấy sản phẩm');
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 99) return fail(422, 'Số lượng phải từ 1 đến 99');
+    const c = store.get('cart', {}), next = (Number(c[product.id]) || 0) + quantity;
+    if (product.so_luong_ton <= 0 || next > product.so_luong_ton) return fail(422, 'Số lượng vượt quá tồn kho hiện có');
+    c[product.id] = next; store.set('cart', c);
+    return ok({ count: cartData().count });
   }
   if (/^\/cart\/items\/\d+$/.test(route) && method === 'PUT') {
-    const id = route.split('/').pop(), c = store.get('cart', {});
-    if (body.so_luong > 0) c[id] = body.so_luong; else delete c[id];
-    store.set('cart', c); return ok({});
+    const id = Number(route.split('/').pop()), c = store.get('cart', {});
+    const product = allProducts().find((item) => item.id === id), quantity = Number(body.so_luong);
+    if (!product || !c[id]) return fail(404, 'Không tìm thấy sản phẩm trong giỏ hàng');
+    if (!Number.isInteger(quantity) || quantity < 1) return fail(422, 'Số lượng tối thiểu là 1');
+    if (quantity > product.so_luong_ton) return fail(422, `Chỉ còn ${product.so_luong_ton} sản phẩm trong kho`);
+    c[id] = quantity;
+    store.set('cart', c); return ok(cartData());
+  }
+  if (/^\/cart\/items\/\d+$/.test(route) && method === 'DELETE') {
+    const id = Number(route.split('/').pop()), c = store.get('cart', {});
+    delete c[id]; store.set('cart', c); return ok(cartData());
+  }
+  if (route === '/cart' && method === 'DELETE') {
+    store.set('cart', {}); return ok(cartData());
   }
   if (route === '/auth/me') return ok({ user: store.get('me', null) });
   if (route === '/auth/logout') { store.set('me', null); return ok(); }
@@ -257,8 +398,9 @@ export async function handle(method, path, body = {}) {
   }
   if (route === '/admin/auth/otp/resend' && method === 'POST') {
     if (!store.get('adminPending', false)) return fail(401, 'Phiên đăng nhập đã hết hạn');
+    if (store.get('adminWrong', 0) >= 5) return fail(429, 'Bạn đã nhập sai tối đa 5 lần. Hãy đăng nhập lại.');
     if (Date.now() < store.get('adminResendAt', 0)) return fail(429, 'Vui lòng đợi đủ 60 giây trước khi gửi lại mã.');
-    store.set('adminPendingAt', Date.now()); store.set('adminResendAt', Date.now() + 60000); store.set('adminWrong', 0);
+    store.set('adminPendingAt', Date.now()); store.set('adminResendAt', Date.now() + 60000);
     return ok({}, 'Đã gửi lại mã OTP');
   }
   if (route === '/admin/auth/me') return store.get('adminAuth', false) ? ok({ admin: true }) : fail(401, 'Chưa đăng nhập quản trị');
@@ -266,9 +408,91 @@ export async function handle(method, path, body = {}) {
     store.set('adminAuth', false); store.set('adminPending', false); return ok({}, 'Đã đăng xuất');
   }
   if (route.startsWith('/admin/') && !store.get('adminAuth', false)) return fail(401, 'Chưa đăng nhập quản trị');
+  if (route === '/admin/dashboard' && method === 'GET') return ok(dashboardData());
+  if (route === '/admin/categories' && method === 'GET') return ok(adminCategories());
+  if (route === '/admin/categories' && method === 'POST') {
+    const categories = allCategories();
+    if (!String(body.ten_danh_muc || '').trim() || !String(body.slug || '').trim()
+      || categories.some((category) => category.slug === body.slug)) {
+      return fail(422, 'Tên và đường dẫn danh mục là bắt buộc và phải duy nhất');
+    }
+    const category = {
+      id: Math.max(0, ...categories.map((entry) => Number(entry.id))) + 1,
+      ten_danh_muc: String(body.ten_danh_muc).trim(), slug: body.slug, icon: body.icon || 'box',
+      thu_tu: Number(body.thu_tu) || categories.length + 1, children: Array.isArray(body.children) ? body.children : [],
+    };
+    store.set('categories', [...categories, category]);
+    return ok(category, 'Đã thêm danh mục');
+  }
+  if (/^\/admin\/categories\/\d+$/.test(route) && method === 'PUT') {
+    const id = Number(route.split('/').pop()), categories = allCategories();
+    const index = categories.findIndex((category) => Number(category.id) === id);
+    if (index < 0) return fail(404, 'Không tìm thấy danh mục');
+    if (!String(body.ten_danh_muc || '').trim() || !String(body.slug || '').trim()
+      || categories.some((category) => Number(category.id) !== id && category.slug === body.slug)) {
+      return fail(422, 'Tên và đường dẫn danh mục là bắt buộc và phải duy nhất');
+    }
+    categories[index] = {
+      ...categories[index], ...body, id, ten_danh_muc: String(body.ten_danh_muc).trim(),
+      thu_tu: Number(body.thu_tu) || categories[index].thu_tu,
+      children: Array.isArray(body.children) ? body.children : categories[index].children,
+    };
+    store.set('categories', categories);
+    return ok(categories[index], 'Đã lưu danh mục');
+  }
+  if (/^\/admin\/categories\/\d+$/.test(route) && method === 'DELETE') {
+    const id = Number(route.split('/').pop()), category = adminCategories().find((entry) => Number(entry.id) === id);
+    if (!category) return fail(404, 'Không tìm thấy danh mục');
+    if (category.product_count > 0) return fail(409, `Không thể xóa vì danh mục còn ${category.product_count} sản phẩm`);
+    store.set('categories', allCategories().filter((entry) => Number(entry.id) !== id));
+    return ok({}, 'Đã xóa danh mục');
+  }
+  if (route === '/admin/orders' && method === 'GET') {
+    const q = normalizeKeyword(params.get('q') || ''), status = params.get('status') || '', methodFilter = params.get('method') || '';
+    const list = allOrders().filter((order) => (!status || order.trang_thai === status)
+      && (!methodFilter || order.hinh_thuc_nhan === methodFilter)
+      && (!q || normalizeKeyword(`${order.ma_don_hang} ${order.khach_hang.ho_ten} ${order.khach_hang.so_dien_thoai}`).includes(q)))
+      .sort((a, b) => b.created_at.localeCompare(a.created_at));
+    const page = Math.max(1, Number(params.get('page')) || 1), perPage = Math.min(20, Math.max(1, Number(params.get('per_page')) || 20));
+    return ok({ items: list.slice((page - 1) * perPage, page * perPage), total: list.length, page, per_page: perPage });
+  }
+  if (/^\/admin\/orders\/\d+$/.test(route) && method === 'GET') {
+    const order = allOrders().find((entry) => Number(entry.id) === Number(route.split('/').pop()));
+    return order ? ok(order) : fail(404, 'Không tìm thấy đơn hàng');
+  }
+  if (/^\/admin\/orders\/\d+\/status$/.test(route) && method === 'PATCH') {
+    const id = Number(route.split('/')[3]), orders = allOrders(), order = orders.find((entry) => Number(entry.id) === id);
+    if (!order) return fail(404, 'Không tìm thấy đơn hàng');
+    const next = order.hinh_thuc_nhan === 'cod'
+      ? { cho_xu_ly: 'dang_giao', dang_giao: 'thanh_cong' }
+      : { cho_xu_ly: 'cho_lay_hang', cho_lay_hang: 'thanh_cong' };
+    if (next[order.trang_thai] !== body.trang_thai) return fail(422, 'Trạng thái đơn hàng không thể chuyển theo quy tắc hiện tại');
+    order.trang_thai = body.trang_thai;
+    order.updated_at = new Date().toISOString();
+    store.set('orders', orders);
+    return ok(order, 'Đã cập nhật trạng thái đơn hàng');
+  }
+  if (/^\/admin\/orders\/\d+\/cancel$/.test(route) && method === 'POST') {
+    const id = Number(route.split('/')[3]), orders = allOrders(), order = orders.find((entry) => Number(entry.id) === id);
+    if (!order) return fail(404, 'Không tìm thấy đơn hàng');
+    if (['thanh_cong', 'da_huy'].includes(order.trang_thai)) return fail(422, 'Không thể hủy đơn hàng ở trạng thái này');
+    if (!String(body.ly_do || '').trim()) return fail(422, 'Vui lòng nhập lý do hủy đơn hàng');
+    order.trang_thai = 'da_huy'; order.ly_do_huy = String(body.ly_do).trim(); order.updated_at = new Date().toISOString();
+    store.set('orders', orders);
+    return ok(order, 'Đã hủy đơn hàng');
+  }
+  if (/^\/admin\/orders\/\d+\/shipping$/.test(route) && method === 'PATCH') {
+    const id = Number(route.split('/')[3]), orders = allOrders(), order = orders.find((entry) => Number(entry.id) === id);
+    const shipping = Number(body.phi_ship);
+    if (!order) return fail(404, 'Không tìm thấy đơn hàng');
+    if (!Number.isInteger(shipping) || shipping < 0 || shipping > 100000) return fail(422, 'Phí giao hàng phải từ 0 đến 100.000đ');
+    order.phi_ship = shipping; order.tong = order.tam_tinh - order.giam_gia + shipping; order.updated_at = new Date().toISOString();
+    store.set('orders', orders);
+    return ok(order, 'Đã cập nhật phí giao hàng');
+  }
   if (route === '/admin/products' && method === 'GET') {
     const all = allProducts();
-    return ok({ items: all, categories: CATS });
+    return ok({ items: all, categories: allCategories() });
   }
   if (route === '/admin/products' && method === 'POST') {
     const all = allProducts();

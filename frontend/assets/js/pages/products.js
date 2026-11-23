@@ -21,10 +21,10 @@ function urlFor(changes = {}) {
 
 function appliedFilters() {
   const keys = [
-    ['min_price', 'Từ'], ['max_price', 'Đến'], ['in_stock', 'Còn hàng'], ['discount', 'Đang giảm giá'],
+    ['in_stock', 'Còn hàng'], ['discount', 'Đang giảm giá'],
     ['sort', 'Sắp xếp'], ['flavor', 'Hương vị'], ['pack', 'Đóng gói'],
   ];
-  const titles = { best: 'Bán chạy', price_asc: 'Giá tăng', price_desc: 'Giá giảm', newest: 'Mới nhất', name_asc: 'Tên A–Z' };
+  const titles = { best: 'Bán chạy', price_asc: 'Giá tăng', price_desc: 'Giá giảm', newest: 'Mới nhất' };
   return keys.filter(([key]) => params.has(key)).map(([key, label]) => {
     const value = params.get(key);
     return `<button type="button" class="filter-chip" data-remove="${key}">${label}: ${escapeHtml(titles[value] || value || 'Có')} ×</button>`;
@@ -47,13 +47,12 @@ function filterOptions(items, field) {
 function renderFilters(items) {
   const flavors = filterOptions(items, 'huong_vi'), packs = filterOptions(items, 'dong_goi');
   return `<form id="product-filters" class="product-filters">
-    <label class="price-filter"><span>Khoảng giá</span><input name="min_price" type="number" min="0" placeholder="Từ" value="${escapeHtml(params.get('min_price') || '')}"><input name="max_price" type="number" min="0" placeholder="Đến" value="${escapeHtml(params.get('max_price') || '')}"></label>
     <label class="filter-check"><input name="in_stock" type="checkbox" value="1" ${params.has('in_stock') ? 'checked' : ''}> Chỉ hàng còn</label>
     <label class="filter-check"><input name="discount" type="checkbox" value="1" ${params.has('discount') ? 'checked' : ''}> Đang giảm giá</label>
     <label><span>Sắp xếp</span><select name="sort">
       <option value="">Mặc định</option><option value="best" ${selectedValues('sort') === 'best' ? 'selected' : ''}>Bán chạy</option>
       <option value="price_asc" ${selectedValues('sort') === 'price_asc' ? 'selected' : ''}>Giá tăng</option><option value="price_desc" ${selectedValues('sort') === 'price_desc' ? 'selected' : ''}>Giá giảm</option>
-      <option value="newest" ${selectedValues('sort') === 'newest' ? 'selected' : ''}>Mới nhất</option><option value="name_asc" ${selectedValues('sort') === 'name_asc' ? 'selected' : ''}>Tên A–Z</option></select></label>
+      <option value="newest" ${selectedValues('sort') === 'newest' ? 'selected' : ''}>Mới nhất</option></select></label>
     <label><span>Hương vị</span><select name="flavor"><option value="">Tất cả</option>${flavors.map((x) => `<option ${params.get('flavor') === x ? 'selected' : ''} value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join('')}</select></label>
     <label><span>Đóng gói</span><select name="pack"><option value="">Tất cả</option>${packs.map((x) => `<option ${params.get('pack') === x ? 'selected' : ''} value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join('')}</select></label>
     <button class="ms-btn ms-btn--green" type="submit">Bộ lọc</button>
@@ -97,7 +96,7 @@ async function render() {
       event.preventDefault();
       const data = new FormData(event.currentTarget);
       const next = new URLSearchParams(location.search);
-      ['min_price', 'max_price', 'sort', 'flavor', 'pack', 'in_stock', 'discount'].forEach((key) => next.delete(key));
+      ['sort', 'flavor', 'pack', 'in_stock', 'discount'].forEach((key) => next.delete(key));
       for (const [key, value] of data.entries()) if (value) next.set(key, value);
       history.pushState(null, '', `${location.pathname}?${next.toString()}`);
       render();

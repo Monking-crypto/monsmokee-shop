@@ -1,6 +1,6 @@
 // header.js - topbar + header sticky + thanh danh mục. Dùng: mountHeader(document.getElementById('site-header'))
 import { CONFIG } from '../core/config.js';
-import { api } from '../core/api.js';
+import { api, ApiError } from '../core/api.js';
 import { escapeHtml, debounce, toast } from '../core/ui.js';
 import { formatVnd } from '../core/format.js';
 import { initCategoryMenu, toggleCategoryMenu } from './category-menu.js';
@@ -33,10 +33,10 @@ export async function mountHeader(host) {
       </div>
     </div>
     <div class="catbar"><div class="ms-container">
-      <button class="catbar__btn" id="cat-btn" type="button"><i class="bi bi-list" aria-hidden="true"></i>Danh mục sản phẩm</button>
+      <button class="catbar__btn" id="cat-btn" type="button" aria-controls="catmenu-dialog" aria-expanded="false"><i class="bi bi-list" aria-hidden="true"></i>Danh mục sản phẩm</button>
       <a class="catbar__link catbar__link--sale" href="index.html#sale-thu-6">Siêu sale Thứ 6</a>
-      <a class="catbar__link catbar__link--exp" href="index.html#can-han">Cận hạn giảm 50%</a>
-      <a class="catbar__link" href="index.html#ban-chay">Bán chạy</a>
+      <a class="catbar__link catbar__link--exp" href="can-han.html">Cận hạn giảm 50%</a>
+      <a class="catbar__link" href="ban-chay.html">Bán chạy</a>
     </div></div>
   </header>`;
   initCategoryMenu(host.querySelector('.site-header'));
@@ -61,22 +61,36 @@ export async function refreshCartCount() {
 
 async function renderAuth(el) {
   let user = null;
-  try { user = (await api.get('/auth/me')).user; } catch { /* coi như chưa đăng nhập */ }
+  try {
+    user = (await api.get('/auth/me')).user;
+  } catch (error) {
+    if (!(error instanceof ApiError) || error.status !== 401) toast(error.message || 'Không thể kiểm tra phiên đăng nhập.', 'error');
+  }
   document.documentElement.dataset.auth = user ? 'in' : 'out';
   if (!user) {
     el.innerHTML = '<a class="ms-btn ms-btn--ghost" href="dang-nhap.html">Đăng nhập</a><a class="ms-btn ms-btn--green" href="dang-ky.html">Đăng ký</a>';
     return;
   }
+  const isAdmin = String(user.vai_tro || '').toLowerCase() === 'admin';
+  const menuLinks = isAdmin
+    ? '<a href="admin/index.html">Trang quản trị</a><a href="admin/tai-khoan.html">Tài khoản quản trị</a>'
+    : '<a href="tai-khoan.html">Tài khoản</a><a href="don-hang.html">Đơn hàng của tôi</a>';
   const initial = escapeHtml((user.ho_ten || '?').trim().split(/\s+/).pop().charAt(0).toUpperCase());
   el.innerHTML = `<div class="user-menu"><button class="hdr-link" type="button" aria-haspopup="true" aria-expanded="false">
       <span class="avatar" aria-hidden="true">${initial}</span><span class="hdr-text">${escapeHtml(user.ho_ten)}</span></button>
-    <div class="user-menu__panel" hidden><a href="tai-khoan.html">Tài khoản</a><a href="don-hang.html">Đơn hàng của tôi</a>
+    <div class="user-menu__panel" hidden>${menuLinks}
     <button type="button" data-logout>Đăng xuất</button></div></div>`;
   const btn = el.querySelector('.hdr-link'), pnl = el.querySelector('.user-menu__panel');
   btn.addEventListener('click', () => { pnl.hidden = !pnl.hidden; btn.setAttribute('aria-expanded', String(!pnl.hidden)); });
   document.addEventListener('click', (e) => { if (!e.target.closest('.user-menu')) pnl.hidden = true; });
   el.querySelector('[data-logout]').addEventListener('click', async () => {
-    try { await api.post('/auth/logout'); toast('Đã đăng xuất'); setTimeout(() => location.assign('index.html'), 500); } catch { /* đã báo lỗi */ }
+    try {
+      await api.post('/auth/logout');
+      toast('Đã đăng xuất');
+      setTimeout(() => location.assign('index.html'), 500);
+    } catch (error) {
+      toast(error instanceof ApiError ? error.message : 'Không thể đăng xuất. Vui lòng thử lại.', 'error');
+    }
   });
 }
 

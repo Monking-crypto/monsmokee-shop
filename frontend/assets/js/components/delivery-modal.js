@@ -75,7 +75,7 @@ function trapFocus(event) {
 
 async function fillSelect(select, items, placeholder) {
   select.innerHTML = `<option value="">${escapeHtml(placeholder)}</option>${items.map((item) =>
-    `<option value="${escapeHtml(item.id)}">${escapeHtml(item.ten)}</option>`).join('')}`;
+    `<option value="${escapeHtml(item.id)}"${item.distance_km !== null && item.distance_km !== undefined && Number.isFinite(Number(item.distance_km)) ? ` data-distance-km="${Number(item.distance_km)}"` : ''}>${escapeHtml(item.ten)}</option>`).join('')}`;
   select.disabled = false;
 }
 
@@ -140,12 +140,15 @@ function saveAddress(event) {
     wardId: ward.value, ward: ward.selectedOptions[0]?.textContent || '',
     street: street.value.trim(), short,
   };
+  const distance = Number(ward.selectedOptions[0]?.dataset.distanceKm);
+  if (Number.isFinite(distance)) value.distance_km = distance;
   if (!value.provinceId || !value.districtId || !value.wardId || !value.street) {
     toast('Vui lòng nhập đầy đủ địa chỉ giao hàng', 'error');
     return;
   }
   localStorage.setItem('ms_delivery', JSON.stringify(value));
   updateHeaderAddress();
+  document.dispatchEvent(new CustomEvent('ms:delivery'));
   closeDeliveryModal();
   toast('Đã lưu địa chỉ giao hàng');
 }

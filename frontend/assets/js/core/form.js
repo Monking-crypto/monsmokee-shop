@@ -30,3 +30,21 @@ export const showAlert = (el, message, type = 'error') => {
   el.textContent = message;
   el.hidden = !message;
 };
+export function lockButtonForRetry(button, seconds, label = 'Thử lại') {
+  const duration = Math.ceil(Number(seconds));
+  if (!button || !Number.isFinite(duration) || duration <= 0) return;
+  const original = button.innerHTML;
+  let remaining = duration;
+  button.disabled = true;
+  const tick = () => {
+    button.textContent = `${label} (${remaining}s)`;
+    if (remaining <= 0) {
+      button.innerHTML = original;
+      button.disabled = false;
+      return;
+    }
+    remaining -= 1;
+    setTimeout(tick, 1000);
+  };
+  tick();
+}

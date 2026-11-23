@@ -58,19 +58,31 @@ if (await requireAdmin()) {
         ? `<li class="admin-nav-group"><button class="admin-nav-group__toggle${active.startsWith('stock-') ? ' is-active' : ''}" type="button" aria-expanded="${active.startsWith('stock-')}"><i class="bi bi-${icon}" aria-hidden="true"></i><span>${label}</span><i class="bi bi-chevron-down admin-nav-group__chevron" aria-hidden="true"></i></button>
           <ul class="admin-subnav" ${active.startsWith('stock-') ? '' : 'hidden'}>${STOCK_NAV.map(([childKey, childLabel, childHref]) =>
             `<li><a class="${active === childKey ? 'is-active' : ''}" href="${childHref}">${childLabel}</a></li>`).join('')}</ul></li>`
-        : `<li><a class="${active === key ? 'is-active' : ''}" href="${href}"><i class="bi bi-${icon}" aria-hidden="true"></i><span>${label}</span></a></li>`).join('')}</ul></nav>
+        : `<li><a class="${active === key ? 'is-active' : ''}" href="${href}"><i class="bi bi-${icon}" aria-hidden="true"></i><span>${label}</span>${key === 'orders' ? '<span id="admin-pending-count" class="admin-nav-badge" hidden></span>' : ''}</a></li>`).join('')}</ul></nav>
     </aside>
     <div class="admin-main">
       <header class="admin-topbar"><button id="admin-menu-toggle" class="admin-icon-btn" type="button" aria-label="Mở menu"><i class="bi bi-list"></i></button>
         <div><h1>${escapeHtml(title)}</h1><p>MON SMOKEE / ${escapeHtml(title)}</p></div>
+        <form id="admin-quick-search" class="admin-quick-search" role="search">
+          <i class="bi bi-search" aria-hidden="true"></i>
+          <input type="search" aria-label="Tìm nhanh sản phẩm" placeholder="Tìm nhanh sản phẩm">
+        </form>
         <span class="admin-role">Quản trị tối cao</span>
         <button id="admin-logout" class="admin-logout" type="button"><i class="bi bi-box-arrow-right"></i> Đăng xuất</button></header>
       <main class="admin-content" id="admin-page-content"></main>
     </div>
   </div>`;
   const content = qs('#admin-page-content');
-  if (page === 'products') await import('./products.js');
+  if (page === 'overview') await import('./dashboard.js');
+  else if (page === 'categories') await import('./categories.js');
+  else if (page === 'products') await import('./products.js');
   else if (page === 'promotions') await import('./promotions.js');
+  else if (page === 'orders') await import('./orders.js');
+  else if (page === 'order-detail') await import('./order-detail.js');
+  else if (page.startsWith('stock-')) await import('./inventory.js');
+  else if (page === 'customers') await import('./customers.js');
+  else if (page === 'statistics') await import('./statistics.js');
+  else if (page === 'account') await import('./account.js');
   else {
     const steps = STEPS[page] || STEPS.overview;
     content.innerHTML = `<div class="admin-breadcrumb">Quản trị <span>/</span> ${escapeHtml(title)}</div>
@@ -94,8 +106,19 @@ if (await requireAdmin()) {
   };
   qs('#admin-menu-toggle').addEventListener('click', toggle);
   scrim.addEventListener('click', toggle);
+  qs('#admin-quick-search').addEventListener('submit', (event) => {
+    event.preventDefault();
+    const query = event.currentTarget.querySelector('input').value.trim();
+    location.assign(`san-pham.html${query ? `?q=${encodeURIComponent(query)}` : ''}`);
+  });
+  try {
+    const pending = await api.get('/admin/orders?status=cho_xu_ly&page=1&per_page=1');
+    const badge = qs('#admin-pending-count');
+    if (pending.total) { badge.textContent = pending.total > 99 ? '99+' : pending.total; badge.hidden = false; }
+  } catch (error) {
+    if (error?.status === 0) toast('Không tải được số đơn chờ xử lý.', 'error');
+  }
   qs('#admin-logout').addEventListener('click', async () => {
-    try { await api.post('/admin/auth/logout'); location.replace('login.html'); }
-    catch { toast('Không thể đăng xuất. Vui lòng thử lại.', 'error'); }
+    toast('Backend chưa cung cấp API đăng xuất Admin.', 'error');
   });
 }

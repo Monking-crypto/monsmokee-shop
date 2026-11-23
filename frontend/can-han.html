@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hàng cận hạn giảm 50% - MON SMOKEE</title>
+  <meta name="description" content="Xem các sản phẩm còn hạn sử dụng trong 10 ngày, giảm 50% tại MON SMOKEE.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link rel="icon" href="assets/img/logo.svg">
+  <link rel="stylesheet" href="assets/css/variables.css">
+  <link rel="stylesheet" href="assets/css/base.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+  <link rel="stylesheet" href="assets/css/customer.css">
+</head>
+<body class="has-bottom-nav">
+  <a class="visually-hidden" href="#main">Bỏ qua tới nội dung chính</a>
+  <div id="site-header"></div>
+  <main id="main" class="ms-container near-expiry-page">
+    <header class="near-expiry-hero">
+      <span class="near-expiry-hero__eyebrow">ƯU ĐÃI CÓ THỜI HẠN</span>
+      <h1>Hàng cận hạn giảm 50%</h1>
+      <p>Sản phẩm còn hạn sử dụng trong 10 ngày, được giảm một nửa giá. Hãy xem kỹ ngày sử dụng trước khi chọn mua.</p>
+    </header>
+    <nav id="expiry-filters" class="expiry-filters" aria-label="Lọc theo thời hạn">
+      <button type="button" class="is-active" data-days="10" aria-pressed="true">Tất cả</button>
+      <button type="button" data-days="3" aria-pressed="false">Trong 3 ngày</button>
+      <button type="button" data-days="7" aria-pressed="false">Trong 7 ngày</button>
+      <button type="button" data-days="10" aria-pressed="false">Trong 10 ngày</button>
+    </nav>
+    <p id="expiry-count" class="expiry-count" aria-live="polite"></p>
+    <section id="near-expiry-products" class="near-expiry-list" aria-label="Sản phẩm cận hạn">
+      <div class="near-expiry-skeleton" aria-hidden="true"></div>
+      <div class="near-expiry-skeleton" aria-hidden="true"></div>
+      <div class="near-expiry-skeleton" aria-hidden="true"></div>
+    </section>
+  </main>
+  <footer id="site-footer"></footer>
+  <nav id="bottom-nav"></nav>
+  <script type="module" src="assets/js/pages/near-expiry.js"></script>
+</body>
+</html>

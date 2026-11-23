@@ -33,6 +33,7 @@ export function mountOtp(host, { length = 6, onComplete } = {}) {
     value,
     clear() { boxes.forEach((b) => { b.value = ''; }); boxes[0].focus(); },
     setInvalid(v) { host.classList.toggle('is-invalid', v); },
+    setDisabled(disabled) { boxes.forEach((box) => { box.disabled = disabled; }); },
     focus() { boxes[0].focus(); },
   };
 }

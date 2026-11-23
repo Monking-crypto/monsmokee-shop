@@ -2,10 +2,12 @@
 import { api, ApiError } from '../core/api.js';
 import { escapeHtml, qs, toast } from '../core/ui.js';
 import { normalizeKeyword, formatVnd } from '../core/format.js';
+import { confirmDialog } from '../components/confirm-dialog.js';
 
 const root = qs('#admin-page-content');
 let products = [], categories = [], page = 1, editingId = null, imageData = '', saving = false;
 const PAGE_SIZE = 10;
+const initialQuery = new URLSearchParams(location.search).get('q') || '';
 
 function renderShell() {
   root.innerHTML = `<div class="admin-breadcrumb">Quản trị <span>/</span> Sản phẩm</div>
@@ -42,13 +44,14 @@ function field(name, label, type, placeholder, extra = '') {
   return `<label class="admin-field">${label}<input name="${name}" type="${type}" placeholder="${placeholder}" ${extra} required><small data-error="${name}"></small></label>`;
 }
 function bindShell() {
+  qs('#product-search').value = initialQuery;
   ['product-search', 'category-filter', 'status-filter', 'product-sort'].forEach((id) => qs(`#${id}`).addEventListener(id === 'product-search' ? 'input' : 'change', () => { page = 1; renderTable(); }));
   qs('#add-product').addEventListener('click', () => openForm());
   qs('#product-form').addEventListener('submit', saveProduct);
   qs('#product-image').addEventListener('change', previewImage);
   qs('#product-form [name=danh_muc_id]').addEventListener('change', updateSubcategories);
   qs('#product-modal').addEventListener('click', (e) => { if (e.target.closest('[data-modal-close]')) closeForm(); });
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeForm(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !e.target.closest('.confirm-dialog')) closeForm(); });
   qs('#select-all-products').addEventListener('change', (e) => {
     qs('#product-table-wrap').querySelectorAll('[data-product-select]').forEach((box) => { box.checked = e.target.checked; });
     updateBulkButton();
@@ -186,18 +189,36 @@ async function saveProduct(event) {
   } finally { button.disabled = false; saving = false; }
 }
 async function deleteProduct(product) {
-  if (!product || !confirm(`Xóa sản phẩm ${product.ten_san_pham}? Không thể hoàn tác.`)) return;
+  if (!product) return;
+  const { confirmed } = await confirmDialog({
+    title: 'Xóa sản phẩm?',
+    message: `Xóa sản phẩm ${product.ten_san_pham}? Không thể hoàn tác.`,
+    confirmText: 'Xóa sản phẩm',
+  });
+  if (!confirmed) return;
   try { await api.del(`/admin/products/${product.id}`); toast('Đã xóa sản phẩm'); await loadProducts(); }
   catch (error) { if (error instanceof ApiError && error.status) toast(error.message, 'error'); }
 }
 async function bulkDelete() {
   const ids = [...qs('#product-table-wrap').querySelectorAll('[data-product-select]:checked')].map((x) => Number(x.value));
-  if (!ids.length || !confirm(`Xóa ${ids.length} sản phẩm đã chọn? Không thể hoàn tác.`)) return;
+  if (!ids.length) return;
+  const names = products.filter((product) => ids.includes(product.id)).map((product) => product.ten_san_pham);
+  const { confirmed } = await confirmDialog({
+    title: 'Xóa sản phẩm đã chọn?',
+    message: `Xóa ${names.join(', ')}? Không thể hoàn tác.`,
+    confirmText: 'Xóa sản phẩm',
+  });
+  if (!confirmed) return;
   try { await api.post('/admin/products/bulk-delete', { ids }); toast('Đã xóa sản phẩm'); await loadProducts(); }
   catch (error) { if (error instanceof ApiError && error.status) toast(error.message, 'error'); }
 }
 async function resetProducts() {
-  if (!confirm('Khôi phục toàn bộ dữ liệu mẫu? Các thay đổi sản phẩm hiện tại sẽ bị xóa.')) return;
+  const { confirmed } = await confirmDialog({
+    title: 'Khôi phục dữ liệu mẫu?',
+    message: 'Các thay đổi sản phẩm hiện tại sẽ bị xóa.',
+    confirmText: 'Khôi phục dữ liệu mẫu',
+  });
+  if (!confirmed) return;
   try { await api.post('/admin/products/reset'); toast('Đã khôi phục dữ liệu mẫu'); await loadProducts(); }
   catch (error) { if (error instanceof ApiError && error.status) toast(error.message, 'error'); }
 }
