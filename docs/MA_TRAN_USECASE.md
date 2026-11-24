@@ -6,7 +6,7 @@ Trạng thái bên dưới phản ánh phạm vi backend hiện tại; giao di�
 |---|---|---|---|
 | Đăng ký Customer qua email OTP | `Customer/AuthController.php`, `OtpService.php` | `/api/auth/register/start`, `/api/auth/register/verify`, `/api/auth/otp/resend` | Hoàn thành |
 | Đăng nhập, đăng xuất và xem phiên Customer | `Customer/AuthController.php`, `AuthMiddleware.php` | `/api/auth/login`, `/api/auth/logout`, `/api/auth/me` | Hoàn thành |
-| Quên mật khẩu Customer qua OTP email | `Customer/AuthController.php`, `OtpService.php` | `/api/auth/forgot-password/start`, `/api/auth/forgot-password/verify`, `/api/auth/forgot-password/resend` | Hoàn thành |
+| Quên mật khẩu Customer qua OTP email và reset ticket | `Customer/AuthController.php`, `OtpService.php` | `/api/auth/forgot-password/start`, `/api/auth/forgot-password/verify-otp`, `/api/auth/forgot-password/reset`, `/api/auth/forgot-password/resend`; `/verify` deprecated | Hoàn thành backend |
 | Đăng nhập Admin hai bước và xem phiên Admin | `Admin/AdminAuthController.php`, `AdminMiddleware.php` | `/api/admin/auth/login`, `/api/admin/auth/verify-otp`, `/api/admin/auth/otp/resend`, `/api/admin/me` | Hoàn thành |
 | Session, CSRF và validation dùng chung | `Session.php`, `Csrf.php`, `Validator.php` | `/api/csrf` | Hoàn thành |
 | Đọc danh mục công khai | `CategoryController.php` | `/api/categories` | Hoàn thành backend |

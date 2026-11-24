@@ -73,6 +73,16 @@ $router->post(
     [static fn(Request $request): bool => CsrfMiddleware::handle($request)]
 );
 $router->post(
+    '/api/auth/forgot-password/verify-otp',
+    [$authController, 'forgotPasswordVerifyOtp'],
+    [static fn(Request $request): bool => CsrfMiddleware::handle($request)]
+);
+$router->post(
+    '/api/auth/forgot-password/reset',
+    [$authController, 'forgotPasswordReset'],
+    [static fn(Request $request): bool => CsrfMiddleware::handle($request)]
+);
+$router->post(
     '/api/auth/forgot-password/resend',
     [$authController, 'forgotPasswordResend'],
     [static fn(Request $request): bool => CsrfMiddleware::handle($request)]

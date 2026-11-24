@@ -6,7 +6,11 @@
 @customerOtp =
 @wrongResetOtp =
 @resetOtp =
+@resetTicket =
+@expiredResetTicket =
 @newPassword =
+@otherCustomerEmail =
+@unknownCustomerEmail =
 @adminEmail =
 @adminPhone =
 @adminPassword =
@@ -101,26 +105,59 @@ X-CSRF-Token: {{csrf.response.body.data.csrf_token}}
   "email": "{{customerEmail}}"
 }
 
-### OTP sai 6 chữ số - phải trả 422, không đổi mật khẩu
-POST http://localhost/monsmokee/backend/public/api/auth/forgot-password/verify
+### Reset trước khi xác thực OTP - phải trả 422
+POST http://localhost/monsmokee/backend/public/api/auth/forgot-password/reset
 Content-Type: application/json
 X-CSRF-Token: {{csrf.response.body.data.csrf_token}}
 
 {
   "email": "{{customerEmail}}",
-  "otp": "{{wrongResetOtp}}",
+  "reset_ticket": "{{resetTicket}}",
   "mat_khau": "{{newPassword}}",
   "nhap_lai_mat_khau": "{{newPassword}}"
 }
 
-### Xác nhận OTP và đổi mật khẩu - phải trả 200, không tự đăng nhập
-POST http://localhost/monsmokee/backend/public/api/auth/forgot-password/verify
+### OTP sai - phải trả 422 chung và remaining_attempts cho Customer hợp lệ
+POST http://localhost/monsmokee/backend/public/api/auth/forgot-password/verify-otp
 Content-Type: application/json
 X-CSRF-Token: {{csrf.response.body.data.csrf_token}}
 
 {
   "email": "{{customerEmail}}",
-  "otp": "{{resetOtp}}",
+  "otp": "{{wrongResetOtp}}"
+}
+
+### Xác thực OTP đúng - trả reset_ticket, chưa đổi mật khẩu
+# @name verifyForgotPasswordOtp
+POST http://localhost/monsmokee/backend/public/api/auth/forgot-password/verify-otp
+Content-Type: application/json
+X-CSRF-Token: {{csrf.response.body.data.csrf_token}}
+
+{
+  "email": "{{customerEmail}}",
+  "otp": "{{resetOtp}}"
+}
+
+### Email khác không thể dùng ticket - phải trả lỗi chung 422
+POST http://localhost/monsmokee/backend/public/api/auth/forgot-password/reset
+Content-Type: application/json
+X-CSRF-Token: {{csrf.response.body.data.csrf_token}}
+
+{
+  "email": "{{otherCustomerEmail}}",
+  "reset_ticket": "{{verifyForgotPasswordOtp.response.body.data.reset_ticket}}",
+  "mat_khau": "{{newPassword}}",
+  "nhap_lai_mat_khau": "{{newPassword}}"
+}
+
+### Đổi mật khẩu bằng reset ticket; thành công không tự đăng nhập
+POST http://localhost/monsmokee/backend/public/api/auth/forgot-password/reset
+Content-Type: application/json
+X-CSRF-Token: {{csrf.response.body.data.csrf_token}}
+
+{
+  "email": "{{customerEmail}}",
+  "reset_ticket": "{{verifyForgotPasswordOtp.response.body.data.reset_ticket}}",
   "mat_khau": "{{newPassword}}",
   "nhap_lai_mat_khau": "{{newPassword}}"
 }
@@ -129,25 +166,48 @@ X-CSRF-Token: {{csrf.response.body.data.csrf_token}}
 # @name csrfAfterPasswordReset
 GET http://localhost/monsmokee/backend/public/api/csrf
 
-### Dùng lại OTP đã tiêu thụ - phải trả 422
-POST http://localhost/monsmokee/backend/public/api/auth/forgot-password/verify
+### Dùng lại ticket đã tiêu thụ - phải trả 422
+POST http://localhost/monsmokee/backend/public/api/auth/forgot-password/reset
 Content-Type: application/json
 X-CSRF-Token: {{csrfAfterPasswordReset.response.body.data.csrf_token}}
 
 {
   "email": "{{customerEmail}}",
-  "otp": "{{resetOtp}}",
+  "reset_ticket": "{{verifyForgotPasswordOtp.response.body.data.reset_ticket}}",
   "mat_khau": "{{newPassword}}",
   "nhap_lai_mat_khau": "{{newPassword}}"
 }
 
-### Email Admin cũng nhận response chung 200 và không gửi thư
-POST http://localhost/monsmokee/backend/public/api/auth/forgot-password/start
+### Ticket hết hạn hoặc sai - phải trả cùng lỗi 422
+POST http://localhost/monsmokee/backend/public/api/auth/forgot-password/reset
 Content-Type: application/json
 X-CSRF-Token: {{csrfAfterPasswordReset.response.body.data.csrf_token}}
 
 {
-  "email": "{{adminEmail}}"
+  "email": "{{customerEmail}}",
+  "reset_ticket": "{{expiredResetTicket}}",
+  "mat_khau": "{{newPassword}}",
+  "nhap_lai_mat_khau": "{{newPassword}}"
+}
+
+### Email không tồn tại: xác minh OTP cũng phải trả lỗi chung 422, không ticket
+POST http://localhost/monsmokee/backend/public/api/auth/forgot-password/verify-otp
+Content-Type: application/json
+X-CSRF-Token: {{csrfAfterPasswordReset.response.body.data.csrf_token}}
+
+{
+  "email": "{{unknownCustomerEmail}}",
+  "otp": "{{resetOtp}}"
+}
+
+### Email Admin: xác minh OTP phải trả lỗi chung 422, không ticket
+POST http://localhost/monsmokee/backend/public/api/auth/forgot-password/verify-otp
+Content-Type: application/json
+X-CSRF-Token: {{csrfAfterPasswordReset.response.body.data.csrf_token}}
+
+{
+  "email": "{{adminEmail}}",
+  "otp": "{{resetOtp}}"
 }
 
 ### 7. Xem Customer hiện tại sau reset - phải trả 401

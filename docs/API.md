@@ -263,7 +263,70 @@ Các giá trị `{{...}}` dưới đây là placeholder, cần thay bằng dữ 
 Chỉ Customer đang hoạt động mới nhận OTP.
 **Lỗi:** `403` CSRF không hợp lệ; `500` lỗi hệ thống. Việc email không tồn tại hoặc thuộc Admin không làm thay đổi response 200 chung.
 
-## 9. Xác nhận OTP và đặt mật khẩu Customer mới
+## 9. Xác nhận OTP quên mật khẩu — bước 2
+
+### `POST /api/auth/forgot-password/verify-otp`
+
+**Headers:** `Content-Type: application/json`, `X-CSRF-Token: {{csrf_token}}`, cookie session.
+**Body:**
+
+```json
+{
+  "email": "{{customer_email}}",
+  "otp": "{{six_digit_otp_from_email}}"
+}
+```
+
+OTP có 6 chữ số, hết hạn sau 300 giây và tối đa 5 lần nhập sai. OTP đúng được tiêu thụ và cấp ticket ngẫu nhiên; ticket thô chỉ trả đúng một lần, CSDL chỉ lưu SHA-256. Ticket có hiệu lực mặc định 600 giây (cấu hình `password_reset_ticket.ttl_seconds` trong `backend/config/business.php`).
+
+**Response — 200**
+
+```json
+{
+  "success": true,
+  "message": "Mã xác thực hợp lệ",
+  "data": {
+    "reset_ticket": "{{opaque_reset_ticket}}",
+    "expires_in_seconds": 600
+  },
+  "errors": null
+}
+```
+
+**Lỗi:** `403` CSRF không hợp lệ; `422` OTP sai/hết hạn/đã dùng, email không tồn tại hoặc không thuộc Customer đang hoạt động. Các trường hợp này dùng cùng thông báo chung; chỉ OTP sai cho tài khoản Customer đang hoạt động có thể kèm `errors.remaining_attempts`. `429` vượt giới hạn 10 lần trong 15 phút theo từng IP và email.
+
+## 10. Đặt mật khẩu mới bằng reset ticket — bước 3
+
+### `POST /api/auth/forgot-password/reset`
+
+**Headers:** `Content-Type: application/json`, `X-CSRF-Token: {{csrf_token}}`, cookie session.
+**Body:**
+
+```json
+{
+  "email": "{{customer_email}}",
+  "reset_ticket": "{{opaque_reset_ticket}}",
+  "mat_khau": "{{new_customer_password}}",
+  "nhap_lai_mat_khau": "{{new_customer_password}}"
+}
+```
+
+Mật khẩu mới cần ít nhất 8 ký tự, có chữ thường và số; hai trường mật khẩu phải khớp. Ticket phải gắn với đúng email, chưa dùng và chưa hết hạn. Trong một transaction, API khóa dòng ticket, cập nhật mật khẩu bcrypt và đánh dấu ticket đã dùng. Sau thành công session hiện tại bị hủy; khách cần đăng nhập lại.
+
+**Response — 200**
+
+```json
+{
+  "success": true,
+  "message": "Đặt lại mật khẩu thành công, vui lòng đăng nhập lại",
+  "data": null,
+  "errors": null
+}
+```
+
+**Lỗi:** `403` CSRF không hợp lệ; `422` ticket sai/hết hạn/đã dùng/không khớp email, hoặc mật khẩu mới không hợp lệ; `429` vượt giới hạn 10 lần trong 15 phút theo từng IP và email. Ticket sai luôn dùng cùng một thông báo chung.
+
+## 11. Endpoint cũ: xác nhận OTP và đặt mật khẩu Customer mới (DEPRECATED)
 
 ### `POST /api/auth/forgot-password/verify`
 
@@ -294,7 +357,9 @@ Mật khẩu mới cần ít nhất 8 ký tự, có chữ thường và số; ha
 
 **Lỗi:** `403` CSRF không hợp lệ; `422` dữ liệu/mật khẩu không hợp lệ, OTP sai/hết hạn/đã dùng, hoặc không còn Customer hoạt động; OTP sai có thể kèm `errors.remaining_attempts`. `429` vượt giới hạn verify theo email/IP. Khi lỗi, mật khẩu không bị đổi.
 
-## 10. Gửi lại OTP quên mật khẩu
+Endpoint gộp này được giữ tương thích với frontend hiện tại. Frontend mới nên chuyển sang luồng `start` → `verify-otp` → `reset`; endpoint cũ sẽ bị xóa sau khi frontend đã chuyển sang hai API mới.
+
+## 12. Gửi lại OTP quên mật khẩu
 
 ### `POST /api/auth/forgot-password/resend`
 
@@ -318,9 +383,9 @@ Mật khẩu mới cần ít nhất 8 ký tự, có chữ thường và số; ha
 
 **Lỗi:** `403` CSRF không hợp lệ; `429` cooldown (60 giây) hoặc vượt giới hạn gửi (tối đa 5 lần/giờ theo email và IP); `500` lỗi hệ thống.
 
-Các request verify cũng được giới hạn tối đa 10 lần trong 15 phút theo email và IP; OTP vẫn tự vô hiệu sau 5 lần nhập sai.
+Các API `verify-otp`, `reset` và endpoint verify cũ được giới hạn tối đa 10 lần trong 15 phút theo mỗi email và IP. OTP vẫn tự vô hiệu sau 5 lần nhập sai. Ticket và OTP không được đặt trong URL.
 
-## 11. Đăng nhập Admin — bước 1
+## 13. Đăng nhập Admin — bước 1
 
 ### `POST /api/admin/auth/login`
 
@@ -352,7 +417,7 @@ Các request verify cũng được giới hạn tối đa 10 lần trong 15 phú
 
 **Lỗi:** `403` CSRF không hợp lệ, tài khoản không phải Admin hoặc Admin bị khóa; `401` SĐT/mật khẩu sai; `422` dữ liệu không hợp lệ; `429` giới hạn đăng nhập/gửi OTP; `500` lỗi gửi email.
 
-## 12. Xác thực OTP Admin — bước 2
+## 14. Xác thực OTP Admin — bước 2
 
 ### `POST /api/admin/auth/verify-otp`
 
@@ -384,7 +449,7 @@ Các request verify cũng được giới hạn tối đa 10 lần trong 15 phú
 
 **Lỗi:** `401` không có trạng thái chờ OTP hoặc pending đã hết hạn; `403` tài khoản Admin không còn khả dụng/CSRF không hợp lệ; `422` OTP sai, hết hạn hoặc đã dùng. OTP sai kèm `errors.remaining_attempts`; lần sai thứ 5 làm mất hiệu lực OTP và xóa pending.
 
-## 13. Gửi lại OTP Admin
+## 15. Gửi lại OTP Admin
 
 ### `POST /api/admin/auth/otp/resend`
 
@@ -408,7 +473,7 @@ Các request verify cũng được giới hạn tối đa 10 lần trong 15 phú
 
 **Lỗi:** `401` không có pending/OTP chờ; `403` CSRF không hợp lệ hoặc tài khoản Admin không còn khả dụng; `429` cooldown hoặc vượt giới hạn gửi; `500` lỗi gửi email.
 
-## 14. Thông tin Admin hiện tại
+## 16. Thông tin Admin hiện tại
 
 ### `GET /api/admin/me`
 
@@ -436,7 +501,7 @@ Các request verify cũng được giới hạn tối đa 10 lần trong 15 phú
 
 **Lỗi:** `401` chưa đăng nhập, session không hợp lệ hoặc tài khoản bị khóa; `403` sai vai trò hoặc session thiếu cờ xác thực OTP. Pending OTP không được xem là đăng nhập.
 
-## 15. Danh mục công khai
+## 17. Danh mục công khai
 
 ### `GET /api/categories`
 
@@ -469,7 +534,7 @@ Danh mục có `trang_thai = 1` mới được trả về theo `thu_tu`; danh m�
 
 **Lỗi:** `500` nếu server không thể truy vấn danh mục.
 
-## 16. Danh sách sản phẩm công khai
+## 18. Danh sách sản phẩm công khai
 
 ### `GET /api/products`
 
@@ -526,7 +591,7 @@ Chỉ sản phẩm và danh mục có `trang_thai = 1` được trả về. `con
 
 **Lỗi:** `422` page/per_page/category_id/q/sort không hợp lệ; `500` lỗi truy vấn.
 
-## 17. Chi tiết sản phẩm công khai
+## 19. Chi tiết sản phẩm công khai
 
 ### `GET /api/products/{id}`
 
@@ -569,7 +634,7 @@ Chỉ sản phẩm đang bán được trả về. Response không chứa số l
 
 Response không trả hạn sử dụng hoặc số lượng tồn chính xác. `?now=YYYY-MM-DD` chỉ hoạt động khi `APP_ENV=development`; môi trường khác trả `422`.
 
-## 21. Khuyến mãi hiệu lực công khai
+## 20. Khuyến mãi hiệu lực công khai
 
 Giá khuyến mãi được tính theo giờ Việt Nam. Thứ Sáu chỉ giảm cho các sản phẩm đã được lưu trong chương trình `THU_SAU` đang hoạt động và còn trong thời hạn. Lô còn hàng có hạn sử dụng không muộn hơn hôm nay cộng số ngày cấu hình được áp dụng mức giảm cận hạn. Nếu đồng thời thỏa hai điều kiện, chỉ áp dụng mức giảm cao hơn, không cộng dồn. Hệ thống không trả hạn sử dụng trong API công khai.
 
@@ -590,7 +655,7 @@ Không cần CSRF hoặc đăng nhập. Trả các chương trình đang bật v
 
 **Response — 200:** `data.promotions[]` gồm `id`, `ma_khuyen_mai`, `ten_chuong_trinh`, `loai`, `phan_tram_giam`, thời hạn và `products[]`. Sản phẩm kèm giá hiệu lực, nhãn khuyến mãi, ảnh và `con_hang`; không kèm lô hay hạn sử dụng. `?now=YYYY-MM-DD` chỉ dùng trong development.
 
-## 22. Quản lý khuyến mãi Admin
+## 21. Quản lý khuyến mãi Admin
 
 Tất cả API dưới đây yêu cầu session Admin đã xác thực OTP. Mọi `POST`, `PUT`, `PATCH`, `DELETE` cần cookie session, `X-CSRF-Token` và `Content-Type: application/json`.
 
@@ -638,7 +703,7 @@ Xóa chương trình chưa được dùng trong đơn hàng (`200`). Nếu đã 
 
 **Lỗi chung:** `401` chưa đăng nhập; `403` sai vai trò, chưa xác thực OTP hoặc CSRF sai; `404` không tồn tại; `409` mã trùng/chương trình đã gắn đơn hàng; `422` tham số hoặc dữ liệu không hợp lệ, hoặc không đủ sản phẩm để kích hoạt; `500` lỗi hệ thống. Thao tác Admin được ghi log với Admin ID, hành động và ID chương trình, không ghi payload nhạy cảm.
 
-## 18. Quản lý danh mục Admin
+## 22. Quản lý danh mục Admin
 
 Tất cả API trong mục này yêu cầu cookie session Admin đã đăng nhập và xác thực OTP. Mọi request ghi dữ liệu phải gửi `X-CSRF-Token` lấy từ `GET /api/csrf`, cookie session và `Content-Type: application/json`.
 
@@ -689,7 +754,7 @@ Tên là bắt buộc và không trùng; slug được tạo từ tên. `icon` v
 **Body:** `{"trang_thai": 0}` để ẩn, `{"trang_thai": 1}` để hiện. Không có API xóa danh mục; danh mục có sản phẩm chỉ được ẩn.
 **Response — 200:** `{"success":true,"message":"Đã cập nhật trạng thái danh mục","data":{"id":12,"trang_thai":0},"errors":null}`
 
-## 19. Quản lý sản phẩm Admin
+## 23. Quản lý sản phẩm Admin
 
 Các API yêu cầu Admin đã xác thực OTP, cookie session và CSRF cho `POST`, `PUT`, `PATCH`, `DELETE`. Sản phẩm có thể được tạo/cập nhật với `ten_san_pham`, `danh_muc_id`, `gia_ban` (số nguyên VND dương), `don_vi_tinh` và `mo_ta`. Nội dung HTML bị loại bỏ trước khi lưu. Trường tồn kho, hạn sử dụng và các trường trạng thái nội bộ không được nhận từ payload cập nhật; sản phẩm mới bắt đầu với tồn kho `0`. Thay ảnh qua endpoint upload riêng.
 
@@ -755,7 +820,7 @@ Gửi `multipart/form-data` với trường tệp `image`, cookie Admin và `X-C
 
 Mọi thao tác ghi thành công được ghi vào `backend/storage/logs/admin_audit.log` dưới dạng thời gian, Admin ID, hành động, loại bản ghi và ID; không ghi payload, mật khẩu hay OTP.
 
-## 20. Phiếu nhập kho, lô hàng và lịch sử kho Admin
+## 24. Phiếu nhập kho, lô hàng và lịch sử kho Admin
 
 Tất cả API dưới đây yêu cầu Admin đã đăng nhập và xác thực OTP. Mọi `POST` cần cookie session, `Content-Type: application/json` và `X-CSRF-Token` lấy từ `GET /api/csrf`.
 
