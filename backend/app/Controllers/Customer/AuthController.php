@@ -349,6 +349,216 @@ final class AuthController
         Response::success('Đặt lại mật khẩu thành công, vui lòng đăng nhập lại');
     }
 
+    public function forgotPasswordVerifyOtp(Request $request, array $params = []): void
+    {
+        $input = $request->all();
+        $email = is_string($input['email'] ?? null)
+            ? strtolower(trim($input['email']))
+            : '';
+        $otp = is_string($input['otp'] ?? null) ? trim($input['otp']) : '';
+        $rateLimit = $this->consumeForgotPasswordActionLimit(
+            'forgot_password_verify_otp',
+            $email,
+            $request->ip()
+        );
+        if (!$rateLimit['allowed']) {
+            Response::error(
+                'Đã thử quá nhiều lần, vui lòng thử lại sau',
+                429,
+                ['retry_after' => $rateLimit['retry_after']]
+            );
+            return;
+        }
+
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL) || !preg_match('/^\d{6}$/', $otp)) {
+            password_verify($otp, self::DUMMY_PASSWORD_HASH);
+            $this->respondToForgotPasswordOtpFailure();
+            return;
+        }
+
+        $customer = $this->findActiveCustomerByEmail($email);
+        if ($customer === false) {
+            password_verify($otp, self::DUMMY_PASSWORD_HASH);
+            $this->respondToForgotPasswordOtpFailure();
+            return;
+        }
+
+        $verification = $this->otpService->verifyAndConsume(
+            $email,
+            'QUEN_MAT_KHAU',
+            $otp,
+            function () use ($email): array {
+                $lockedCustomer = $this->findActiveCustomerByEmail($email, true);
+                if ($lockedCustomer === false) {
+                    return ['outcome' => 'account_unavailable'];
+                }
+
+                $this->pdo->prepare(
+                    'DELETE FROM dat_lai_mat_khau_ticket WHERE het_han_luc <= NOW()'
+                )->execute();
+                $this->pdo->prepare(
+                    'UPDATE dat_lai_mat_khau_ticket
+                     SET da_dung = 1
+                     WHERE user_id = ? AND da_dung = 0'
+                )->execute([(int) $lockedCustomer['id']]);
+
+                $ticket = bin2hex(random_bytes(32));
+                $ttl = max(1, (int) ($this->business['password_reset_ticket']['ttl_seconds'] ?? 600));
+                $expiresAt = (new DateTimeImmutable('now'))
+                    ->modify('+' . $ttl . ' seconds');
+                $insert = $this->pdo->prepare(
+                    'INSERT INTO dat_lai_mat_khau_ticket
+                     (user_id, email, ticket_hash, het_han_luc, da_dung)
+                     VALUES (?, ?, ?, ?, 0)'
+                );
+                $insert->execute([
+                    (int) $lockedCustomer['id'],
+                    $email,
+                    hash('sha256', $ticket),
+                    $expiresAt->format('Y-m-d H:i:s'),
+                ]);
+
+                return [
+                    'outcome' => 'ticket_created',
+                    'ticket' => $ticket,
+                    'expires_in_seconds' => $ttl,
+                ];
+            }
+        );
+
+        if (!$verification['valid']) {
+            $this->respondToForgotPasswordOtpFailure(
+                in_array($verification['reason'] ?? null, ['OTP_WRONG', 'OTP_INVALIDATED'], true)
+                    ? ($verification['remaining_attempts'] ?? null)
+                    : null
+            );
+            return;
+        }
+
+        $result = $verification['result'] ?? [];
+        if (($result['outcome'] ?? null) !== 'ticket_created') {
+            $this->respondToForgotPasswordOtpFailure();
+            return;
+        }
+
+        Response::success('Mã xác thực hợp lệ', [
+            'reset_ticket' => $result['ticket'],
+            'expires_in_seconds' => $result['expires_in_seconds'],
+        ]);
+    }
+
+    public function forgotPasswordReset(Request $request, array $params = []): void
+    {
+        $input = $request->all();
+        $email = is_string($input['email'] ?? null)
+            ? strtolower(trim($input['email']))
+            : '';
+        $ticket = is_string($input['reset_ticket'] ?? null)
+            ? trim($input['reset_ticket'])
+            : '';
+        $rateLimit = $this->consumeForgotPasswordActionLimit(
+            'forgot_password_reset',
+            $email,
+            $request->ip()
+        );
+        if (!$rateLimit['allowed']) {
+            Response::error(
+                'Đã thử quá nhiều lần, vui lòng thử lại sau',
+                429,
+                ['retry_after' => $rateLimit['retry_after']]
+            );
+            return;
+        }
+
+        if (
+            !filter_var($email, FILTER_VALIDATE_EMAIL)
+            || !preg_match('/^[a-f0-9]{64}$/i', $ticket)
+        ) {
+            $this->respondToInvalidResetTicket();
+            return;
+        }
+
+        $password = is_string($input['mat_khau'] ?? null) ? $input['mat_khau'] : '';
+        $confirmPassword = is_string($input['nhap_lai_mat_khau'] ?? null)
+            ? $input['nhap_lai_mat_khau']
+            : '';
+        $passwordErrors = $this->validator->validate(
+            ['mat_khau' => $password, 'nhap_lai_mat_khau' => $confirmPassword],
+            ['mat_khau' => ['required', 'password'], 'nhap_lai_mat_khau' => ['required']]
+        );
+        if ($password !== $confirmPassword) {
+            $passwordErrors['nhap_lai_mat_khau'] = 'Mật khẩu nhập lại không khớp';
+        }
+
+        $this->pdo->beginTransaction();
+        try {
+            $ticketHash = hash('sha256', $ticket);
+            $customer = $this->pdo->prepare(
+                'SELECT u.id
+                 FROM nguoi_dung u
+                 JOIN vai_tro v ON v.id = u.vai_tro_id
+                 WHERE u.email = ? AND u.trang_thai = 1 AND v.ten_vai_tro = ?
+                 LIMIT 1
+                 FOR UPDATE'
+            );
+            $customer->execute([$email, 'Customer']);
+            $customerId = $customer->fetchColumn();
+            if ($customerId === false) {
+                $this->pdo->rollBack();
+                $this->respondToInvalidResetTicket();
+                return;
+            }
+
+            $find = $this->pdo->prepare(
+                'SELECT id, user_id, email, ticket_hash, het_han_luc
+                 FROM dat_lai_mat_khau_ticket
+                 WHERE email = ? AND ticket_hash = ? AND da_dung = 0
+                 ORDER BY id DESC
+                 LIMIT 1
+                 FOR UPDATE'
+            );
+            $find->execute([$email, $ticketHash]);
+            $row = $find->fetch(PDO::FETCH_ASSOC);
+            if (
+                $row === false
+                || !hash_equals((string) ($row['ticket_hash'] ?? ''), $ticketHash)
+                || (int) $row['user_id'] !== (int) $customerId
+                || new DateTimeImmutable((string) $row['het_han_luc']) <= new DateTimeImmutable('now')
+            ) {
+                $this->pdo->rollBack();
+                $this->respondToInvalidResetTicket();
+                return;
+            }
+
+            if ($passwordErrors !== []) {
+                $this->pdo->rollBack();
+                Response::error('Mật khẩu mới không hợp lệ', 422, $passwordErrors);
+                return;
+            }
+
+            $updatePassword = $this->pdo->prepare(
+                'UPDATE nguoi_dung SET mat_khau = ? WHERE id = ?'
+            );
+            $updatePassword->execute([
+                password_hash($password, PASSWORD_BCRYPT),
+                (int) $row['user_id'],
+            ]);
+            $consumeTicket = $this->pdo->prepare(
+                'UPDATE dat_lai_mat_khau_ticket SET da_dung = 1 WHERE id = ?'
+            );
+            $consumeTicket->execute([(int) $row['id']]);
+            $this->pdo->commit();
+        } catch (Throwable $error) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $error;
+        }
+
+        Session::destroy();
+        Response::success('Đặt lại mật khẩu thành công, vui lòng đăng nhập lại');
+    }
+
     public function forgotPasswordResend(Request $request, array $params = []): void
     {
         $input = $request->all();
@@ -750,6 +960,18 @@ final class AuthController
         );
     }
 
+    private function consumeForgotPasswordActionLimit(string $action, string $email, string $ip): array
+    {
+        return $this->consumeForgotPasswordRateLimit(
+            [
+                $action . ':email:' . hash('sha256', $email),
+                $action . ':ip:' . hash('sha256', $ip),
+            ],
+            10,
+            900
+        );
+    }
+
     private function consumeForgotPasswordRateLimit(
         array $keys,
         int $maxAttempts,
@@ -881,6 +1103,22 @@ final class AuthController
         }
 
         Response::error('Mã OTP không hợp lệ hoặc đã được sử dụng', 422);
+    }
+
+    private function respondToForgotPasswordOtpFailure(?int $remainingAttempts = null): void
+    {
+        $errors = ['otp' => 'Mã xác thực không hợp lệ hoặc đã hết hạn'];
+        if ($remainingAttempts !== null) {
+            $errors['remaining_attempts'] = $remainingAttempts;
+        }
+        Response::error('Mã xác thực không hợp lệ hoặc đã hết hạn', 422, $errors);
+    }
+
+    private function respondToInvalidResetTicket(): void
+    {
+        Response::error('Yêu cầu đặt lại mật khẩu không hợp lệ hoặc đã hết hạn', 422, [
+            'reset_ticket' => 'Yêu cầu đặt lại mật khẩu không hợp lệ hoặc đã hết hạn',
+        ]);
     }
 
     private function startCustomerSession(array $user): void

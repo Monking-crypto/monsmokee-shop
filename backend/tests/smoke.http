@@ -6,7 +6,11 @@
 @customerOtp =
 @wrongResetOtp =
 @resetOtp =
+@resetTicket =
+@expiredResetTicket =
 @newPassword =
+@otherCustomerEmail =
+@unknownCustomerEmail =
 @adminEmail =
 @adminPhone =
 @adminPassword =
@@ -18,6 +22,10 @@
 @newCategoryName =
 @newProductName =
 @adminImagePath =
+@stockProductId =
+@stockReceiptDate =
+@promotionCode =
+@promotionTitle =
 
 ### Public catalog: danh sách danh mục
 GET http://localhost/monsmokee/backend/public/api/categories
@@ -30,6 +38,15 @@ GET http://localhost/monsmokee/backend/public/api/products?q={{searchTerm}}&cate
 
 ### Public catalog: chi tiết sản phẩm (không trả hạn sử dụng)
 GET http://localhost/monsmokee/backend/public/api/products/{{productId}}
+
+### Public catalog: lọc sản phẩm có lô cận hạn (không trả hạn sử dụng)
+GET http://localhost/monsmokee/backend/public/api/products?near_expiry=1
+
+### Public catalog: kiểm thử giá ở Thứ Sáu (chỉ APP_ENV=development)
+GET http://localhost/monsmokee/backend/public/api/products/{{productId}}?now=2026-03-06
+
+### Public catalog: chương trình đang chạy (now chỉ dùng trong development)
+GET http://localhost/monsmokee/backend/public/api/promotions/active?now=2026-03-06
 
 ### 1. Lấy CSRF token; REST Client cần giữ cookie session
 # @name csrf
@@ -88,26 +105,59 @@ X-CSRF-Token: {{csrf.response.body.data.csrf_token}}
   "email": "{{customerEmail}}"
 }
 
-### OTP sai 6 chữ số - phải trả 422, không đổi mật khẩu
-POST http://localhost/monsmokee/backend/public/api/auth/forgot-password/verify
+### Reset trước khi xác thực OTP - phải trả 422
+POST http://localhost/monsmokee/backend/public/api/auth/forgot-password/reset
 Content-Type: application/json
 X-CSRF-Token: {{csrf.response.body.data.csrf_token}}
 
 {
   "email": "{{customerEmail}}",
-  "otp": "{{wrongResetOtp}}",
+  "reset_ticket": "{{resetTicket}}",
   "mat_khau": "{{newPassword}}",
   "nhap_lai_mat_khau": "{{newPassword}}"
 }
 
-### Xác nhận OTP và đổi mật khẩu - phải trả 200, không tự đăng nhập
-POST http://localhost/monsmokee/backend/public/api/auth/forgot-password/verify
+### OTP sai - phải trả 422 chung và remaining_attempts cho Customer hợp lệ
+POST http://localhost/monsmokee/backend/public/api/auth/forgot-password/verify-otp
 Content-Type: application/json
 X-CSRF-Token: {{csrf.response.body.data.csrf_token}}
 
 {
   "email": "{{customerEmail}}",
-  "otp": "{{resetOtp}}",
+  "otp": "{{wrongResetOtp}}"
+}
+
+### Xác thực OTP đúng - trả reset_ticket, chưa đổi mật khẩu
+# @name verifyForgotPasswordOtp
+POST http://localhost/monsmokee/backend/public/api/auth/forgot-password/verify-otp
+Content-Type: application/json
+X-CSRF-Token: {{csrf.response.body.data.csrf_token}}
+
+{
+  "email": "{{customerEmail}}",
+  "otp": "{{resetOtp}}"
+}
+
+### Email khác không thể dùng ticket - phải trả lỗi chung 422
+POST http://localhost/monsmokee/backend/public/api/auth/forgot-password/reset
+Content-Type: application/json
+X-CSRF-Token: {{csrf.response.body.data.csrf_token}}
+
+{
+  "email": "{{otherCustomerEmail}}",
+  "reset_ticket": "{{verifyForgotPasswordOtp.response.body.data.reset_ticket}}",
+  "mat_khau": "{{newPassword}}",
+  "nhap_lai_mat_khau": "{{newPassword}}"
+}
+
+### Đổi mật khẩu bằng reset ticket; thành công không tự đăng nhập
+POST http://localhost/monsmokee/backend/public/api/auth/forgot-password/reset
+Content-Type: application/json
+X-CSRF-Token: {{csrf.response.body.data.csrf_token}}
+
+{
+  "email": "{{customerEmail}}",
+  "reset_ticket": "{{verifyForgotPasswordOtp.response.body.data.reset_ticket}}",
   "mat_khau": "{{newPassword}}",
   "nhap_lai_mat_khau": "{{newPassword}}"
 }
@@ -116,25 +166,48 @@ X-CSRF-Token: {{csrf.response.body.data.csrf_token}}
 # @name csrfAfterPasswordReset
 GET http://localhost/monsmokee/backend/public/api/csrf
 
-### Dùng lại OTP đã tiêu thụ - phải trả 422
-POST http://localhost/monsmokee/backend/public/api/auth/forgot-password/verify
+### Dùng lại ticket đã tiêu thụ - phải trả 422
+POST http://localhost/monsmokee/backend/public/api/auth/forgot-password/reset
 Content-Type: application/json
 X-CSRF-Token: {{csrfAfterPasswordReset.response.body.data.csrf_token}}
 
 {
   "email": "{{customerEmail}}",
-  "otp": "{{resetOtp}}",
+  "reset_ticket": "{{verifyForgotPasswordOtp.response.body.data.reset_ticket}}",
   "mat_khau": "{{newPassword}}",
   "nhap_lai_mat_khau": "{{newPassword}}"
 }
 
-### Email Admin cũng nhận response chung 200 và không gửi thư
-POST http://localhost/monsmokee/backend/public/api/auth/forgot-password/start
+### Ticket hết hạn hoặc sai - phải trả cùng lỗi 422
+POST http://localhost/monsmokee/backend/public/api/auth/forgot-password/reset
 Content-Type: application/json
 X-CSRF-Token: {{csrfAfterPasswordReset.response.body.data.csrf_token}}
 
 {
-  "email": "{{adminEmail}}"
+  "email": "{{customerEmail}}",
+  "reset_ticket": "{{expiredResetTicket}}",
+  "mat_khau": "{{newPassword}}",
+  "nhap_lai_mat_khau": "{{newPassword}}"
+}
+
+### Email không tồn tại: xác minh OTP cũng phải trả lỗi chung 422, không ticket
+POST http://localhost/monsmokee/backend/public/api/auth/forgot-password/verify-otp
+Content-Type: application/json
+X-CSRF-Token: {{csrfAfterPasswordReset.response.body.data.csrf_token}}
+
+{
+  "email": "{{unknownCustomerEmail}}",
+  "otp": "{{resetOtp}}"
+}
+
+### Email Admin: xác minh OTP phải trả lỗi chung 422, không ticket
+POST http://localhost/monsmokee/backend/public/api/auth/forgot-password/verify-otp
+Content-Type: application/json
+X-CSRF-Token: {{csrfAfterPasswordReset.response.body.data.csrf_token}}
+
+{
+  "email": "{{adminEmail}}",
+  "otp": "{{resetOtp}}"
 }
 
 ### 7. Xem Customer hiện tại sau reset - phải trả 401
@@ -331,6 +404,111 @@ Content-Type: application/json
 X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
 
 {"trang_thai": 0}
+
+### Admin: nhập kho một lô (điền stockProductId và ngày nhập hôm nay)
+# @name createStockReceipt
+POST http://localhost/monsmokee/backend/public/api/admin/stock-receipts
+Content-Type: application/json
+X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
+
+{
+  "nha_cung_cap": "Nhà cung cấp kiểm thử",
+  "ngay_nhap": "{{stockReceiptDate}}",
+  "ghi_chu": "Phiếu nhập smoke test",
+  "chi_tiet": [
+    {
+      "san_pham_id": {{stockProductId}},
+      "so_luong": 12,
+      "gia_nhap": 8000,
+      "han_su_dung": "2030-12-31",
+      "so_lo": "SMOKE-LOT-01"
+    }
+  ]
+}
+
+### Admin: danh sách phiếu nhập theo ngày
+GET http://localhost/monsmokee/backend/public/api/admin/stock-receipts?from_date={{stockReceiptDate}}&to_date={{stockReceiptDate}}&page=1&per_page=20
+
+### Admin: chi tiết phiếu và lô nhập
+GET http://localhost/monsmokee/backend/public/api/admin/stock-receipts/{{createStockReceipt.response.body.data.id}}
+
+### Admin: lô còn hàng, sắp hết hạn trong 30 ngày
+GET http://localhost/monsmokee/backend/public/api/admin/batches?product_id={{stockProductId}}&expiring_within_days=30
+
+### Admin: các lô đã hết hạn còn tồn
+GET http://localhost/monsmokee/backend/public/api/admin/batches?product_id={{stockProductId}}&expired=1
+
+### Admin: lịch sử kho theo sản phẩm
+GET http://localhost/monsmokee/backend/public/api/admin/stock-history?product_id={{stockProductId}}&page=1&per_page=20
+
+### Admin: chi tiết sản phẩm gồm tồn tổng và hạn gần nhất
+GET http://localhost/monsmokee/backend/public/api/admin/products/{{stockProductId}}
+
+### Admin: hủy phiếu khi toàn bộ lô còn nguyên số lượng
+POST http://localhost/monsmokee/backend/public/api/admin/stock-receipts/{{createStockReceipt.response.body.data.id}}/cancel
+Content-Type: application/json
+X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
+
+{}
+
+### Hủy lại phiếu đã hủy - phải trả 409
+POST http://localhost/monsmokee/backend/public/api/admin/stock-receipts/{{createStockReceipt.response.body.data.id}}/cancel
+Content-Type: application/json
+X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
+
+{}
+
+### Admin: tạo bản nháp Thứ Sáu; ID sản phẩm gửi lên (nếu có) là sản phẩm ghim
+# @name createFridayPromotion
+POST http://localhost/monsmokee/backend/public/api/admin/promotions
+Content-Type: application/json
+X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
+
+{
+  "ma_khuyen_mai": "{{promotionCode}}",
+  "ten_chuong_trinh": "{{promotionTitle}}",
+  "loai": "THU_SAU",
+  "phan_tram_giam": 10,
+  "so_san_pham": 10,
+  "san_pham_ids": [],
+  "ngay_bat_dau": "2026-01-01 00:00:00",
+  "ngay_ket_thuc": "2030-12-31 23:59:59",
+  "trang_thai": 0
+}
+
+### Admin: chi tiết cho biết sản phẩm được ghim/ngẫu nhiên và cảnh báo số lượng hợp lệ
+GET http://localhost/monsmokee/backend/public/api/admin/promotions/{{createFridayPromotion.response.body.data.id}}
+
+### Admin: bốc lại phần ngẫu nhiên; kết quả giữ nguyên ở request khách
+POST http://localhost/monsmokee/backend/public/api/admin/promotions/{{createFridayPromotion.response.body.data.id}}/random-products
+Content-Type: application/json
+X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
+
+{}
+
+### Admin: kích hoạt; trả 422 nếu chưa đủ 10 sản phẩm còn hàng/đang bán
+PATCH http://localhost/monsmokee/backend/public/api/admin/promotions/{{createFridayPromotion.response.body.data.id}}/status
+Content-Type: application/json
+X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
+
+{"trang_thai": 1}
+
+### Admin: danh sách và lọc chương trình khuyến mãi
+GET http://localhost/monsmokee/backend/public/api/admin/promotions?loai=THU_SAU&trang_thai=1&page=1&per_page=20
+
+### Public: chương trình Friday chỉ xuất hiện hôm Thứ Sáu; sản phẩm ẩn/hết hàng bị loại
+GET http://localhost/monsmokee/backend/public/api/promotions/active?now=2026-03-06
+
+### Admin: tạm dừng chương trình kiểm thử
+PATCH http://localhost/monsmokee/backend/public/api/admin/promotions/{{createFridayPromotion.response.body.data.id}}/status
+Content-Type: application/json
+X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
+
+{"trang_thai": 0}
+
+### Admin: xóa chương trình kiểm thử chưa được dùng trong đơn hàng
+DELETE http://localhost/monsmokee/backend/public/api/admin/promotions/{{createFridayPromotion.response.body.data.id}}
+X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
 
 ### Dùng lại OTP sau khi pending bị xóa - 401
 POST http://localhost/monsmokee/backend/public/api/admin/auth/verify-otp

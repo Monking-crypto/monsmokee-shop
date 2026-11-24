@@ -149,9 +149,42 @@ final class ProductAdminController
             return;
         }
 
-        Response::success('Chi tiết sản phẩm quản trị', [
-            'product' => self::mapProduct($row),
-        ]);
+        $batchQuery = $this->pdo->prepare(
+            'SELECT id, chi_tiet_phieu_nhap_id, ngay_san_xuat,
+                    han_su_dung, so_luong_nhap, so_luong_con
+             FROM lo_hang
+             WHERE san_pham_id = ? AND so_luong_con > 0
+               AND (
+                   chi_tiet_phieu_nhap_id IS NULL
+                   OR EXISTS (
+                       SELECT 1
+                       FROM chi_tiet_phieu_nhap d
+                       JOIN phieu_nhap_kho p ON p.id = d.phieu_nhap_id
+                       WHERE d.id = lo_hang.chi_tiet_phieu_nhap_id
+                         AND p.trang_thai = \'HOAN_THANH\'
+                   )
+               )
+             ORDER BY han_su_dung ASC, id ASC'
+        );
+        $batchQuery->execute([$id]);
+        $batches = array_map(
+            static fn(array $batch): array => [
+                'id' => (int) $batch['id'],
+                'chi_tiet_phieu_nhap_id' => $batch['chi_tiet_phieu_nhap_id'] === null
+                    ? null
+                    : (int) $batch['chi_tiet_phieu_nhap_id'],
+                'ngay_san_xuat' => $batch['ngay_san_xuat'],
+                'han_su_dung' => $batch['han_su_dung'],
+                'so_luong_nhap' => (int) $batch['so_luong_nhap'],
+                'so_luong_con' => (int) $batch['so_luong_con'],
+            ],
+            $batchQuery->fetchAll(PDO::FETCH_ASSOC)
+        );
+        $product = self::mapProduct($row);
+        $product['tong_ton_kho'] = $product['so_luong_ton'];
+        $product['han_su_dung_gan_nhat'] = $batches[0]['han_su_dung'] ?? null;
+        $product['lo_hang'] = $batches;
+        Response::success('Chi tiết sản phẩm quản trị', ['product' => $product]);
     }
 
     public function create(Request $request, array $params = []): void

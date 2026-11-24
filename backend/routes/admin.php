@@ -19,6 +19,11 @@ $adminAuthController = new App\Controllers\Admin\AdminAuthController(
 );
 $categoryAdminController = new App\Controllers\Admin\CategoryAdminController($adminDatabase);
 $productAdminController = new App\Controllers\Admin\ProductAdminController($adminDatabase);
+$stockAdminController = new App\Controllers\Admin\StockAdminController($adminDatabase);
+$promotionAdminController = new App\Controllers\Admin\PromotionAdminController(
+    $adminDatabase,
+    $adminBusinessConfig
+);
 $requireVerifiedAdmin = static fn(Request $request): bool =>
     App\Middleware\AdminMiddleware::handle($request);
 $requireAdminCsrf = static fn(Request $request): bool =>
@@ -90,5 +95,70 @@ $router->delete(
 $router->post(
     '/api/admin/products/{id}/image',
     [$productAdminController, 'uploadImage'],
+    [$requireVerifiedAdmin, $requireAdminCsrf]
+);
+$router->post(
+    '/api/admin/stock-receipts',
+    [$stockAdminController, 'createReceipt'],
+    [$requireVerifiedAdmin, $requireAdminCsrf]
+);
+$router->get(
+    '/api/admin/stock-receipts',
+    [$stockAdminController, 'receipts'],
+    [$requireVerifiedAdmin]
+);
+$router->get(
+    '/api/admin/stock-receipts/{id}',
+    [$stockAdminController, 'receiptDetail'],
+    [$requireVerifiedAdmin]
+);
+$router->post(
+    '/api/admin/stock-receipts/{id}/cancel',
+    [$stockAdminController, 'cancelReceipt'],
+    [$requireVerifiedAdmin, $requireAdminCsrf]
+);
+$router->get(
+    '/api/admin/batches',
+    [$stockAdminController, 'batches'],
+    [$requireVerifiedAdmin]
+);
+$router->get(
+    '/api/admin/stock-history',
+    [$stockAdminController, 'stockHistory'],
+    [$requireVerifiedAdmin]
+);
+$router->get(
+    '/api/admin/promotions',
+    [$promotionAdminController, 'index'],
+    [$requireVerifiedAdmin]
+);
+$router->get(
+    '/api/admin/promotions/{id}',
+    [$promotionAdminController, 'show'],
+    [$requireVerifiedAdmin]
+);
+$router->post(
+    '/api/admin/promotions',
+    [$promotionAdminController, 'create'],
+    [$requireVerifiedAdmin, $requireAdminCsrf]
+);
+$router->put(
+    '/api/admin/promotions/{id}',
+    [$promotionAdminController, 'update'],
+    [$requireVerifiedAdmin, $requireAdminCsrf]
+);
+$router->patch(
+    '/api/admin/promotions/{id}/status',
+    [$promotionAdminController, 'updateStatus'],
+    [$requireVerifiedAdmin, $requireAdminCsrf]
+);
+$router->post(
+    '/api/admin/promotions/{id}/random-products',
+    [$promotionAdminController, 'randomProducts'],
+    [$requireVerifiedAdmin, $requireAdminCsrf]
+);
+$router->delete(
+    '/api/admin/promotions/{id}',
+    [$promotionAdminController, 'delete'],
     [$requireVerifiedAdmin, $requireAdminCsrf]
 );
