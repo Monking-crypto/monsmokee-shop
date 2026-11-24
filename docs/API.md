@@ -481,10 +481,12 @@ Danh mục có `trang_thai = 1` mới được trả về theo `thu_tu`; danh m�
 - `q`: tìm theo tên sản phẩm hoặc tên không dấu, tối đa 100 ký tự.
 - `category_id`: id danh mục cần lọc.
 - `sort`: `newest` (mặc định), `price_asc` hoặc `price_desc`.
+- `near_expiry=1`: chỉ lấy sản phẩm có lô còn hàng hết hạn trong số ngày cận hạn cấu hình; mặc định `0`.
+- `now=YYYY-MM-DD`: giả lập ngày để kiểm thử khuyến mãi, chỉ được chấp nhận khi `APP_ENV=development`.
 
 **Body:** Không có.
 
-Chỉ sản phẩm có `trang_thai = 1` được trả về. `con_hang` là boolean; API không trả số lượng tồn chính xác.
+Chỉ sản phẩm và danh mục có `trang_thai = 1` được trả về. `con_hang` là boolean; API không trả số lượng tồn chính xác. `gia_goc`, `phan_tram_giam`, `gia_ban_hieu_luc` và `nhan_khuyen_mai` dùng cùng quy tắc giá hiệu lực như API chi tiết.
 
 **Response — 200**
 
@@ -498,6 +500,10 @@ Chỉ sản phẩm có `trang_thai = 1` được trả về. `con_hang` là bool
         "id": 1,
         "ten_san_pham": "Nước suối 500ml",
         "gia_ban": 5000,
+        "gia_goc": 5000,
+        "phan_tram_giam": 0,
+        "gia_ban_hieu_luc": 5000,
+        "nhan_khuyen_mai": null,
         "hinh_anh": "placeholder-product.svg",
         "danh_muc": {
           "id": 1,
@@ -542,6 +548,10 @@ Chỉ sản phẩm có `trang_thai = 1` được trả về. `con_hang` là bool
       "hinh_anh": "placeholder-product.svg",
       "don_vi_tinh": "chai",
       "gia_ban": 5000,
+      "gia_goc": 5000,
+      "phan_tram_giam": 0,
+      "gia_ban_hieu_luc": 5000,
+      "nhan_khuyen_mai": null,
       "danh_muc": {
         "id": 1,
         "ten_danh_muc": "Nước giải khát",
@@ -557,7 +567,76 @@ Chỉ sản phẩm có `trang_thai = 1` được trả về. `con_hang` là bool
 Chỉ sản phẩm đang bán được trả về. Response không chứa số lượng tồn chính xác hoặc hạn sử dụng.
 **Lỗi:** `404` id không hợp lệ, sản phẩm không tồn tại hoặc đã ẩn; `500` lỗi truy vấn.
 
-Khuyến mãi, giỏ hàng và đơn hàng chưa nằm trong phạm vi API công khai ở bước này.
+Response không trả hạn sử dụng hoặc số lượng tồn chính xác. `?now=YYYY-MM-DD` chỉ hoạt động khi `APP_ENV=development`; môi trường khác trả `422`.
+
+## 21. Khuyến mãi hiệu lực công khai
+
+Giá khuyến mãi được tính theo giờ Việt Nam. Thứ Sáu chỉ giảm cho các sản phẩm đã được lưu trong chương trình `THU_SAU` đang hoạt động và còn trong thời hạn. Lô còn hàng có hạn sử dụng không muộn hơn hôm nay cộng số ngày cấu hình được áp dụng mức giảm cận hạn. Nếu đồng thời thỏa hai điều kiện, chỉ áp dụng mức giảm cao hơn, không cộng dồn. Hệ thống không trả hạn sử dụng trong API công khai.
+
+### `GET /api/products` và `GET /api/products/{id}`
+
+Ngoài `gia_ban` (giá gốc để tương thích), mỗi sản phẩm có:
+
+- `gia_goc`: giá niêm yết VND.
+- `phan_tram_giam`: mức giảm hiệu lực, không cộng dồn.
+- `gia_ban_hieu_luc`: giá VND sau khi làm tròn, không âm.
+- `nhan_khuyen_mai`: `THU_SAU`, `CAN_HAN` hoặc `null`.
+
+Danh sách hỗ trợ `near_expiry=1` để chỉ lọc sản phẩm có lô cận hạn còn hàng. Tham số `now=YYYY-MM-DD` chỉ được dùng trong `APP_ENV=development`; gửi tham số này ở môi trường khác hoặc sai định dạng trả `422`.
+
+### `GET /api/promotions/active`
+
+Không cần CSRF hoặc đăng nhập. Trả các chương trình đang bật và trong thời hạn hôm nay, kèm sản phẩm đang hiển thị, danh mục đang hiển thị và còn hàng. Với chương trình `THU_SAU`, chỉ trả vào đúng thứ trong cấu hình (mặc định Thứ Sáu). Sản phẩm đã ẩn/hết hàng vẫn giữ trong danh sách Admin nhưng không xuất hiện công khai.
+
+**Response — 200:** `data.promotions[]` gồm `id`, `ma_khuyen_mai`, `ten_chuong_trinh`, `loai`, `phan_tram_giam`, thời hạn và `products[]`. Sản phẩm kèm giá hiệu lực, nhãn khuyến mãi, ảnh và `con_hang`; không kèm lô hay hạn sử dụng. `?now=YYYY-MM-DD` chỉ dùng trong development.
+
+## 22. Quản lý khuyến mãi Admin
+
+Tất cả API dưới đây yêu cầu session Admin đã xác thực OTP. Mọi `POST`, `PUT`, `PATCH`, `DELETE` cần cookie session, `X-CSRF-Token` và `Content-Type: application/json`.
+
+### `GET /api/admin/promotions`
+
+Query tùy chọn: `page`, `per_page` (tối đa 50), `q` (mã/tên), `loai` (`THU_SAU`, `CAN_HAN`, `KHAC`), `trang_thai` (`0`/`1`). Trả mã, tên, mức giảm, thời hạn, trạng thái và số sản phẩm đã chọn.
+
+### `GET /api/admin/promotions/{id}`
+
+Trả thông tin chương trình, danh sách sản phẩm kèm `la_chon_thu_cong`/`hop_le`, `che_do_chon_sp` suy ra từ danh sách ghim, và cảnh báo số lượng/sản phẩm cần thay nếu chương trình Thứ Sáu có dưới 10 sản phẩm hợp lệ.
+
+### `POST /api/admin/promotions` và `PUT /api/admin/promotions/{id}`
+
+**Body mẫu:**
+
+```json
+{
+  "ma_khuyen_mai": "FRIDAY-SAMPLE",
+  "ten_chuong_trinh": "Ưu đãi Thứ Sáu",
+  "loai": "THU_SAU",
+  "phan_tram_giam": 10,
+  "so_san_pham": 10,
+  "san_pham_ids": [1, 2],
+  "ngay_bat_dau": "2026-01-01 00:00:00",
+  "ngay_ket_thuc": "2026-12-31 23:59:59",
+  "trang_thai": 0
+}
+```
+
+`san_pham_ids` là danh sách ghim, có thể bỏ qua khi sửa để giữ ghim hiện có. Thứ Sáu yêu cầu đúng 10 sản phẩm; hệ thống lưu ngay các ghim và bốc ngẫu nhiên phần còn lại từ sản phẩm đang bán, còn hàng, thuộc danh mục đang hiển thị. Việc chọn/lưu chạy trong một transaction và không random lại khi khách đọc API. Có thể lưu nháp nếu chưa đủ sản phẩm; kích hoạt khi chưa đủ 10 sản phẩm hợp lệ trả `422` kèm số lượng hiện có. `lich_chay_thu` của `THU_SAU` luôn là `5`. Với loại khác, danh sách gửi lên được lưu thủ công. Ngày có thể là `YYYY-MM-DD` hoặc `YYYY-MM-DD HH:MM:SS`.
+
+**Response:** `201` khi tạo, `200` khi sửa. Mã trùng trả `409`; sản phẩm không tồn tại, ngày/mức giảm/trạng thái không hợp lệ trả `422`.
+
+### `PATCH /api/admin/promotions/{id}/status`
+
+Body `{"trang_thai": 1}` để kích hoạt hoặc `{"trang_thai": 0}` để tạm dừng. Kích hoạt chương trình Thứ Sáu kiểm tra và bốc bù ngẫu nhiên trong transaction; không đủ 10 sản phẩm hợp lệ trả `422`.
+
+### `POST /api/admin/promotions/{id}/random-products`
+
+Bốc lại phần ngẫu nhiên và giữ nguyên mọi sản phẩm Admin đã ghim. Kết quả được lưu; không bốc lại ở request khách hàng. Chương trình Thứ Sáu đang bật chỉ được cập nhật nếu vẫn đủ 10 sản phẩm hợp lệ.
+
+### `DELETE /api/admin/promotions/{id}`
+
+Xóa chương trình chưa được dùng trong đơn hàng (`200`). Nếu đã dùng, trả `409` và chỉ cho phép tạm dừng.
+
+**Lỗi chung:** `401` chưa đăng nhập; `403` sai vai trò, chưa xác thực OTP hoặc CSRF sai; `404` không tồn tại; `409` mã trùng/chương trình đã gắn đơn hàng; `422` tham số hoặc dữ liệu không hợp lệ, hoặc không đủ sản phẩm để kích hoạt; `500` lỗi hệ thống. Thao tác Admin được ghi log với Admin ID, hành động và ID chương trình, không ghi payload nhạy cảm.
 
 ## 18. Quản lý danh mục Admin
 
@@ -675,3 +754,71 @@ Gửi `multipart/form-data` với trường tệp `image`, cookie Admin và `X-C
 **Lỗi chung:** `401` chưa đăng nhập; `403` không phải Admin/OTP chưa xác thực hoặc CSRF sai; `404` danh mục/sản phẩm không tồn tại; `409` tên danh mục trùng hoặc xóa sản phẩm bị cản bởi liên kết; `413` tệp vượt giới hạn cấu hình PHP; `422` dữ liệu không hợp lệ hoặc ảnh sai loại/kích thước; `500` lỗi hệ thống.
 
 Mọi thao tác ghi thành công được ghi vào `backend/storage/logs/admin_audit.log` dưới dạng thời gian, Admin ID, hành động, loại bản ghi và ID; không ghi payload, mật khẩu hay OTP.
+
+## 20. Phiếu nhập kho, lô hàng và lịch sử kho Admin
+
+Tất cả API dưới đây yêu cầu Admin đã đăng nhập và xác thực OTP. Mọi `POST` cần cookie session, `Content-Type: application/json` và `X-CSRF-Token` lấy từ `GET /api/csrf`.
+
+### `POST /api/admin/stock-receipts`
+
+Tạo phiếu nhập, chi tiết, lô, cập nhật tồn kho và ghi lịch sử trong một transaction. Ngày nhập dùng `YYYY-MM-DD` và không được ở tương lai; hạn sử dụng phải sau ngày nhập và chưa hết hạn. Ngày sản xuất được ghi nhận bằng ngày nhập vì request chưa có trường ngày sản xuất.
+
+**Body:**
+
+```json
+{
+  "nha_cung_cap": "Nhà cung cấp mẫu",
+  "ngay_nhap": "2026-11-23",
+  "ghi_chu": "Nhập hàng",
+  "chi_tiet": [
+    {
+      "san_pham_id": 1,
+      "so_luong": 12,
+      "gia_nhap": 8000,
+      "han_su_dung": "2027-11-23",
+      "so_lo": "LOT-2026-11"
+    }
+  ]
+}
+```
+
+Mỗi phiếu nhận 1–100 dòng; số lượng là số nguyên dương, giá nhập là số nguyên không âm. Sản phẩm phải tồn tại và đang hiển thị. Nếu bất kỳ dòng nào không hợp lệ, không ghi dữ liệu nào.
+
+**Response — 201:**
+
+```json
+{
+  "success": true,
+  "message": "Đã tạo phiếu nhập kho",
+  "data": {"id": 15, "ma_phieu": "PN2611230123456789AB", "tong_tien_nhap": 96000},
+  "errors": null
+}
+```
+
+### `GET /api/admin/stock-receipts`
+
+Query tùy chọn `page`, `per_page` (tối đa 50), `from_date`, `to_date` theo `YYYY-MM-DD`. Trả phiếu đã hoàn thành và đã hủy cùng tổng số dòng, nhà cung cấp, ngày nhập, ghi chú, trạng thái và tổng tiền.
+
+### `GET /api/admin/stock-receipts/{id}`
+
+Trả phiếu cùng các dòng hàng, số lô, hạn sử dụng và số lượng lô còn lại; `404` nếu không tồn tại.
+
+### `POST /api/admin/stock-receipts/{id}/cancel`
+
+Hủy trong transaction sau khi khóa phiếu, chi tiết, lô và sản phẩm. Chỉ hủy nếu mỗi lô còn nguyên số lượng nhập và tồn sản phẩm đủ để trừ; nếu đã xuất hàng, thiếu lô, phiếu đã hủy hoặc tồn kho không đủ thì trả `409`, kèm `errors.reason`. Hủy thành công đặt số lượng còn trong lô về 0, trừ tồn sản phẩm, ghi lịch sử và đánh dấu phiếu `DA_HUY`.
+
+### `GET /api/admin/batches`
+
+Trả lô còn hàng, sắp theo hạn sử dụng gần nhất. Query tùy chọn `product_id`, `expiring_within_days` (1–3650) hoặc `expired=1`; không kết hợp hai bộ lọc hạn cùng lúc. Đây là API tra cứu lô/hạn sử dụng chỉ dành cho Admin.
+
+### `GET /api/admin/stock-history`
+
+Query tùy chọn `product_id`, `page`, `per_page` (tối đa 50). Trả loại giao dịch, số lượng thay đổi có dấu, tồn sau giao dịch, tham chiếu, người thực hiện và thời gian.
+
+### Chi tiết sản phẩm Admin
+
+`GET /api/admin/products/{id}` trả thêm `tong_ton_kho`, `lo_hang` còn tồn và `han_su_dung_gan_nhat`. Hạn sử dụng và tồn chính xác chỉ xuất hiện ở API Admin; API sản phẩm công khai không trả các trường này.
+
+**Lỗi chung:** `401` chưa đăng nhập; `403` sai vai trò, chưa xác thực OTP hoặc CSRF sai; `404` không tìm thấy phiếu/sản phẩm; `409` không thể hủy phiếu; `422` dữ liệu dòng nhập, ngày, số lượng, giá hoặc bộ lọc không hợp lệ; `500` lỗi hệ thống.
+
+Mọi thao tác tạo/hủy phiếu nhập được ghi vào `backend/storage/logs/admin_audit.log`, chỉ gồm Admin ID, hành động và ID phiếu. Khi triển khai bán hàng, hệ thống phải xuất lô có hạn sử dụng gần nhất trước (FEFO) trong cùng transaction với việc giảm tồn; cập nhật kho có điều kiện và khóa hàng để tồn không âm.

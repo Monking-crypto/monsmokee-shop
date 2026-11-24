@@ -11,6 +11,7 @@ Trạng thái bên dưới phản ánh phạm vi backend hiện tại; giao di�
 | Session, CSRF và validation dùng chung | `Session.php`, `Csrf.php`, `Validator.php` | `/api/csrf` | Hoàn thành |
 | Đọc danh mục công khai | `CategoryController.php` | `/api/categories` | Hoàn thành backend |
 | UC01/QT1 — đọc sản phẩm công khai | `ProductController.php`, `san-pham.html` | `/api/products`, `/api/products/{id}` | Hoàn thành backend |
+| UC12/QT13 — quản lý khuyến mãi và giá hiệu lực | `PromotionAdminController.php`, `PromotionController.php`, `PromotionService.php` | `/api/admin/promotions*`, `/api/promotions/active` | Hoàn thành backend |
 | UC02/QT2-3 — giỏ hàng | `CartController.php`, `gio-hang.html` | `/api/cart*` | Chưa làm |
 | UC03/QT6 — hồ sơ | `ProfileController.php`, `tai-khoan.html` | `/api/auth/profile` | Chưa làm |
 | UC04/QT8-9 — thanh toán | `CheckoutController.php`, `thanh-toan.html` | `/api/checkout/*` | Chưa làm |
@@ -18,11 +19,10 @@ Trạng thái bên dưới phản ánh phạm vi backend hiện tại; giao di�
 | UC06/QT13 — quản lý danh mục | `CategoryAdminController.php` | `/api/admin/categories` | Hoàn thành backend |
 | UC07/QT13 — quản lý sản phẩm | `ProductAdminController.php` | `/api/admin/products` | Hoàn thành backend |
 | UC08/QT14 — quản lý đơn hàng | `OrderAdminController.php` | `/api/admin/orders` | Chưa làm |
-| UC09/QT14-15 — tồn kho | `InventoryAdminController.php` | `/api/admin/inventory` | Chưa làm |
+| UC09/QT14-15 — nhập kho, lô hàng và lịch sử kho | `StockAdminController.php`, `ProductAdminController.php` | `/api/admin/stock-receipts*`, `/api/admin/batches`, `/api/admin/stock-history` | Hoàn thành backend (nhập/hủy phiếu, tra cứu lô và lịch sử) |
 | UC10 — quản lý khách hàng | `CustomerAdminController.php` | `/api/admin/customers` | Chưa làm |
 | UC11/QT15 — thống kê | `StatisticsController.php` | `/api/admin/statistics` | Chưa làm |
-| UC12/QT13 — khuyến mãi | `PromotionAdminController.php` | `/api/admin/promotions` | Chưa làm |
 
-Khuyến mãi, giỏ hàng và đơn hàng chưa được triển khai trong phần đọc công khai này; giao diện frontend vẫn là phạm vi riêng.
+Giỏ hàng, thanh toán, đơn hàng, đánh giá, quản lý đơn và thống kê vẫn chưa làm; giao diện frontend vẫn là phạm vi riêng.
 
-Danh mục hỗ trợ tạo/sửa/ẩn/hiện; sản phẩm hỗ trợ quản lý, ẩn/hiện, xóa mềm theo lịch sử giao dịch và tải ảnh. Tồn kho cùng hạn sử dụng chỉ được cập nhật qua chức năng phiếu nhập kho (chưa làm).
+Danh mục hỗ trợ tạo/sửa/ẩn/hiện; sản phẩm hỗ trợ quản lý, ẩn/hiện, xóa mềm theo lịch sử giao dịch và tải ảnh. Tồn kho và hạn sử dụng được cập nhật qua phiếu nhập kho; khi triển khai bán hàng, cần xuất từ lô có hạn sử dụng gần nhất trước (FEFO).

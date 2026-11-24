@@ -3,6 +3,9 @@ declare(strict_types=1);
 
 namespace App\Controllers\Customer;
 
+use App\Services\PromotionService;
+use DateTimeImmutable;
+use DateTimeZone;
 use PDO;
 use Request;
 use Response;
@@ -12,13 +15,21 @@ final class ProductController
     private const DEFAULT_PER_PAGE = 20;
     private const MAX_PER_PAGE = 50;
 
-    public function __construct(private PDO $pdo)
-    {
+    public function __construct(
+        private PDO $pdo,
+        private PromotionService $promotionService,
+        private array $appConfig,
+        private array $businessConfig
+    ) {
     }
 
     public function index(Request $request, array $params = []): void
     {
         $query = $request->query;
+        $now = $this->requestTime($query['now'] ?? null);
+        if ($now === null) {
+            return;
+        }
         $page = $this->positiveInteger($query['page'] ?? 1);
         $perPage = $this->positiveInteger($query['per_page'] ?? self::DEFAULT_PER_PAGE);
         $errors = [];
@@ -74,6 +85,26 @@ final class ProductController
             $values[] = $searchTerm;
             $values[] = $searchTerm;
         }
+        $nearExpiry = $query['near_expiry'] ?? '0';
+        if (!in_array($nearExpiry, [0, 1, '0', '1'], true)) {
+            Response::error('Tham số lọc sản phẩm không hợp lệ', 422, [
+                'near_expiry' => 'near_expiry chỉ nhận 0 hoặc 1',
+            ]);
+            return;
+        }
+        if ((string) $nearExpiry === '1') {
+            $cutoff = $now
+                ->setTime(0, 0)
+                ->modify('+' . max(0, (int) ($this->businessConfig['promotion']['near_expiry_days'] ?? 10)) . ' days')
+                ->format('Y-m-d');
+            $conditions[] = 'EXISTS (
+                SELECT 1 FROM lo_hang b
+                WHERE b.san_pham_id = s.id
+                  AND b.so_luong_con > 0
+                  AND b.han_su_dung <= ?
+            )';
+            $values[] = $cutoff;
+        }
         $where = implode(' AND ', $conditions);
 
         $count = $this->pdo->prepare(
@@ -107,18 +138,7 @@ final class ProductController
             $productsQuery->execute();
 
             $products = array_map(
-                static fn(array $row): array => [
-                    'id' => (int) $row['id'],
-                    'ten_san_pham' => $row['ten_san_pham'],
-                    'gia_ban' => (int) $row['gia_ban'],
-                    'hinh_anh' => $row['hinh_anh'],
-                    'danh_muc' => [
-                        'id' => (int) $row['danh_muc_id'],
-                        'ten_danh_muc' => $row['ten_danh_muc'],
-                        'slug' => $row['danh_muc_slug'],
-                    ],
-                    'con_hang' => (bool) $row['con_hang'],
-                ],
+                fn(array $row): array => $this->formatProduct($row, $now),
                 $productsQuery->fetchAll(PDO::FETCH_ASSOC)
             );
         }
@@ -136,6 +156,10 @@ final class ProductController
 
     public function show(Request $request, array $params = []): void
     {
+        $now = $this->requestTime($request->query['now'] ?? null);
+        if ($now === null) {
+            return;
+        }
         $id = $this->positiveInteger($params['id'] ?? null);
         if ($id === null) {
             Response::error('Không tìm thấy sản phẩm', 404);
@@ -158,22 +182,64 @@ final class ProductController
             return;
         }
 
-        Response::success('Chi tiết sản phẩm', [
-            'product' => [
-                'id' => (int) $row['id'],
-                'ten_san_pham' => $row['ten_san_pham'],
-                'mo_ta' => $row['mo_ta'],
-                'hinh_anh' => $row['hinh_anh'],
-                'don_vi_tinh' => $row['don_vi_tinh'],
-                'gia_ban' => (int) $row['gia_ban'],
-                'danh_muc' => [
-                    'id' => (int) $row['danh_muc_id'],
-                    'ten_danh_muc' => $row['ten_danh_muc'],
-                    'slug' => $row['danh_muc_slug'],
-                ],
-                'con_hang' => (bool) $row['con_hang'],
+        Response::success('Chi tiết sản phẩm', ['product' => $this->formatProduct($row, $now, true)]);
+    }
+
+    private function formatProduct(array $row, DateTimeImmutable $now, bool $includeDescription = false): array
+    {
+        $price = $this->promotionService->getEffectivePrice($row, $now);
+        $product = [
+            'id' => (int) $row['id'],
+            'ten_san_pham' => $row['ten_san_pham'],
+            'gia_ban' => (int) $row['gia_ban'],
+            'gia_goc' => $price['gia_goc'],
+            'phan_tram_giam' => $price['phan_tram_giam'],
+            'gia_ban_hieu_luc' => $price['gia_ban_hieu_luc'],
+            'nhan_khuyen_mai' => $price['nguon'],
+            'hinh_anh' => $row['hinh_anh'],
+            'danh_muc' => [
+                'id' => (int) $row['danh_muc_id'],
+                'ten_danh_muc' => $row['ten_danh_muc'],
+                'slug' => $row['danh_muc_slug'],
             ],
-        ]);
+            'con_hang' => (bool) $row['con_hang'],
+        ];
+        if ($includeDescription) {
+            $product['mo_ta'] = $row['mo_ta'];
+            $product['don_vi_tinh'] = $row['don_vi_tinh'];
+        }
+        return $product;
+    }
+
+    private function requestTime(mixed $date): ?DateTimeImmutable
+    {
+        $timezone = new DateTimeZone((string) ($this->appConfig['timezone'] ?? 'Asia/Ho_Chi_Minh'));
+        if ($date === null) {
+            return new DateTimeImmutable('now', $timezone);
+        }
+        if (($this->appConfig['env'] ?? '') !== 'development') {
+            Response::error('Tham số now chỉ được dùng trong môi trường development', 422);
+            return null;
+        }
+        if (!is_string($date) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            Response::error('Tham số now phải theo định dạng YYYY-MM-DD', 422, [
+                'now' => 'Ngày không hợp lệ',
+            ]);
+            return null;
+        }
+        $parsed = DateTimeImmutable::createFromFormat('!Y-m-d', $date, $timezone);
+        $parseErrors = DateTimeImmutable::getLastErrors();
+        if (
+            $parsed === false
+            || ($parseErrors !== false && ($parseErrors['warning_count'] > 0 || $parseErrors['error_count'] > 0))
+            || $parsed->format('Y-m-d') !== $date
+        ) {
+            Response::error('Tham số now phải theo định dạng YYYY-MM-DD', 422, [
+                'now' => 'Ngày không hợp lệ',
+            ]);
+            return null;
+        }
+        return $parsed->setTime(12, 0);
     }
 
     private function positiveInteger(mixed $value): ?int

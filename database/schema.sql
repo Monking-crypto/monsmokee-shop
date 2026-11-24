@@ -103,6 +103,7 @@ CREATE TABLE khuyen_mai (
 CREATE TABLE khuyen_mai_san_pham (
   khuyen_mai_id INT UNSIGNED NOT NULL,
   san_pham_id INT UNSIGNED NOT NULL,
+  la_chon_thu_cong TINYINT(1) NOT NULL DEFAULT 1,
   PRIMARY KEY (khuyen_mai_id, san_pham_id),
   FOREIGN KEY (khuyen_mai_id) REFERENCES khuyen_mai(id) ON DELETE CASCADE,
   FOREIGN KEY (san_pham_id) REFERENCES san_pham(id)
@@ -195,6 +196,8 @@ CREATE TABLE phieu_nhap_kho (
   ma_phieu VARCHAR(20) NOT NULL UNIQUE,
   admin_id INT UNSIGNED NOT NULL,
   ngay_nhap DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  nha_cung_cap VARCHAR(150) NULL,
+  trang_thai ENUM('HOAN_THANH','DA_HUY') NOT NULL DEFAULT 'HOAN_THANH',
   tong_tien_nhap DECIMAL(14,0) NOT NULL DEFAULT 0,
   ghi_chu VARCHAR(255) NULL,
   FOREIGN KEY (admin_id) REFERENCES nguoi_dung(id)
@@ -208,6 +211,7 @@ CREATE TABLE chi_tiet_phieu_nhap (
   gia_nhap DECIMAL(12,0) NOT NULL CHECK (gia_nhap >= 0),
   ngay_san_xuat DATE NOT NULL,
   han_su_dung DATE NOT NULL,
+  so_lo VARCHAR(100) NULL,
   CHECK (han_su_dung > ngay_san_xuat),
   FOREIGN KEY (phieu_nhap_id) REFERENCES phieu_nhap_kho(id) ON DELETE CASCADE,
   FOREIGN KEY (san_pham_id) REFERENCES san_pham(id)

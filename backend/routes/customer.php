@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 /** @var Router $router */
 $databaseConfig = require dirname(__DIR__) . '/config/database.php';
+$appConfig = require dirname(__DIR__) . '/config/app.php';
 $businessConfig = require dirname(__DIR__) . '/config/business.php';
 $mailConfig = require dirname(__DIR__) . '/config/mail.php';
 $database = Database::connection($databaseConfig);
@@ -18,7 +19,23 @@ $authController = new App\Controllers\Customer\AuthController(
     $businessConfig
 );
 $categoryController = new App\Controllers\Customer\CategoryController($database);
-$productController = new App\Controllers\Customer\ProductController($database);
+$promotionService = new App\Services\PromotionService(
+    $database,
+    $businessConfig,
+    new DateTimeZone($appConfig['timezone'])
+);
+$productController = new App\Controllers\Customer\ProductController(
+    $database,
+    $promotionService,
+    $appConfig,
+    $businessConfig
+);
+$promotionController = new App\Controllers\Customer\PromotionController(
+    $database,
+    $promotionService,
+    $appConfig,
+    $businessConfig
+);
 
 $router->get('/api/csrf', static function (Request $request): void {
     Response::success('CSRF token', [
@@ -28,6 +45,7 @@ $router->get('/api/csrf', static function (Request $request): void {
 $router->get('/api/categories', [$categoryController, 'index']);
 $router->get('/api/products', [$productController, 'index']);
 $router->get('/api/products/{id}', [$productController, 'show']);
+$router->get('/api/promotions/active', [$promotionController, 'active']);
 
 $router->post(
     '/api/auth/register/start',
