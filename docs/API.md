@@ -549,6 +549,8 @@ Danh mục có `trang_thai = 1` mới được trả về theo `thu_tu`; danh m�
 
 **Lỗi:** `500` nếu server không thể truy vấn danh mục.
 
+Response `GET /api/categories` dùng `Cache-Control: public, max-age=300`. Các API khác mặc định `Cache-Control: no-store`; riêng sản phẩm giữ `no-store` vì giá thay đổi theo thời gian. JSON được nén gzip/deflate khi client hỗ trợ.
+
 ## 18. Danh sách sản phẩm công khai
 
 ### `GET /api/products`
@@ -557,7 +559,7 @@ Danh mục có `trang_thai = 1` mới được trả về theo `thu_tu`; danh m�
 **Query tùy chọn:**
 
 - `page`: trang bắt đầu từ 1, mặc định `1`.
-- `per_page`: mặc định `20`, phạm vi `1`–`50`.
+- `per_page`: mặc định `12`, phạm vi `1`–`50`.
 - `q`: tìm theo tên sản phẩm hoặc tên không dấu, tối đa 100 ký tự.
 - `category_id`: id danh mục cần lọc.
 - `sort`: `newest` (mặc định), `price_asc` hoặc `price_desc`.
@@ -566,7 +568,7 @@ Danh mục có `trang_thai = 1` mới được trả về theo `thu_tu`; danh m�
 
 **Body:** Không có.
 
-Chỉ sản phẩm và danh mục có `trang_thai = 1` được trả về. `con_hang` là boolean; API không trả số lượng tồn chính xác. `gia_goc`, `phan_tram_giam`, `gia_ban_hieu_luc` và `nhan_khuyen_mai` dùng cùng quy tắc giá hiệu lực như API chi tiết. Chỉ khi `nhan_khuyen_mai` là `CAN_HAN` mới có thêm `han_su_dung` của lô gần nhất còn hàng; sản phẩm khác không trả hạn sử dụng hoặc dữ liệu lô.
+Chỉ sản phẩm và danh mục có `trang_thai = 1` được trả về. Danh sách chỉ gồm thông tin cho thẻ sản phẩm, không có mô tả dài hoặc tồn kho chính xác; `con_hang` là boolean. Ảnh dùng `anh_thumb`; API không trả ảnh kích thước lớn trong danh sách. `gia_goc`, `phan_tram_giam`, `gia_ban_hieu_luc` và `nhan_khuyen_mai` dùng cùng quy tắc giá hiệu lực như API chi tiết. Chỉ khi `nhan_khuyen_mai` là `CAN_HAN` mới có thêm `han_su_dung` của lô gần nhất còn hàng; sản phẩm khác không trả hạn sử dụng hoặc dữ liệu lô. Endpoint này dùng `Cache-Control: no-store`.
 
 **Response — 200**
 
@@ -584,7 +586,7 @@ Chỉ sản phẩm và danh mục có `trang_thai = 1` được trả về. `con
         "phan_tram_giam": 0,
         "gia_ban_hieu_luc": 5000,
         "nhan_khuyen_mai": null,
-        "hinh_anh": "placeholder-product.svg",
+        "anh_thumb": "placeholder-product.svg",
         "danh_muc": {
           "id": 1,
           "ten_danh_muc": "Nước giải khát",
@@ -595,9 +597,9 @@ Chỉ sản phẩm và danh mục có `trang_thai = 1` được trả về. `con
     ],
     "pagination": {
       "page": 1,
-      "per_page": 20,
+      "per_page": 12,
       "total": 1,
-      "total_pages": 1
+      "has_more": false
     }
   },
   "errors": null
@@ -625,7 +627,8 @@ Chỉ sản phẩm và danh mục có `trang_thai = 1` được trả về. `con
       "id": 1,
       "ten_san_pham": "Nước suối 500ml",
       "mo_ta": "Nước uống đóng chai tiện lợi",
-      "hinh_anh": "placeholder-product.svg",
+      "anh": "placeholder-product.svg",
+      "anh_thumb": "placeholder-product.svg",
       "don_vi_tinh": "chai",
       "gia_ban": 5000,
       "gia_goc": 5000,
@@ -670,7 +673,7 @@ Danh sách hỗ trợ `near_expiry=1` để chỉ lọc sản phẩm có lô c�
 
 Không cần CSRF hoặc đăng nhập. Trả các chương trình đang bật và trong thời hạn hôm nay, kèm sản phẩm đang hiển thị, danh mục đang hiển thị và còn hàng. Với chương trình `THU_SAU`, chỉ trả vào đúng thứ trong cấu hình (mặc định Thứ Sáu). Sản phẩm đã ẩn/hết hàng vẫn giữ trong danh sách Admin nhưng không xuất hiện công khai.
 
-**Response — 200:** `data.promotions[]` gồm `id`, `ma_khuyen_mai`, `ten_chuong_trinh`, `loai`, `phan_tram_giam`, thời hạn và `products[]`. Sản phẩm kèm giá hiệu lực, nhãn khuyến mãi, ảnh và `con_hang`; không kèm lô hay hạn sử dụng. `?now=YYYY-MM-DD` chỉ dùng trong development.
+**Response — 200:** `data.promotions[]` gồm `id`, `ma_khuyen_mai`, `ten_chuong_trinh`, `loai`, `phan_tram_giam`, thời hạn và `products[]`. Sản phẩm kèm giá hiệu lực, nhãn khuyến mãi, `anh_thumb` và `con_hang`; không kèm lô hay hạn sử dụng. `?now=YYYY-MM-DD` chỉ dùng trong development.
 
 ## 21. Quản lý khuyến mãi Admin
 
@@ -773,12 +776,12 @@ Tên là bắt buộc và không trùng; slug tự tạo từ tên, bỏ dấu, 
 
 ## 23. Quản lý sản phẩm Admin
 
-Các API yêu cầu Admin đã xác thực OTP, cookie session và CSRF cho `POST`, `PUT`, `PATCH`, `DELETE`. Contract sản phẩm chỉ dùng `ten`, `danh_muc_id`, `gia`, `don_vi_tinh`, `mo_ta`, `anh`. `gia` phải là JSON number nguyên dương (không nhận chuỗi hay số thập phân), tối đa `999999999` VND; response trả số nguyên để frontend tự định dạng. Trường ảnh `anh` là đường dẫn ảnh hợp lệ đã tải lên hoặc `null`; tệp ảnh mới vẫn tải qua endpoint upload. Nội dung HTML bị loại bỏ trước khi lưu. Trường tồn kho, hạn sử dụng và trạng thái không nhận từ payload cập nhật; sản phẩm mới bắt đầu với tồn kho `0`. API từ chối các trường cũ `ten_san_pham`, `gia_ban`, `hinh_anh`, `nhom_con`, `huong_vi`, `dong_goi`; nếu các cột nhóm con/hương vị/đóng gói tồn tại trong CSDL thì không dùng/xóa dữ liệu đó.
+Các API yêu cầu Admin đã xác thực OTP, cookie session và CSRF cho `POST`, `PUT`, `PATCH`, `DELETE`; mọi response API Admin dùng `Cache-Control: no-store`. Contract sản phẩm chỉ dùng `ten`, `danh_muc_id`, `gia`, `don_vi_tinh`, `mo_ta`, `anh`. `gia` phải là JSON number nguyên dương (không nhận chuỗi hay số thập phân), tối đa `999999999` VND; response trả số nguyên để frontend tự định dạng. Response ảnh có `anh` (800×800) và `anh_thumb` (400×400). Nội dung HTML bị loại bỏ trước khi lưu. Trường tồn kho, hạn sử dụng và trạng thái không nhận từ payload cập nhật; sản phẩm mới bắt đầu với tồn kho `0`. API từ chối các trường cũ `ten_san_pham`, `gia_ban`, `hinh_anh`, `nhom_con`, `huong_vi`, `dong_goi`; nếu các cột nhóm con/hương vị/đóng gói tồn tại trong CSDL thì không dùng/xóa dữ liệu đó.
 
 ### `GET /api/admin/products`
 
 **Query tùy chọn:** `page` (mặc định 1), `per_page` (mặc định 20, tối đa 50), `q`, `category_id`, `trang_thai` (`0` hoặc `1`). Không lọc trạng thái thì trả cả sản phẩm đang bán và đang ẩn.
-**Response — 200:** `data.products` kèm `data.pagination`; mỗi sản phẩm có `id`, `danh_muc_id`, `ten_danh_muc`, `ten`, `gia` (JSON integer), `don_vi_tinh`, `mo_ta`, `anh`, `so_luong_ton`, `muc_ton_toi_thieu`, `trang_thai`. Chi tiết Admin bổ sung lô và hạn sử dụng.
+**Response — 200:** `data.products` kèm `data.pagination`; mỗi sản phẩm có `id`, `danh_muc_id`, `ten_danh_muc`, `ten`, `gia` (JSON integer), `don_vi_tinh`, `mo_ta`, `anh`, `anh_thumb` (có thể `null` nếu ảnh được lưu nguyên bản khi GD chưa bật), `so_luong_ton`, `muc_ton_toi_thieu`, `trang_thai`. Chi tiết Admin bổ sung lô và hạn sử dụng.
 
 ### `GET /api/admin/products/{id}`
 
@@ -817,7 +820,7 @@ Nếu sản phẩm xuất hiện trong chi tiết đơn hàng hoặc phiếu nh�
 
 ### `POST /api/admin/products/{id}/image`
 
-Gửi `multipart/form-data` với trường tệp `image`, cookie Admin và `X-CSRF-Token` (không tự đặt `Content-Type` để client tạo multipart boundary). Chỉ nhận JPEG, PNG hoặc WebP; kích thước tối đa 2 MB. Loại tệp được kiểm bằng `finfo`, tên lưu ngẫu nhiên trong `backend/uploads/products/`; ảnh cũ do API này quản lý được xóa sau khi thay thế thành công.
+Gửi `multipart/form-data` với trường tệp `image`, cookie Admin và `X-CSRF-Token` (không tự đặt `Content-Type` để client tạo multipart boundary). Chỉ nhận JPEG, PNG hoặc WebP; kích thước tối đa 2 MB. MIME được kiểm bằng `finfo`; GD giải mã rồi tạo ảnh vuông 800×800 và thumbnail 400×400 trên nền trắng, giữ trọn ảnh theo tỉ lệ (không crop), chất lượng khoảng 82. Ảnh được mã hóa lại nên EXIF bị loại bỏ. Ưu tiên WebP nếu encoder GD khả dụng, nếu không thì JPEG. Tên file ngẫu nhiên trong `backend/uploads/products/`; ảnh cũ chỉ bị xóa sau khi các file mới được lưu và cập nhật CSDL thành công. Nếu GD chưa bật, vẫn trả `200`, lưu ảnh gốc theo MIME đã kiểm tra và trả cảnh báo cùng `anh_thumb: null`.
 
 **Response — 200:**
 
@@ -828,7 +831,9 @@ Gửi `multipart/form-data` với trường tệp `image`, cookie Admin và `X-C
   "data": {
     "id": 25,
     "anh": "uploads/products/0123456789abcdef0123456789abcdef.webp",
-    "url": "http://localhost/monsmokee/backend/uploads/products/0123456789abcdef0123456789abcdef.webp"
+    "anh_thumb": "uploads/products/0123456789abcdef0123456789abcdef_thumb.webp",
+    "url": "http://localhost/monsmokee/backend/uploads/products/0123456789abcdef0123456789abcdef.webp",
+    "thumb_url": "http://localhost/monsmokee/backend/uploads/products/0123456789abcdef0123456789abcdef_thumb.webp"
   },
   "errors": null
 }
@@ -837,6 +842,8 @@ Gửi `multipart/form-data` với trường tệp `image`, cookie Admin và `X-C
 **Lỗi chung:** `401` chưa đăng nhập; `403` không phải Admin/OTP chưa xác thực hoặc CSRF sai; `404` danh mục/sản phẩm không tồn tại; `409` tên danh mục trùng hoặc xóa sản phẩm bị cản bởi liên kết; `413` tệp vượt giới hạn cấu hình PHP; `422` dữ liệu không hợp lệ hoặc ảnh sai loại/kích thước; `500` lỗi hệ thống.
 
 Mọi thao tác ghi thành công được ghi vào `backend/storage/logs/admin_audit.log` dưới dạng thời gian, Admin ID, hành động, loại bản ghi và ID; không ghi payload, mật khẩu hay OTP.
+
+Ảnh tĩnh trong `backend/uploads/products/` được cache `public, max-age=31536000, immutable` vì tên file ngẫu nhiên, và thư mục uploads chặn thực thi PHP. Nếu GD chưa bật, ảnh vẫn được lưu nguyên bản sau khi kiểm tra MIME thật; response có `warning`, `anh_thumb` và `thumb_url` là `null`, đồng thời ghi cảnh báo vào log. Khi GD đã bật, chạy `php backend/scripts/regenerate_images.php` từ thư mục gốc để chuẩn hóa ảnh cũ; script chỉ xóa ảnh cũ sau khi đã ghi xong cả hai biến thể và cập nhật các bản ghi CSDL.
 
 ## 24. Phiếu nhập kho, lô hàng và lịch sử kho Admin
 

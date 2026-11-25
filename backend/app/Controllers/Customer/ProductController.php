@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\Controllers\Customer;
 
 use App\Services\PromotionService;
+use App\Services\ProductImageService;
 use DateTimeImmutable;
 use DateTimeZone;
 use PDO;
@@ -12,12 +13,13 @@ use Response;
 
 final class ProductController
 {
-    private const DEFAULT_PER_PAGE = 20;
+    private const DEFAULT_PER_PAGE = 12;
     private const MAX_PER_PAGE = 50;
 
     public function __construct(
         private PDO $pdo,
         private PromotionService $promotionService,
+        private ProductImageService $imageService,
         private array $appConfig,
         private array $businessConfig
     ) {
@@ -149,7 +151,7 @@ final class ProductController
                 'page' => $page,
                 'per_page' => $perPage,
                 'total' => $total,
-                'total_pages' => $totalPages,
+                'has_more' => $page * $perPage < $total,
             ],
         ]);
     }
@@ -196,7 +198,7 @@ final class ProductController
             'phan_tram_giam' => $price['phan_tram_giam'],
             'gia_ban_hieu_luc' => $price['gia_ban_hieu_luc'],
             'nhan_khuyen_mai' => $price['nguon'],
-            'hinh_anh' => $row['hinh_anh'],
+            'anh_thumb' => $this->imageService->cardImagePath($row['hinh_anh']),
             'danh_muc' => [
                 'id' => (int) $row['danh_muc_id'],
                 'ten_danh_muc' => $row['ten_danh_muc'],
@@ -204,6 +206,9 @@ final class ProductController
             ],
             'con_hang' => (bool) $row['con_hang'],
         ];
+        if ($includeDescription) {
+            $product['anh'] = $row['hinh_anh'];
+        }
         if ($price['nguon'] === 'CAN_HAN') {
             $cutoff = $now
                 ->setTime(0, 0)

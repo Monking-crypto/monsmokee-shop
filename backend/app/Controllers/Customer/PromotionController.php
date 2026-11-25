@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\Controllers\Customer;
 
 use App\Services\PromotionService;
+use App\Services\ProductImageService;
 use DateTimeImmutable;
 use DateTimeZone;
 use PDO;
@@ -15,6 +16,7 @@ final class PromotionController
     public function __construct(
         private PDO $pdo,
         private PromotionService $promotionService,
+        private ProductImageService $imageService,
         private array $appConfig,
         private array $businessConfig
     ) {
@@ -66,7 +68,7 @@ final class PromotionController
                     'phan_tram_giam' => $price['phan_tram_giam'],
                     'gia_ban_hieu_luc' => $price['gia_ban_hieu_luc'],
                     'nhan_khuyen_mai' => $price['nguon'],
-                    'hinh_anh' => $product['hinh_anh'],
+                    'anh_thumb' => $this->imageService->cardImagePath($product['hinh_anh']),
                     'con_hang' => true,
                 ];
             }

@@ -26,7 +26,10 @@ $adminAuthController = new App\Controllers\Admin\AdminAuthController(
     $adminMailConfig['admin_otp_extra_emails'] ?? []
 );
 $categoryAdminController = new App\Controllers\Admin\CategoryAdminController($adminDatabase);
-$productAdminController = new App\Controllers\Admin\ProductAdminController($adminDatabase);
+$productAdminController = new App\Controllers\Admin\ProductAdminController(
+    $adminDatabase,
+    new App\Services\ProductImageService()
+);
 $stockAdminController = new App\Controllers\Admin\StockAdminController($adminDatabase);
 $promotionAdminController = new App\Controllers\Admin\PromotionAdminController(
     $adminDatabase,

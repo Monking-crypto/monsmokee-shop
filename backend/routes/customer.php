@@ -27,12 +27,14 @@ $promotionService = new App\Services\PromotionService(
 $productController = new App\Controllers\Customer\ProductController(
     $database,
     $promotionService,
+    new App\Services\ProductImageService(),
     $appConfig,
     $businessConfig
 );
 $promotionController = new App\Controllers\Customer\PromotionController(
     $database,
     $promotionService,
+    new App\Services\ProductImageService(),
     $appConfig,
     $businessConfig
 );

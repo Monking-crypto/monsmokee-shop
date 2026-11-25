@@ -37,8 +37,8 @@
 ### Public catalog: danh sách danh mục
 GET http://localhost/monsmokee/backend/public/api/categories
 
-### Public catalog: danh sách mới nhất, kiểm tra phân trang
-GET http://localhost/monsmokee/backend/public/api/products?page=1&per_page=20&sort=newest
+### Public catalog: mặc định 12 sản phẩm; pagination có has_more
+GET http://localhost/monsmokee/backend/public/api/products?page=1&sort=newest
 
 ### Public catalog: tìm kiếm, lọc danh mục và sắp xếp giá tăng dần
 GET http://localhost/monsmokee/backend/public/api/products?q={{searchTerm}}&category_id={{categoryId}}&sort=price_asc&page=1&per_page=10
@@ -466,7 +466,7 @@ X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
 
 {"trang_thai": 1}
 
-### Admin: upload ảnh JPEG/PNG/WebP nhỏ hơn 2 MB; điền đường dẫn file cục bộ
+### Admin: upload JPEG/PNG/WebP tối đa 2 MB; tạo ảnh vuông 800 và thumbnail 400
 POST http://localhost/monsmokee/backend/public/api/admin/products/{{createAdminProduct.response.body.data.id}}/image
 X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
 Content-Type: multipart/form-data; boundary=----SmokeBoundary

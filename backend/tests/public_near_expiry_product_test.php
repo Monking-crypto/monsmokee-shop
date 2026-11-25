@@ -4,6 +4,7 @@ declare(strict_types=1);
 require dirname(__DIR__) . '/core/Request.php';
 require dirname(__DIR__) . '/core/Response.php';
 require dirname(__DIR__) . '/app/Services/PromotionService.php';
+require dirname(__DIR__) . '/app/Services/ProductImageService.php';
 require dirname(__DIR__) . '/app/Controllers/Customer/ProductController.php';
 
 use App\Controllers\Customer\ProductController;
@@ -60,6 +61,7 @@ $timezone = new DateTimeZone('Asia/Ho_Chi_Minh');
 $controller = new ProductController(
     $pdo,
     new PromotionService($pdo, $business, $timezone),
+    new App\Services\ProductImageService(),
     ['env' => 'development', 'timezone' => 'Asia/Ho_Chi_Minh'],
     $business
 );
@@ -82,27 +84,32 @@ $show = static function (int $id) use ($controller): array {
     return $response['data']['product'] ?? [];
 };
 
-$list = static function () use ($controller): array {
+$list = static function (?int $perPage = null) use ($controller): array {
     $_SERVER['REQUEST_METHOD'] = 'GET';
-    $_SERVER['REQUEST_URI'] = '/api/products?now=2026-03-05';
+    $_SERVER['REQUEST_URI'] = '/api/products?now=2026-03-05'
+        . ($perPage === null ? '' : '&per_page=' . $perPage);
     $_SERVER['SCRIPT_NAME'] = '/index.php';
     $_GET = ['now' => '2026-03-05'];
+    if ($perPage !== null) {
+        $_GET['per_page'] = (string) $perPage;
+    }
     http_response_code(200);
     ob_start();
     $controller->index(new Request());
     $response = json_decode((string) ob_get_clean(), true);
-    return $response['data']['products'] ?? [];
+    return $response['data'] ?? [];
 };
 
 $nearExpiry = $show(1);
 $regular = $show(2);
 $listed = $list();
+$listedProducts = $listed['products'] ?? [];
 $listedNearExpiry = array_values(array_filter(
-    $listed,
+    $listedProducts,
     static fn(array $product): bool => $product['id'] === 1
 ))[0] ?? [];
 $listedRegular = array_values(array_filter(
-    $listed,
+    $listedProducts,
     static fn(array $product): bool => $product['id'] === 2
 ))[0] ?? [];
 $assert(
@@ -118,6 +125,28 @@ $assert(
     ($listedNearExpiry['han_su_dung'] ?? null) === '2026-03-10'
         && !array_key_exists('han_su_dung', $listedRegular),
     'Product listing must expose expiry only for near-expiry discounts'
+);
+$assert(
+    ($listed['pagination'] ?? null) === [
+        'page' => 1,
+        'per_page' => 12,
+        'total' => 2,
+        'has_more' => false,
+    ],
+    'Product listing must use the 12-item default and the documented pagination shape'
+);
+$assert(
+    array_key_exists('anh_thumb', $listedNearExpiry)
+        && !array_key_exists('anh', $listedNearExpiry)
+        && array_key_exists('anh', $nearExpiry)
+        && array_key_exists('anh_thumb', $nearExpiry),
+    'Product cards must use thumbnails while detail responses include both image sizes'
+);
+$singlePage = $list(1);
+$assert(
+    ($singlePage['pagination']['per_page'] ?? null) === 1
+        && ($singlePage['pagination']['has_more'] ?? null) === true,
+    'Pagination must report when another page is available'
 );
 
 echo "Public near-expiry product tests passed\n";

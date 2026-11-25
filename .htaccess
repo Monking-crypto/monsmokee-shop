@@ -1,0 +1,18 @@
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule (^|/)\. - [F,L,NC]
+    RewriteRule ^backend/\.env(?:\.example)?$ - [F,L,NC]
+    RewriteRule ^backend/(?:app|core|config|routes|storage|vendor|tests|cron|scripts)(?:/|$) - [F,L,NC]
+    RewriteRule ^(?:core|config|routes|storage|vendor|tests|cron|scripts)(?:/|$) - [F,L,NC]
+    RewriteRule ^(?:database|docs)(?:/|$) - [F,L,NC]
+    RewriteRule ^.*\.md$ - [F,L,NC]
+    RewriteRule ^composer\.(?:json|lock)$ - [F,L,NC]
+</IfModule>
+
+<IfModule mod_deflate.c>
+    <FilesMatch "(?i)(?:index\.php|\.json|\.css|\.js|\.svg)$">
+        SetOutputFilter DEFLATE
+    </FilesMatch>
+</IfModule>
