@@ -18,6 +18,7 @@ Website tạp hóa MON SMOKEE xây dựng bằng PHP thuần, MySQL và Bootstra
    - MySQL: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS`.
    - Tài khoản Admin: `ADMIN_PHONE`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NAME`.
    - Email OTP: để `MAIL_DRIVER=log` khi phát triển cục bộ; nếu dùng Gmail SMTP, cấu hình `MAIL_DRIVER`, `MAIL_HOST`, `MAIL_PORT`, `MAIL_ENCRYPTION`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM`, `MAIL_FROM_NAME` theo mục bên dưới.
+   - Email OTP Admin phụ là tùy chọn: `ADMIN_OTP_EXTRA_EMAILS` nhận tối đa hai email phân tách bằng dấu phẩy. Chỉ cấu hình hộp thư thuộc người quản trị. Gửi OTP đến nhiều hộp thư làm tăng bề mặt rủi ro và nên tránh nếu không cần.
    - Session: `SESSION_NAME`, `SESSION_LIFETIME_SECONDS`, `SESSION_IDLE_TIMEOUT_SECONDS` (mặc định 2 giờ), `ADMIN_SESSION_IDLE_TIMEOUT_SECONDS` (mặc định 30 phút).
    Không commit `backend/.env`; file này chứa thông tin riêng.
 4. Mở PowerShell/CMD tại thư mục dự án và cài dependency trong đúng thư mục backend:
@@ -30,7 +31,8 @@ Website tạp hóa MON SMOKEE xây dựng bằng PHP thuần, MySQL và Bootstra
    1. `database/schema.sql`
    2. `database/seed.sql`
    3. `database/seed_khu_vuc.sql`
-   4. Các file trong `database/migrations/`, sắp theo tên tăng dần (ví dụ `001_...sql`, `002_...sql`) và chạy lần lượt.
+   4. `database/seed_demo.sql` (tùy chọn, dữ liệu dựng giao diện)
+   5. Các file trong `database/migrations/`, sắp theo tên tăng dần (ví dụ `001_...sql`, `002_...sql`) và chạy lần lượt.
 
    Migration `001_otp_dang_nhap_admin.sql` thêm mục đích đăng nhập Admin vào enum `otp_xac_thuc.muc_dich`; migration `002_danh_muc_trang_thai.sql` thêm cờ ẩn/hiện danh mục; migration `003_stock_receipts.sql` thêm nhà cung cấp/trạng thái phiếu nhập và số lô; migration `004_promotion_pinned_products.sql` phân biệt sản phẩm ghim và ngẫu nhiên trong khuyến mãi. Các migration có thể chạy lại an toàn. Với CSDL mới, chạy sau các file seed; với CSDL đã tồn tại, chọn database `monsmokee` trong phpMyAdmin, mở tab **SQL** và chạy lần lượt theo tên. **Lưu ý:** `schema.sql` có lệnh xóa và tạo lại database `monsmokee`; không import vào database đang có dữ liệu cần giữ.
 6. Từ thư mục gốc dự án, chạy `php database/seed_admin.php`. Script tạo/cập nhật Admin từ `ADMIN_*` trong `backend/.env`; mật khẩu được băm bcrypt trước khi lưu.

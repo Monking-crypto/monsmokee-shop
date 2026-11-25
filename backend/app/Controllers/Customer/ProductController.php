@@ -204,6 +204,40 @@ final class ProductController
             ],
             'con_hang' => (bool) $row['con_hang'],
         ];
+        if ($price['nguon'] === 'CAN_HAN') {
+            $cutoff = $now
+                ->setTime(0, 0)
+                ->modify(
+                    '+'
+                    . max(
+                        0,
+                        (int) ($this->businessConfig['promotion']['near_expiry_days'] ?? 10)
+                    )
+                    . ' days'
+                )
+                ->format('Y-m-d');
+            $expiry = $this->pdo->prepare(
+                'SELECT b.han_su_dung
+                 FROM lo_hang b
+                 WHERE b.san_pham_id = ?
+                   AND b.so_luong_con > 0
+                   AND b.han_su_dung <= ?
+                   AND (
+                       b.chi_tiet_phieu_nhap_id IS NULL
+                       OR EXISTS (
+                           SELECT 1
+                           FROM chi_tiet_phieu_nhap d
+                           JOIN phieu_nhap_kho p ON p.id = d.phieu_nhap_id
+                           WHERE d.id = b.chi_tiet_phieu_nhap_id
+                             AND p.trang_thai = \'HOAN_THANH\'
+                       )
+                   )
+                 ORDER BY b.han_su_dung ASC, b.id ASC
+                 LIMIT 1'
+            );
+            $expiry->execute([(int) $row['id'], $cutoff]);
+            $product['han_su_dung'] = $expiry->fetchColumn() ?: null;
+        }
         if ($includeDescription) {
             $product['mo_ta'] = $row['mo_ta'];
             $product['don_vi_tinh'] = $row['don_vi_tinh'];

@@ -2,11 +2,11 @@ USE monsmokee;
 SET NAMES utf8mb4;
 
 INSERT INTO danh_muc (ten_danh_muc, slug, icon, thu_tu) VALUES
-('Nước giải khát', 'nuoc-giai-khat', 'droplet', 1),
+('Nước giải khát', 'nuoc-giai-khat', 'box', 1),
 ('Mì & thực phẩm khô', 'mi-thuc-pham-kho', 'box', 2),
-('Bánh kẹo', 'banh-keo', 'cookie', 3),
-('Sữa – Trứng – Đông lạnh', 'sua-trung-dong-lanh', 'egg-fried', 4),
-('Gia vị – Dầu ăn', 'gia-vi-dau-an', 'basket', 5)
+('Bánh kẹo', 'banh-keo', 'box', 3),
+('Sữa – Trứng – Đông lạnh', 'sua-trung-dong-lanh', 'box', 4),
+('Gia vị – Dầu ăn', 'gia-vi-dau-an', 'box', 5)
 ON DUPLICATE KEY UPDATE
     id = id;
 

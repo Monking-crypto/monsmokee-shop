@@ -41,9 +41,13 @@ final class Session
         $lifetimeExpired = $lifetime > 0 && $now - (int) $_SESSION['created_at'] >= $lifetime;
         $idleExpired = $now - $lastActivity >= $idleTimeout;
         if ($lifetimeExpired || $idleExpired) {
+            $expiredAdmin = $isVerifiedAdmin;
             session_unset();
             session_regenerate_id(true);
             $_SESSION['created_at'] = $now;
+            if ($expiredAdmin) {
+                $_SESSION['session_expired'] = true;
+            }
         }
         $_SESSION['last_activity'] = $now;
     }

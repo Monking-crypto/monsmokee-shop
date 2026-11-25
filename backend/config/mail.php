@@ -2,9 +2,30 @@
 declare(strict_types=1);
 
 $env = Env::load(__DIR__ . '/../.env');
+$adminOtpExtraEmails = [];
+$configuredAdminOtpExtraEmails = trim((string) ($env['ADMIN_OTP_EXTRA_EMAILS'] ?? ''));
+if ($configuredAdminOtpExtraEmails !== '') {
+    $recipients = array_values(array_unique(array_filter(
+        array_map(
+            static fn(string $recipient): string => strtolower(trim($recipient)),
+            explode(',', $configuredAdminOtpExtraEmails)
+        ),
+        static fn(string $recipient): bool => $recipient !== ''
+    )));
+    if (count($recipients) > 2) {
+        throw new RuntimeException('ADMIN_OTP_EXTRA_EMAILS nhận tối đa hai địa chỉ email.');
+    }
+    foreach ($recipients as $recipient) {
+        if (filter_var($recipient, FILTER_VALIDATE_EMAIL) === false) {
+            throw new RuntimeException('ADMIN_OTP_EXTRA_EMAILS chứa địa chỉ email không hợp lệ.');
+        }
+        $adminOtpExtraEmails[] = $recipient;
+    }
+}
 
 return [
     'driver' => strtolower((string) ($env['MAIL_DRIVER'] ?? 'log')),
+    'admin_otp_extra_emails' => $adminOtpExtraEmails,
     'smtp' => [
         'host' => (string) ($env['MAIL_HOST'] ?? $env['SMTP_HOST'] ?? 'smtp.gmail.com'),
         'port' => (int) ($env['MAIL_PORT'] ?? $env['SMTP_PORT'] ?? 587),

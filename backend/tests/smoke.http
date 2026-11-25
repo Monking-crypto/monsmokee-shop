@@ -16,8 +16,10 @@
 @adminPassword =
 @adminOtp =
 @wrongAdminOtp = not-a-code
+@oldCsrfToken =
 @categoryId = 1
 @productId = 1
+@nearExpiryProductId =
 @searchTerm = sua
 @newCategoryName =
 @newProductName =
@@ -44,8 +46,14 @@ GET http://localhost/monsmokee/backend/public/api/products?q={{searchTerm}}&cate
 ### Public catalog: chi tiết sản phẩm (không trả hạn sử dụng)
 GET http://localhost/monsmokee/backend/public/api/products/{{productId}}
 
-### Public catalog: lọc sản phẩm có lô cận hạn (không trả hạn sử dụng)
+### Public catalog: lọc sản phẩm cận hạn; chỉ nhãn CAN_HAN được trả hạn gần nhất
 GET http://localhost/monsmokee/backend/public/api/products?near_expiry=1
+
+### Public catalog: sản phẩm thường không có trường han_su_dung
+GET http://localhost/monsmokee/backend/public/api/products/{{productId}}
+
+### Public catalog: sản phẩm giảm CAN_HAN có hạn của lô gần nhất còn hàng
+GET http://localhost/monsmokee/backend/public/api/products/{{nearExpiryProductId}}
 
 ### Public catalog: kiểm thử giá ở Thứ Sáu (chỉ APP_ENV=development)
 GET http://localhost/monsmokee/backend/public/api/products/{{productId}}?now=2026-03-06
@@ -310,7 +318,7 @@ X-CSRF-Token: {{csrfForCustomerLogin.response.body.data.csrf_token}}
 # @name csrfForAdmin
 GET http://localhost/monsmokee/backend/public/api/csrf
 
-### 10. Admin đăng nhập bước 1; OTP gửi tới email lấy từ CSDL
+### 10. Admin đăng nhập bước 1; cùng OTP gửi tới email chính và các địa chỉ phụ cấu hình
 POST http://localhost/monsmokee/backend/public/api/admin/auth/login
 Content-Type: application/json
 X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
@@ -365,7 +373,6 @@ X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
 
 {
   "ten_danh_muc": "{{newCategoryName}}",
-  "icon": "basket",
   "thu_tu": 99
 }
 
@@ -376,7 +383,6 @@ X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
 
 {
   "ten_danh_muc": "{{newCategoryName}} updated",
-  "icon": "basket",
   "thu_tu": 99
 }
 
@@ -401,11 +407,12 @@ Content-Type: application/json
 X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
 
 {
-  "ten_san_pham": "{{newProductName}}",
+  "ten": "{{newProductName}}",
   "danh_muc_id": {{createAdminCategory.response.body.data.id}},
-  "gia_ban": 25000,
+  "gia": 25000,
   "don_vi_tinh": "gói",
-  "mo_ta": "Sản phẩm dùng để kiểm thử quản trị"
+  "mo_ta": "Sản phẩm dùng để kiểm thử quản trị",
+  "anh": null
 }
 
 ### Admin: tìm và lọc sản phẩm
@@ -420,11 +427,26 @@ Content-Type: application/json
 X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
 
 {
-  "ten_san_pham": "{{newProductName}}",
+  "ten": "{{newProductName}}",
   "danh_muc_id": {{createAdminCategory.response.body.data.id}},
-  "gia_ban": 26000,
+  "gia": 26000,
   "don_vi_tinh": "gói",
-  "mo_ta": "Mô tả đã cập nhật"
+  "mo_ta": "Mô tả đã cập nhật",
+  "anh": null
+}
+
+### Giá dạng chuỗi/decimal bị từ chối - 422
+POST http://localhost/monsmokee/backend/public/api/admin/products
+Content-Type: application/json
+X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
+
+{
+  "ten": "{{newProductName}} invalid price",
+  "danh_muc_id": {{createAdminCategory.response.body.data.id}},
+  "gia": "25.000",
+  "don_vi_tinh": "gói",
+  "mo_ta": null,
+  "anh": null
 }
 
 ### Admin: ẩn sản phẩm; API công khai phải trả 404
@@ -582,7 +604,7 @@ X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
 }
 
 ### 12. Logout Admin - 200
-POST http://localhost/monsmokee/backend/public/api/auth/logout
+POST http://localhost/monsmokee/backend/public/api/admin/auth/logout
 X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
 
 ###
@@ -591,6 +613,15 @@ GET http://localhost/monsmokee/backend/public/api/csrf
 
 ### Sau logout, Admin me - 401
 GET http://localhost/monsmokee/backend/public/api/admin/me
+
+### Logout với CSRF cũ - phải trả 403, errors.code=CSRF_INVALID
+POST http://localhost/monsmokee/backend/public/api/admin/auth/logout
+X-CSRF-Token: {{oldCsrfToken}}
+
+### Logout với phiên Admin hết hạn sau 30 phút không hoạt động - 401 SESSION_EXPIRED
+# Dùng cookie session đã hết hạn; endpoint xóa cookie và buộc đăng nhập lại.
+POST http://localhost/monsmokee/backend/public/api/admin/auth/logout
+X-CSRF-Token: {{oldCsrfToken}}
 
 ### Resend khi không có pending - 401
 POST http://localhost/monsmokee/backend/public/api/admin/auth/otp/resend

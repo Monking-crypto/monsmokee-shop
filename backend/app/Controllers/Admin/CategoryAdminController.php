@@ -12,6 +12,8 @@ use Session;
 
 final class CategoryAdminController
 {
+    private const DEFAULT_ICON = 'box';
+
     public function __construct(private PDO $pdo)
     {
     }
@@ -46,7 +48,7 @@ final class CategoryAdminController
             return;
         }
 
-        $slug = $this->slugify($input['ten_danh_muc']);
+        $slug = $this->uniqueSlug($input['ten_danh_muc']);
         if ($slug === '') {
             Response::error('Không thể tạo slug từ tên danh mục', 422, [
                 'ten_danh_muc' => 'Tên danh mục cần có ký tự chữ hoặc số',
@@ -67,7 +69,7 @@ final class CategoryAdminController
             ]);
         } catch (PDOException $error) {
             if ($error->getCode() === '23000') {
-                Response::error('Tên danh mục hoặc slug đã tồn tại', 409);
+                Response::error('Tên danh mục đã tồn tại', 409);
                 return;
             }
             throw $error;
@@ -97,7 +99,7 @@ final class CategoryAdminController
             Response::error('Dữ liệu danh mục không hợp lệ', 422, $input['errors']);
             return;
         }
-        $slug = $this->slugify($input['ten_danh_muc']);
+        $slug = $this->uniqueSlug($input['ten_danh_muc'], $id);
         if ($slug === '') {
             Response::error('Không thể tạo slug từ tên danh mục', 422, [
                 'ten_danh_muc' => 'Tên danh mục cần có ký tự chữ hoặc số',
@@ -120,7 +122,7 @@ final class CategoryAdminController
             ]);
         } catch (PDOException $error) {
             if ($error->getCode() === '23000') {
-                Response::error('Tên danh mục hoặc slug đã tồn tại', 409);
+                Response::error('Tên danh mục đã tồn tại', 409);
                 return;
             }
             throw $error;
@@ -162,23 +164,15 @@ final class CategoryAdminController
     private function validatedInput(array $input): array
     {
         $errors = [];
+        foreach (['slug', 'icon', 'nhom_con'] as $unsupportedField) {
+            if (array_key_exists($unsupportedField, $input)) {
+                $errors[$unsupportedField] = 'Trường này không còn được API quản trị hỗ trợ';
+            }
+        }
         $name = $input['ten_danh_muc'] ?? null;
         $name = is_string($name) ? trim(strip_tags($name)) : '';
         if ($name === '' || mb_strlen($name) > 100) {
             $errors['ten_danh_muc'] = 'Tên danh mục là bắt buộc và tối đa 100 ký tự';
-        }
-
-        $icon = $input['icon'] ?? null;
-        if ($icon !== null && !is_string($icon)) {
-            $errors['icon'] = 'icon phải là chuỗi';
-            $icon = null;
-        } elseif (is_string($icon)) {
-            $icon = trim(strip_tags($icon));
-            if ($icon === '') {
-                $icon = null;
-            } elseif (mb_strlen($icon) > 100) {
-                $errors['icon'] = 'icon không được vượt quá 100 ký tự';
-            }
         }
 
         $order = $input['thu_tu'] ?? 0;
@@ -189,7 +183,11 @@ final class CategoryAdminController
         }
 
         return $errors === []
-            ? ['ten_danh_muc' => $name, 'icon' => $icon, 'thu_tu' => $order]
+            ? [
+                'ten_danh_muc' => $name,
+                'icon' => self::DEFAULT_ICON,
+                'thu_tu' => $order,
+            ]
             : ['errors' => $errors];
     }
 
@@ -202,6 +200,32 @@ final class CategoryAdminController
         $slug = strtolower($ascii);
         $slug = preg_replace('/[^a-z0-9]+/', '-', $slug) ?? '';
         return trim($slug, '-');
+    }
+
+    private function uniqueSlug(string $name, ?int $exceptId = null): string
+    {
+        $base = substr($this->slugify($name), 0, 120);
+        if ($base === '') {
+            return '';
+        }
+        for ($suffix = 1; $suffix <= 10000; $suffix++) {
+            $candidate = $suffix === 1
+                ? $base
+                : substr($base, 0, 120 - strlen((string) $suffix) - 1) . '-' . $suffix;
+            $sql = 'SELECT 1 FROM danh_muc WHERE slug = ?';
+            $values = [$candidate];
+            if ($exceptId !== null) {
+                $sql .= ' AND id <> ?';
+                $values[] = $exceptId;
+            }
+            $sql .= ' LIMIT 1';
+            $query = $this->pdo->prepare($sql);
+            $query->execute($values);
+            if ($query->fetchColumn() === false) {
+                return $candidate;
+            }
+        }
+        throw new \RuntimeException('Không thể tạo slug duy nhất cho danh mục.');
     }
 
     private function audit(string $action, int $id): void

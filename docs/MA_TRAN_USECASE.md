@@ -7,7 +7,7 @@ Trạng thái bên dưới phản ánh phạm vi backend hiện tại; giao di�
 | Đăng ký Customer qua email OTP | `Customer/AuthController.php`, `OtpService.php` | `/api/auth/register/start`, `/api/auth/register/verify`, `/api/auth/otp/resend` | Hoàn thành |
 | Đăng nhập, đăng xuất và xem phiên Customer | `Customer/AuthController.php`, `AuthMiddleware.php` | `/api/auth/login`, `/api/auth/logout`, `/api/auth/me` | Hoàn thành |
 | Quên mật khẩu Customer qua OTP email và reset ticket | `Customer/AuthController.php`, `OtpService.php` | `/api/auth/forgot-password/start`, `/api/auth/forgot-password/verify-otp`, `/api/auth/forgot-password/reset`, `/api/auth/forgot-password/resend`; `/verify` deprecated | Hoàn thành backend |
-| Đăng nhập Admin hai bước và xem phiên Admin | `Admin/AdminAuthController.php`, `AdminMiddleware.php` | `/api/admin/auth/login`, `/api/admin/auth/verify-otp`, `/api/admin/auth/otp/resend`, `/api/admin/me` | Hoàn thành |
+| Đăng nhập/đăng xuất Admin hai bước và xem phiên Admin | `Admin/AdminAuthController.php`, `AdminMiddleware.php` | `/api/admin/auth/login`, `/api/admin/auth/verify-otp`, `/api/admin/auth/otp/resend`, `/api/admin/auth/logout`, `/api/admin/me` | Hoàn thành |
 | Session, CSRF và validation dùng chung | `Session.php`, `Csrf.php`, `Validator.php` | `/api/csrf` | Hoàn thành |
 | Đọc danh mục công khai | `CategoryController.php` | `/api/categories` | Hoàn thành backend |
 | UC01/QT1 — đọc sản phẩm công khai | `ProductController.php`, `san-pham.html` | `/api/products`, `/api/products/{id}` | Hoàn thành backend |
@@ -27,3 +27,5 @@ Trạng thái bên dưới phản ánh phạm vi backend hiện tại; giao di�
 Giỏ hàng, thanh toán, đơn hàng, đánh giá, quản lý đơn và thống kê vẫn chưa làm; giao diện frontend vẫn là phạm vi riêng.
 
 Danh mục hỗ trợ tạo/sửa/ẩn/hiện; sản phẩm hỗ trợ quản lý, ẩn/hiện, xóa mềm theo lịch sử giao dịch và tải ảnh. Tồn kho và hạn sử dụng được cập nhật qua phiếu nhập kho; khi triển khai bán hàng, cần xuất từ lô có hạn sử dụng gần nhất trước (FEFO).
+
+OTP Admin được gửi cùng một mã tới email chính của tài khoản và tối đa hai địa chỉ phụ tùy chọn từ cấu hình môi trường; response chỉ trả email đã che. Chỉ API công khai của sản phẩm đang giảm cận hạn mới có trường `han_su_dung` của lô gần nhất còn hàng; sản phẩm khác không lộ hạn hoặc thông tin lô. API Admin danh mục tự tạo slug và dùng icon mặc định; API sản phẩm chỉ nhận `ten`, `danh_muc_id`, `gia` (JSON integer dương), `don_vi_tinh`, `mo_ta`, `anh`, không nhận các trường nhóm con/hương vị/đóng gói.

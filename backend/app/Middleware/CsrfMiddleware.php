@@ -14,7 +14,7 @@ final class CsrfMiddleware
 
         $token = $request->header('X-CSRF-Token');
         if (!is_string($token) || !Csrf::validate($token)) {
-            Response::error('CSRF token không hợp lệ', 403);
+            Response::error('CSRF token không hợp lệ', 403, ['code' => 'CSRF_INVALID']);
             return false;
         }
         return true;

@@ -17,7 +17,7 @@ final class ProductAdminController
     private const DEFAULT_PER_PAGE = 20;
     private const MAX_PER_PAGE = 50;
     private const MAX_IMAGE_BYTES = 2097152;
-    private const MAX_PRICE = 999999999999;
+    private const MAX_PRICE = 999999999;
 
     public function __construct(private PDO $pdo)
     {
@@ -204,16 +204,17 @@ final class ProductAdminController
         $insert = $this->pdo->prepare(
             'INSERT INTO san_pham
                 (danh_muc_id, ten_san_pham, ten_khong_dau, mo_ta, don_vi_tinh,
-                 gia_ban, so_luong_ton, trang_thai)
-             VALUES (?, ?, ?, ?, ?, ?, 0, 1)'
+                 gia_ban, hinh_anh, so_luong_ton, trang_thai)
+             VALUES (?, ?, ?, ?, ?, ?, ?, 0, 1)'
         );
         $insert->execute([
             $input['danh_muc_id'],
-            $input['ten_san_pham'],
-            $this->normalizeKeyword($input['ten_san_pham']),
+            $input['ten'],
+            $this->normalizeKeyword($input['ten']),
             $input['mo_ta'],
             $input['don_vi_tinh'],
-            $input['gia_ban'],
+            $input['gia'],
+            $input['anh'],
         ]);
         $id = (int) $this->pdo->lastInsertId();
         $this->audit('product.created', $id);
@@ -242,16 +243,23 @@ final class ProductAdminController
         $update = $this->pdo->prepare(
             'UPDATE san_pham
              SET danh_muc_id = ?, ten_san_pham = ?, ten_khong_dau = ?,
-                 mo_ta = ?, don_vi_tinh = ?, gia_ban = ?
+                 mo_ta = ?, don_vi_tinh = ?, gia_ban = ?, hinh_anh = ?
              WHERE id = ?'
         );
+        $image = $input['anh'];
+        if (!array_key_exists('anh', $request->all())) {
+            $currentImage = $this->pdo->prepare('SELECT hinh_anh FROM san_pham WHERE id = ?');
+            $currentImage->execute([$id]);
+            $image = $currentImage->fetchColumn();
+        }
         $update->execute([
             $input['danh_muc_id'],
-            $input['ten_san_pham'],
-            $this->normalizeKeyword($input['ten_san_pham']),
+            $input['ten'],
+            $this->normalizeKeyword($input['ten']),
             $input['mo_ta'],
             $input['don_vi_tinh'],
-            $input['gia_ban'],
+            $input['gia'],
+            $image,
             $id,
         ]);
         $this->audit('product.updated', $id);
@@ -427,7 +435,7 @@ final class ProductAdminController
         $this->audit('product.image_uploaded', $id);
         Response::success('Đã cập nhật ảnh sản phẩm', [
             'id' => $id,
-            'hinh_anh' => $relativePath,
+            'anh' => $relativePath,
             'url' => $this->publicImageUrl($relativePath),
         ]);
     }
@@ -435,19 +443,32 @@ final class ProductAdminController
     private function validatedInput(array $input): array
     {
         $errors = [];
-        $name = $input['ten_san_pham'] ?? null;
+        foreach ([
+            'ten_san_pham',
+            'gia_ban',
+            'hinh_anh',
+            'nhom_con',
+            'huong_vi',
+            'dong_goi',
+        ] as $unsupportedField) {
+            if (array_key_exists($unsupportedField, $input)) {
+                $errors[$unsupportedField] = 'Trường này không còn được API quản trị hỗ trợ';
+            }
+        }
+
+        $name = $input['ten'] ?? null;
         $name = is_string($name) ? trim(strip_tags($name)) : '';
         if ($name === '' || mb_strlen($name) > 200) {
-            $errors['ten_san_pham'] = 'Tên sản phẩm là bắt buộc và tối đa 200 ký tự';
+            $errors['ten'] = 'Tên sản phẩm là bắt buộc và tối đa 200 ký tự';
         }
 
         $categoryId = $this->positiveInteger($input['danh_muc_id'] ?? null);
         if ($categoryId === null) {
             $errors['danh_muc_id'] = 'danh_muc_id phải là số nguyên dương';
         }
-        $price = $this->positiveInteger($input['gia_ban'] ?? null);
+        $price = $this->positiveJsonInteger($input['gia'] ?? null);
         if ($price === null || $price > self::MAX_PRICE) {
-            $errors['gia_ban'] = 'gia_ban phải là số nguyên VND dương';
+            $errors['gia'] = 'gia phải là số nguyên JSON dương, tối đa 999999999 VND';
             $price = null;
         }
 
@@ -469,14 +490,32 @@ final class ProductAdminController
                 $description = null;
             }
         }
+        $image = $input['anh'] ?? null;
+        if (
+            $image !== null
+            && (
+                !is_string($image)
+                || (
+                    $image !== 'placeholder-product.svg'
+                    && preg_match(
+                        '#\Auploads/products/[a-f0-9]{32}\.(?:jpg|png|webp)\z#',
+                        $image
+                    ) !== 1
+                )
+            )
+        ) {
+            $errors['anh'] = 'anh phải là đường dẫn ảnh tải lên hợp lệ hoặc null';
+            $image = null;
+        }
 
         return $errors === []
             ? [
-                'ten_san_pham' => $name,
+                'ten' => $name,
                 'danh_muc_id' => $categoryId,
-                'gia_ban' => $price,
+                'gia' => $price,
                 'don_vi_tinh' => $unit,
                 'mo_ta' => $description,
+                'anh' => $image,
             ]
             : ['errors' => $errors];
     }
@@ -571,21 +610,20 @@ final class ProductAdminController
             'id' => (int) $row['id'],
             'danh_muc_id' => (int) $row['danh_muc_id'],
             'ten_danh_muc' => $row['ten_danh_muc'],
-            'ten_san_pham' => $row['ten_san_pham'],
-            'ten_khong_dau' => $row['ten_khong_dau'],
-            'mo_ta' => $row['mo_ta'],
-            'hinh_anh' => $row['hinh_anh'],
+            'ten' => $row['ten_san_pham'],
+            'gia' => (int) $row['gia_ban'],
             'don_vi_tinh' => $row['don_vi_tinh'],
-            'gia_ban' => (int) $row['gia_ban'],
+            'mo_ta' => $row['mo_ta'],
+            'anh' => $row['hinh_anh'],
             'so_luong_ton' => (int) $row['so_luong_ton'],
             'muc_ton_toi_thieu' => (int) $row['muc_ton_toi_thieu'],
             'trang_thai' => (int) $row['trang_thai'],
-            'giam_can_han' => (bool) $row['giam_can_han'],
-            'phan_tram_giam_can_han' => (int) $row['phan_tram_giam_can_han'],
-            'luot_ban' => (int) $row['luot_ban'],
-            'ngay_tao' => $row['ngay_tao'],
-            'ngay_cap_nhat' => $row['ngay_cap_nhat'],
         ];
+    }
+
+    private function positiveJsonInteger(mixed $value): ?int
+    {
+        return is_int($value) && $value > 0 ? $value : null;
     }
 
     private function positiveInteger(mixed $value): ?int

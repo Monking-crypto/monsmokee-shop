@@ -14,8 +14,16 @@ $adminOtpSender = match ($adminMailConfig['driver']) {
 $adminAuthController = new App\Controllers\Admin\AdminAuthController(
     $adminDatabase,
     new Validator(),
-    new App\Services\OtpService($adminDatabase, $adminOtpSender, $adminBusinessConfig),
-    $adminBusinessConfig
+    new App\Services\OtpService(
+        $adminDatabase,
+        new App\Services\Mail\MultiRecipientOtpSender(
+            $adminOtpSender,
+            $adminMailConfig['admin_otp_extra_emails'] ?? []
+        ),
+        $adminBusinessConfig
+    ),
+    $adminBusinessConfig,
+    $adminMailConfig['admin_otp_extra_emails'] ?? []
 );
 $categoryAdminController = new App\Controllers\Admin\CategoryAdminController($adminDatabase);
 $productAdminController = new App\Controllers\Admin\ProductAdminController($adminDatabase);
@@ -29,6 +37,16 @@ $requireVerifiedAdmin = static fn(Request $request): bool =>
     App\Middleware\AdminMiddleware::handle($request);
 $requireAdminCsrf = static fn(Request $request): bool =>
     CsrfMiddleware::handle($request);
+$requireLogoutCsrf = static function (Request $request): bool {
+    if (Session::get('session_expired') === true) {
+        Session::destroy();
+        Response::error('Phiên đã hết hạn, vui lòng đăng nhập lại', 401, [
+            'code' => 'SESSION_EXPIRED',
+        ]);
+        return false;
+    }
+    return CsrfMiddleware::handle($request);
+};
 
 $router->post(
     '/api/admin/auth/login',
@@ -44,6 +62,11 @@ $router->post(
     '/api/admin/auth/otp/resend',
     [$adminAuthController, 'resendOtp'],
     [static fn(Request $request): bool => CsrfMiddleware::handle($request)]
+);
+$router->post(
+    '/api/admin/auth/logout',
+    [$adminAuthController, 'logout'],
+    [$requireLogoutCsrf]
 );
 $router->get(
     '/api/admin/me',
