@@ -887,3 +887,136 @@ Query tùy chọn `product_id`, `page`, `per_page` (tối đa 50). Trả loại 
 **Lỗi chung:** `401` chưa đăng nhập; `403` sai vai trò, chưa xác thực OTP hoặc CSRF sai; `404` không tìm thấy phiếu/sản phẩm; `409` không thể hủy phiếu; `422` dữ liệu dòng nhập, ngày, số lượng, giá hoặc bộ lọc không hợp lệ; `500` lỗi hệ thống.
 
 Mọi thao tác tạo/hủy phiếu nhập được ghi vào `backend/storage/logs/admin_audit.log`, chỉ gồm Admin ID, hành động và ID phiếu. Khi triển khai bán hàng, hệ thống phải xuất lô có hạn sử dụng gần nhất trước (FEFO) trong cùng transaction với việc giảm tồn; cập nhật kho có điều kiện và khóa hàng để tồn không âm.
+
+## 25. Khu vực giao hàng, báo phí ship và thông tin cửa hàng
+
+### `GET /api/shipping/areas`
+
+Trả danh sách khu vực đang hỗ trợ giao hàng dưới dạng danh sách phẳng có `tinh`, `quan_huyen`, `phuong_xa`, `id` và `khoang_cach_km`. Dropdown có thể lấy danh sách tỉnh duy nhất, sau đó lọc bằng `?tinh=...` và `?tinh=...&quan_huyen=...`.
+
+**Response — 200:**
+
+```json
+{
+  "success": true,
+  "message": "Danh sách khu vực giao hàng",
+  "data": {
+    "areas": [
+      {
+        "id": 1,
+        "tinh": "Quảng Bình",
+        "quan_huyen": "TP. Đồng Hới",
+        "phuong_xa": "Phường Bắc Lý",
+        "khoang_cach_km": 4.5
+      }
+    ]
+  },
+  "errors": null
+}
+```
+
+### `POST /api/shipping/quote`
+
+**Headers:** `Content-Type: application/json`, cookie session, `X-CSRF-Token`.
+**Body:**
+
+```json
+{"khu_vuc_id": 1, "tien_hang_sau_giam": 50000}
+```
+
+**Response — 200:**
+
+```json
+{
+  "success": true,
+  "message": "Báo phí giao hàng tạm tính",
+  "data": {
+    "phi_ship_tam_tinh": 15000,
+    "mien_phi": false,
+    "ly_do": "Phí vận chuyển tạm tính theo khu vực",
+    "cho_phep_cod": true,
+    "ly_do_khong_cod": null,
+    "khoang_cach_km": 4.5,
+    "giao_duoc": true
+  },
+  "errors": null
+}
+```
+
+Các ngưỡng được đọc từ `backend/config/business.php`: miễn phí nếu tiền hàng sau giảm đạt `free_ship_min_order` hoặc khoảng cách không vượt `free_ship_max_km`; ngoài hai điều kiện đó, phí chuẩn `fee_default` áp dụng từ `delivery_min_order` trở lên trong bán kính `max_service_km`. Đơn dưới ngưỡng giao tối thiểu và ở ngoài bán kính miễn phí chỉ hỗ trợ Click & Collect. Ngoài bán kính phục vụ hoặc khu vực tắt thì `giao_duoc=false`. COD chỉ được bật khi đạt `cod_min_order` và khu vực thuộc `service_area`; trường hợp khác trả lý do và gợi ý Click & Collect. Phí trả về chỉ là tạm tính, Admin chốt phí thực tế ở bước đơn hàng.
+
+**Lỗi:** `403` CSRF không hợp lệ; `422` ID khu vực hoặc tiền hàng không hợp lệ; `500` lỗi hệ thống.
+
+### `GET /api/store-info`
+
+Trả `ten_cua_hang`, `dia_chi`, `hotline`, `gio_mo_cua` và `gio_dong_cua` từ cấu hình `store` trong `backend/config/business.php`. Response thành công là `200`; lỗi hệ thống là `500`.
+
+```json
+{
+  "success": true,
+  "message": "Thông tin cửa hàng",
+  "data": {
+    "ten_cua_hang": "MON SMOKEE",
+    "dia_chi": "(cập nhật) Đồng Hới, Quảng Bình",
+    "hotline": "(cập nhật)",
+    "gio_mo_cua": "07:00",
+    "gio_dong_cua": "21:30"
+  },
+  "errors": null
+}
+```
+
+## 26. Admin quản lý khu vực giao hàng
+
+Tất cả API yêu cầu Admin đã đăng nhập và xác thực OTP; mọi thao tác ghi cần cookie session và `X-CSRF-Token`. Địa chỉ khu vực không được trùng tổ hợp tỉnh/quận-huyện/phường-xã; khoảng cách là số không âm, tối đa một chữ số thập phân. Không có API xóa cứng; khu vực đã dùng trong đơn có thể được tắt bằng trạng thái `ho_tro=0`.
+
+### `GET /api/admin/delivery-areas`
+
+Trả `200` và tất cả khu vực, gồm khu vực đang tắt:
+
+```json
+{
+  "success": true,
+  "message": "Danh sách khu vực giao hàng",
+  "data": {
+    "areas": [
+      {
+        "id": 1,
+        "tinh": "Quảng Bình",
+        "quan_huyen": "TP. Đồng Hới",
+        "phuong_xa": "Phường Bắc Lý",
+        "khoang_cach_km": 4.5,
+        "ho_tro": 1
+      }
+    ]
+  },
+  "errors": null
+}
+```
+
+### `POST /api/admin/delivery-areas`
+
+**Body:**
+
+```json
+{
+  "tinh": "Quảng Bình",
+  "quan_huyen": "TP. Đồng Hới",
+  "phuong_xa": "Khu vực mẫu",
+  "khoang_cach_km": 3.2,
+  "ho_tro": 1
+}
+```
+
+Trả `201` và ID mới. `409` nếu địa chỉ đã tồn tại; `422` nếu tên, khoảng cách hoặc trạng thái không hợp lệ.
+
+### `PUT /api/admin/delivery-areas/{id}`
+
+Nhận các trường giống POST để cập nhật đầy đủ khu vực. Trả `200`; `404` nếu không tồn tại; `409` nếu trùng; `422` nếu dữ liệu sai.
+
+### `PATCH /api/admin/delivery-areas/{id}/status`
+
+Body `{"ho_tro": 0}` để tắt hoặc `{"ho_tro": 1}` để bật khu vực. Trả `200`; `404` nếu ID không tồn tại; `422` nếu trạng thái không phải 0/1.
+
+Thao tác tạo, sửa và bật/tắt được ghi vào `backend/storage/logs/admin_audit.log` với Admin ID, hành động và ID khu vực.
+Lỗi chung: `401` chưa đăng nhập; `403` sai vai trò, chưa xác thực OTP hoặc CSRF sai; `404` không tìm thấy khu vực; `409` địa chỉ trùng; `422` dữ liệu không hợp lệ; `500` lỗi hệ thống.

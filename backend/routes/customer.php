@@ -36,6 +36,12 @@ $promotionController = new App\Controllers\Customer\PromotionController(
     $appConfig,
     $businessConfig
 );
+$shippingService = new App\Services\ShippingService($database, $businessConfig);
+$locationController = new App\Controllers\Customer\LocationController(
+    $database,
+    $shippingService,
+    $businessConfig
+);
 
 $router->get('/api/csrf', static function (Request $request): void {
     Response::success('CSRF token', [
@@ -46,6 +52,13 @@ $router->get('/api/categories', [$categoryController, 'index']);
 $router->get('/api/products', [$productController, 'index']);
 $router->get('/api/products/{id}', [$productController, 'show']);
 $router->get('/api/promotions/active', [$promotionController, 'active']);
+$router->get('/api/shipping/areas', [$locationController, 'areas']);
+$router->post(
+    '/api/shipping/quote',
+    [$locationController, 'quote'],
+    [static fn(Request $request): bool => CsrfMiddleware::handle($request)]
+);
+$router->get('/api/store-info', [$locationController, 'storeInfo']);
 
 $router->post(
     '/api/auth/register/start',

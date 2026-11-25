@@ -12,6 +12,7 @@ Trạng thái bên dưới phản ánh phạm vi backend hiện tại; giao di�
 | Đọc danh mục công khai | `CategoryController.php` | `/api/categories` | Hoàn thành backend |
 | UC01/QT1 — đọc sản phẩm công khai | `ProductController.php`, `san-pham.html` | `/api/products`, `/api/products/{id}` | Hoàn thành backend |
 | UC12/QT13 — quản lý khuyến mãi và giá hiệu lực | `PromotionAdminController.php`, `PromotionController.php`, `PromotionService.php` | `/api/admin/promotions*`, `/api/promotions/active` | Hoàn thành backend |
+| Bước 15 — khu vực giao hàng, phí ship và thông tin cửa hàng | `DeliveryAreaAdminController.php`, `LocationController.php`, `ShippingService.php` | `/api/shipping/areas`, `/api/shipping/quote`, `/api/store-info`, `/api/admin/delivery-areas*` | Hoàn thành backend |
 | UC02/QT2-3 — giỏ hàng | `CartController.php`, `gio-hang.html` | `/api/cart*` | Chưa làm |
 | UC03/QT6 — hồ sơ | `ProfileController.php`, `tai-khoan.html` | `/api/auth/profile` | Chưa làm |
 | UC04/QT8-9 — thanh toán | `CheckoutController.php`, `thanh-toan.html` | `/api/checkout/*` | Chưa làm |

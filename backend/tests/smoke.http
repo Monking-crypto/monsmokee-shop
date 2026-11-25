@@ -26,6 +26,11 @@
 @stockReceiptDate =
 @promotionCode =
 @promotionTitle =
+@deliveryAreaId = 1
+@deliveryAreaProvince =
+@deliveryAreaDistrict =
+@deliveryAreaWard =
+@deliveryAreaDistanceKm =
 
 ### Public catalog: danh sách danh mục
 GET http://localhost/monsmokee/backend/public/api/categories
@@ -48,9 +53,66 @@ GET http://localhost/monsmokee/backend/public/api/products/{{productId}}?now=202
 ### Public catalog: chương trình đang chạy (now chỉ dùng trong development)
 GET http://localhost/monsmokee/backend/public/api/promotions/active?now=2026-03-06
 
+### Danh sách khu vực giao hàng đang hỗ trợ
+GET http://localhost/monsmokee/backend/public/api/shipping/areas
+
+### Lọc khu vực theo tỉnh/quận huyện
+GET http://localhost/monsmokee/backend/public/api/shipping/areas?tinh=Qu%E1%BA%A3ng%20B%C3%ACnh&quan_huyen=TP.%20%C4%90%E1%BB%93ng%20H%E1%BB%9Bi
+
+### Thông tin cửa hàng cho footer và Click & Collect
+GET http://localhost/monsmokee/backend/public/api/store-info
+
 ### 1. Lấy CSRF token; REST Client cần giữ cookie session
 # @name csrf
 GET http://localhost/monsmokee/backend/public/api/csrf
+
+### Báo phí ship tạm tính; tiền hàng VND sau giảm
+POST http://localhost/monsmokee/backend/public/api/shipping/quote
+Content-Type: application/json
+X-CSRF-Token: {{csrf.response.body.data.csrf_token}}
+
+{
+  "khu_vuc_id": {{deliveryAreaId}},
+  "tien_hang_sau_giam": 50000
+}
+
+### Admin: danh sách khu vực giao hàng (đăng nhập Admin đã xác thực OTP)
+GET http://localhost/monsmokee/backend/public/api/admin/delivery-areas
+
+### Admin: tạo khu vực (dùng dữ liệu thử cục bộ)
+POST http://localhost/monsmokee/backend/public/api/admin/delivery-areas
+Content-Type: application/json
+X-CSRF-Token: {{csrf.response.body.data.csrf_token}}
+
+{
+  "tinh": "{{deliveryAreaProvince}}",
+  "quan_huyen": "{{deliveryAreaDistrict}}",
+  "phuong_xa": "{{deliveryAreaWard}}",
+  "khoang_cach_km": {{deliveryAreaDistanceKm}},
+  "ho_tro": 1
+}
+
+### Admin: cập nhật đầy đủ khu vực
+PUT http://localhost/monsmokee/backend/public/api/admin/delivery-areas/{{deliveryAreaId}}
+Content-Type: application/json
+X-CSRF-Token: {{csrf.response.body.data.csrf_token}}
+
+{
+  "tinh": "{{deliveryAreaProvince}}",
+  "quan_huyen": "{{deliveryAreaDistrict}}",
+  "phuong_xa": "{{deliveryAreaWard}}",
+  "khoang_cach_km": {{deliveryAreaDistanceKm}},
+  "ho_tro": 1
+}
+
+### Admin: tắt khu vực thay vì xóa cứng
+PATCH http://localhost/monsmokee/backend/public/api/admin/delivery-areas/{{deliveryAreaId}}/status
+Content-Type: application/json
+X-CSRF-Token: {{csrf.response.body.data.csrf_token}}
+
+{
+  "ho_tro": 0
+}
 
 ### 2. Chưa đăng nhập vào Admin me - 401
 GET http://localhost/monsmokee/backend/public/api/admin/me

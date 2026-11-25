@@ -24,6 +24,7 @@ $promotionAdminController = new App\Controllers\Admin\PromotionAdminController(
     $adminDatabase,
     $adminBusinessConfig
 );
+$deliveryAreaAdminController = new App\Controllers\Admin\DeliveryAreaAdminController($adminDatabase);
 $requireVerifiedAdmin = static fn(Request $request): bool =>
     App\Middleware\AdminMiddleware::handle($request);
 $requireAdminCsrf = static fn(Request $request): bool =>
@@ -50,6 +51,26 @@ $router->get(
     [$requireVerifiedAdmin]
 );
 $router->get('/api/admin/categories', [$categoryAdminController, 'index'], [$requireVerifiedAdmin]);
+$router->get(
+    '/api/admin/delivery-areas',
+    [$deliveryAreaAdminController, 'index'],
+    [$requireVerifiedAdmin]
+);
+$router->post(
+    '/api/admin/delivery-areas',
+    [$deliveryAreaAdminController, 'create'],
+    [$requireVerifiedAdmin, $requireAdminCsrf]
+);
+$router->put(
+    '/api/admin/delivery-areas/{id}',
+    [$deliveryAreaAdminController, 'update'],
+    [$requireVerifiedAdmin, $requireAdminCsrf]
+);
+$router->patch(
+    '/api/admin/delivery-areas/{id}/status',
+    [$deliveryAreaAdminController, 'updateStatus'],
+    [$requireVerifiedAdmin, $requireAdminCsrf]
+);
 $router->post(
     '/api/admin/categories',
     [$categoryAdminController, 'create'],
