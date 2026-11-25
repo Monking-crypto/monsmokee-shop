@@ -128,7 +128,8 @@ CREATE TABLE khu_vuc_giao_hang (
   quan_huyen VARCHAR(80) NOT NULL,
   phuong_xa VARCHAR(80) NOT NULL,
   khoang_cach_km DECIMAL(4,1) NOT NULL,
-  ho_tro TINYINT(1) NOT NULL DEFAULT 1
+  ho_tro TINYINT(1) NOT NULL DEFAULT 1,
+  UNIQUE KEY uq_khu_vuc_giao_hang_dia_chinh (tinh, quan_huyen, phuong_xa)
 ) ENGINE=InnoDB;
 
 CREATE TABLE gio_hang (

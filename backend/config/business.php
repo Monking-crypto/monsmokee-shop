@@ -28,6 +28,7 @@ return [
     'fee_default' => 15000,
     'max_service_km' => 6.0,
     'fee_manual_max' => 100000,
+    'delivery_min_order' => 50000,
   ],
   'click_collect' => ['auto_cancel_hours' => 48],
   'promotion' => [

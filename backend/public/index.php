@@ -1,6 +1,11 @@
 <?php
 declare(strict_types=1);
 
+ini_set('display_errors', '0');
+ini_set('display_startup_errors', '0');
+ini_set('log_errors', '1');
+error_reporting(E_ALL);
+
 $backendRoot = dirname(__DIR__);
 $vendorAutoload = $backendRoot . '/vendor/autoload.php';
 if (is_file($vendorAutoload)) {
@@ -46,17 +51,22 @@ spl_autoload_register(static function (string $className) use ($backendRoot): vo
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: DENY');
 header('Referrer-Policy: same-origin');
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
 
 $appConfig = null;
 try {
     $appConfig = require $backendRoot . '/config/app.php';
     date_default_timezone_set((string) $appConfig['timezone']);
-    Session::start($appConfig['session']);
+    $request = new Request();
+    $isPublicCategoryList = $request->method === 'GET' && $request->path === '/api/categories';
+    if (!$isPublicCategoryList) {
+        Session::start($appConfig['session']);
+    }
 
     $databaseConfig = require $backendRoot . '/config/database.php';
     Database::connection($databaseConfig);
 
-    $request = new Request();
     $router = new Router();
 
     require $backendRoot . '/routes/customer.php';
@@ -65,7 +75,8 @@ try {
     $router->dispatch($request);
 } catch (Throwable $error) {
     Logger::error($error::class . ': ' . $error->getMessage());
-    $debug = $appConfig['debug'] ?? false;
+    $debug = strtolower((string) ($appConfig['env'] ?? '')) === 'development'
+        && ($appConfig['debug'] ?? false);
     Response::error(
         $debug ? $error->getMessage() : 'Lỗi máy chủ',
         500,

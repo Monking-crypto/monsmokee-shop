@@ -34,7 +34,8 @@ final class LogOtpSender implements OtpSenderInterface
         file_put_contents($mailDir . '/' . $fileName, $content, LOCK_EX);
         file_put_contents(
             $logDir . '/otp.log',
-            '[' . date('Y-m-d H:i:s') . '] ' . $email . ' | muc_dich=' . $purpose . ' | file=' . $fileName . PHP_EOL,
+            '[' . date('Y-m-d H:i:s') . '] muc_dich=' . $purpose
+                . ' | file=' . $fileName . PHP_EOL,
             FILE_APPEND | LOCK_EX
         );
     }

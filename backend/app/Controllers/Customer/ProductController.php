@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\Controllers\Customer;
 
 use App\Services\PromotionService;
+use App\Services\ProductImageService;
 use DateTimeImmutable;
 use DateTimeZone;
 use PDO;
@@ -12,12 +13,13 @@ use Response;
 
 final class ProductController
 {
-    private const DEFAULT_PER_PAGE = 20;
+    private const DEFAULT_PER_PAGE = 12;
     private const MAX_PER_PAGE = 50;
 
     public function __construct(
         private PDO $pdo,
         private PromotionService $promotionService,
+        private ProductImageService $imageService,
         private array $appConfig,
         private array $businessConfig
     ) {
@@ -149,7 +151,7 @@ final class ProductController
                 'page' => $page,
                 'per_page' => $perPage,
                 'total' => $total,
-                'total_pages' => $totalPages,
+                'has_more' => $page * $perPage < $total,
             ],
         ]);
     }
@@ -196,7 +198,7 @@ final class ProductController
             'phan_tram_giam' => $price['phan_tram_giam'],
             'gia_ban_hieu_luc' => $price['gia_ban_hieu_luc'],
             'nhan_khuyen_mai' => $price['nguon'],
-            'hinh_anh' => $row['hinh_anh'],
+            'anh_thumb' => $this->imageService->cardImagePath($row['hinh_anh']),
             'danh_muc' => [
                 'id' => (int) $row['danh_muc_id'],
                 'ten_danh_muc' => $row['ten_danh_muc'],
@@ -204,6 +206,43 @@ final class ProductController
             ],
             'con_hang' => (bool) $row['con_hang'],
         ];
+        if ($includeDescription) {
+            $product['anh'] = $row['hinh_anh'];
+        }
+        if ($price['nguon'] === 'CAN_HAN') {
+            $cutoff = $now
+                ->setTime(0, 0)
+                ->modify(
+                    '+'
+                    . max(
+                        0,
+                        (int) ($this->businessConfig['promotion']['near_expiry_days'] ?? 10)
+                    )
+                    . ' days'
+                )
+                ->format('Y-m-d');
+            $expiry = $this->pdo->prepare(
+                'SELECT b.han_su_dung
+                 FROM lo_hang b
+                 WHERE b.san_pham_id = ?
+                   AND b.so_luong_con > 0
+                   AND b.han_su_dung <= ?
+                   AND (
+                       b.chi_tiet_phieu_nhap_id IS NULL
+                       OR EXISTS (
+                           SELECT 1
+                           FROM chi_tiet_phieu_nhap d
+                           JOIN phieu_nhap_kho p ON p.id = d.phieu_nhap_id
+                           WHERE d.id = b.chi_tiet_phieu_nhap_id
+                             AND p.trang_thai = \'HOAN_THANH\'
+                       )
+                   )
+                 ORDER BY b.han_su_dung ASC, b.id ASC
+                 LIMIT 1'
+            );
+            $expiry->execute([(int) $row['id'], $cutoff]);
+            $product['han_su_dung'] = $expiry->fetchColumn() ?: null;
+        }
         if ($includeDescription) {
             $product['mo_ta'] = $row['mo_ta'];
             $product['don_vi_tinh'] = $row['don_vi_tinh'];

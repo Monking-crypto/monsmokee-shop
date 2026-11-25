@@ -23,6 +23,7 @@ Các giá trị `{{...}}` dưới đây là placeholder, cần thay bằng dữ 
 ## Session và CSRF
 
 - `GET /api/csrf` tạo/trả `data.csrf_token`. Với mỗi `POST`, gửi token trong header `X-CSRF-Token`.
+- CSRF không hợp lệ trả `403` với `errors.code = "CSRF_INVALID"`.
 - Giữ cookie session do server trả về xuyên suốt các request; trình duyệt cùng origin tự gửi cookie, REST Client/cURL cần bật cookie jar. Tên mặc định là `MONSMOKEESID`.
 - Cookie được đặt `HttpOnly`, `SameSite=Lax`, bật `Secure` khi ứng dụng chạy HTTPS. Thời hạn session mặc định 2 giờ; timeout không hoạt động mặc định là 2 giờ cho Customer và 30 phút cho Admin.
 - Logout xóa session và cookie. Sau logout, gọi lại `/api/csrf` để lấy token cho session mới.
@@ -208,7 +209,7 @@ Các giá trị `{{...}}` dưới đây là placeholder, cần thay bằng dữ 
 }
 ```
 
-**Lỗi:** `403` CSRF không hợp lệ.
+**Lỗi:** `403` CSRF không hợp lệ (`errors.code = "CSRF_INVALID"`).
 
 ## 7. Thông tin tài khoản hiện tại
 
@@ -408,6 +409,10 @@ Các API `verify-otp`, `reset` và endpoint verify cũ được giới hạn t�
   "data": {
     "requires_otp": true,
     "email_masked": "ad****@example.invalid",
+    "emails_masked": [
+      "ad****@example.invalid",
+      "se****@example.invalid"
+    ],
     "expires_in_seconds": 300,
     "resend_after_seconds": 60
   },
@@ -416,6 +421,8 @@ Các API `verify-otp`, `reset` và endpoint verify cũ được giới hạn t�
 ```
 
 **Lỗi:** `403` CSRF không hợp lệ, tài khoản không phải Admin hoặc Admin bị khóa; `401` SĐT/mật khẩu sai; `422` dữ liệu không hợp lệ; `429` giới hạn đăng nhập/gửi OTP; `500` lỗi gửi email.
+
+OTP được gửi cùng một mã tới email chính của tài khoản lấy từ CSDL và tối đa hai email phụ cấu hình tùy chọn bằng `ADMIN_OTP_EXTRA_EMAILS` trong `backend/.env`. Chỉ lưu một hash OTP; response chỉ trả email đã che. Cấu hình sai định dạng hoặc quá hai email sẽ làm cấu hình mail không hợp lệ. Không lưu địa chỉ phụ trong CSDL/code/tài liệu và không ghi email/OTP vào log.
 
 ## 14. Xác thực OTP Admin — bước 2
 
@@ -464,6 +471,10 @@ Các API `verify-otp`, `reset` và endpoint verify cũ được giới hạn t�
   "message": "Đã gửi lại mã OTP đăng nhập Admin",
   "data": {
     "email_masked": "ad****@example.invalid",
+    "emails_masked": [
+      "ad****@example.invalid",
+      "se****@example.invalid"
+    ],
     "expires_in_seconds": 300,
     "resend_after_seconds": 60
   },
@@ -472,6 +483,10 @@ Các API `verify-otp`, `reset` và endpoint verify cũ được giới hạn t�
 ```
 
 **Lỗi:** `401` không có pending/OTP chờ; `403` CSRF không hợp lệ hoặc tài khoản Admin không còn khả dụng; `429` cooldown hoặc vượt giới hạn gửi; `500` lỗi gửi email.
+
+### `POST /api/admin/auth/logout`
+
+Yêu cầu cookie session và `X-CSRF-Token`; không cần session Admin còn đăng nhập để gọi lại logout. Xóa session cùng cookie và trả `200` khi phiên đang hoạt động. Nếu CSRF cũ/không hợp lệ, trả `403` với `errors.code = "CSRF_INVALID"`. Nếu session Admin hết hạn do không hoạt động (mặc định 30 phút), trả `401` với `errors.code = "SESSION_EXPIRED"` và xóa cookie; frontend cần đăng nhập lại.
 
 ## 16. Thông tin Admin hiện tại
 
@@ -534,6 +549,8 @@ Danh mục có `trang_thai = 1` mới được trả về theo `thu_tu`; danh m�
 
 **Lỗi:** `500` nếu server không thể truy vấn danh mục.
 
+Response `GET /api/categories` dùng `Cache-Control: public, max-age=300`. Các API khác mặc định `Cache-Control: no-store`; riêng sản phẩm giữ `no-store` vì giá thay đổi theo thời gian. JSON được nén gzip/deflate khi client hỗ trợ.
+
 ## 18. Danh sách sản phẩm công khai
 
 ### `GET /api/products`
@@ -542,7 +559,7 @@ Danh mục có `trang_thai = 1` mới được trả về theo `thu_tu`; danh m�
 **Query tùy chọn:**
 
 - `page`: trang bắt đầu từ 1, mặc định `1`.
-- `per_page`: mặc định `20`, phạm vi `1`–`50`.
+- `per_page`: mặc định `12`, phạm vi `1`–`50`.
 - `q`: tìm theo tên sản phẩm hoặc tên không dấu, tối đa 100 ký tự.
 - `category_id`: id danh mục cần lọc.
 - `sort`: `newest` (mặc định), `price_asc` hoặc `price_desc`.
@@ -551,7 +568,7 @@ Danh mục có `trang_thai = 1` mới được trả về theo `thu_tu`; danh m�
 
 **Body:** Không có.
 
-Chỉ sản phẩm và danh mục có `trang_thai = 1` được trả về. `con_hang` là boolean; API không trả số lượng tồn chính xác. `gia_goc`, `phan_tram_giam`, `gia_ban_hieu_luc` và `nhan_khuyen_mai` dùng cùng quy tắc giá hiệu lực như API chi tiết.
+Chỉ sản phẩm và danh mục có `trang_thai = 1` được trả về. Danh sách chỉ gồm thông tin cho thẻ sản phẩm, không có mô tả dài hoặc tồn kho chính xác; `con_hang` là boolean. Ảnh dùng `anh_thumb`; API không trả ảnh kích thước lớn trong danh sách. `gia_goc`, `phan_tram_giam`, `gia_ban_hieu_luc` và `nhan_khuyen_mai` dùng cùng quy tắc giá hiệu lực như API chi tiết. Chỉ khi `nhan_khuyen_mai` là `CAN_HAN` mới có thêm `han_su_dung` của lô gần nhất còn hàng; sản phẩm khác không trả hạn sử dụng hoặc dữ liệu lô. Endpoint này dùng `Cache-Control: no-store`.
 
 **Response — 200**
 
@@ -569,7 +586,7 @@ Chỉ sản phẩm và danh mục có `trang_thai = 1` được trả về. `con
         "phan_tram_giam": 0,
         "gia_ban_hieu_luc": 5000,
         "nhan_khuyen_mai": null,
-        "hinh_anh": "placeholder-product.svg",
+        "anh_thumb": "placeholder-product.svg",
         "danh_muc": {
           "id": 1,
           "ten_danh_muc": "Nước giải khát",
@@ -580,9 +597,9 @@ Chỉ sản phẩm và danh mục có `trang_thai = 1` được trả về. `con
     ],
     "pagination": {
       "page": 1,
-      "per_page": 20,
+      "per_page": 12,
       "total": 1,
-      "total_pages": 1
+      "has_more": false
     }
   },
   "errors": null
@@ -610,33 +627,35 @@ Chỉ sản phẩm và danh mục có `trang_thai = 1` được trả về. `con
       "id": 1,
       "ten_san_pham": "Nước suối 500ml",
       "mo_ta": "Nước uống đóng chai tiện lợi",
-      "hinh_anh": "placeholder-product.svg",
+      "anh": "placeholder-product.svg",
+      "anh_thumb": "placeholder-product.svg",
       "don_vi_tinh": "chai",
       "gia_ban": 5000,
       "gia_goc": 5000,
-      "phan_tram_giam": 0,
-      "gia_ban_hieu_luc": 5000,
-      "nhan_khuyen_mai": null,
+      "phan_tram_giam": 50,
+      "gia_ban_hieu_luc": 2500,
+      "nhan_khuyen_mai": "CAN_HAN",
       "danh_muc": {
         "id": 1,
         "ten_danh_muc": "Nước giải khát",
         "slug": "nuoc-giai-khat"
       },
-      "con_hang": true
+      "con_hang": true,
+      "han_su_dung": "2026-11-30"
     }
   },
   "errors": null
 }
 ```
 
-Chỉ sản phẩm đang bán được trả về. Response không chứa số lượng tồn chính xác hoặc hạn sử dụng.
+Chỉ sản phẩm đang bán được trả về. Response không chứa số lượng tồn chính xác. Chỉ sản phẩm có `nhan_khuyen_mai = "CAN_HAN"` mới có trường `han_su_dung`, chỉ chứa hạn của lô gần nhất còn hàng; mọi sản phẩm khác không trả trường này hay thông tin lô. API Admin mới trả đủ hạn và lô.
 **Lỗi:** `404` id không hợp lệ, sản phẩm không tồn tại hoặc đã ẩn; `500` lỗi truy vấn.
 
-Response không trả hạn sử dụng hoặc số lượng tồn chính xác. `?now=YYYY-MM-DD` chỉ hoạt động khi `APP_ENV=development`; môi trường khác trả `422`.
+Ngoại lệ: sản phẩm đang giảm cận hạn (`nhan_khuyen_mai = "CAN_HAN"`) được trả `han_su_dung` gần nhất còn hàng để giải thích ưu đãi; không trả số lượng hoặc các dữ liệu lô khác. Sản phẩm giảm theo `THU_SAU` hoặc không giảm tuyệt đối không có trường hạn sử dụng. `?now=YYYY-MM-DD` chỉ hoạt động khi `APP_ENV=development`; môi trường khác trả `422`.
 
 ## 20. Khuyến mãi hiệu lực công khai
 
-Giá khuyến mãi được tính theo giờ Việt Nam. Thứ Sáu chỉ giảm cho các sản phẩm đã được lưu trong chương trình `THU_SAU` đang hoạt động và còn trong thời hạn. Lô còn hàng có hạn sử dụng không muộn hơn hôm nay cộng số ngày cấu hình được áp dụng mức giảm cận hạn. Nếu đồng thời thỏa hai điều kiện, chỉ áp dụng mức giảm cao hơn, không cộng dồn. Hệ thống không trả hạn sử dụng trong API công khai.
+Giá khuyến mãi được tính theo giờ Việt Nam. Thứ Sáu chỉ giảm cho các sản phẩm đã được lưu trong chương trình `THU_SAU` đang hoạt động và còn trong thời hạn. Lô còn hàng có hạn sử dụng không muộn hơn hôm nay cộng số ngày cấu hình được áp dụng mức giảm cận hạn. Nếu đồng thời thỏa hai điều kiện, chỉ áp dụng mức giảm cao hơn, không cộng dồn. Chỉ sản phẩm có nhãn hiệu lực `CAN_HAN` mới trả hạn sử dụng của lô gần nhất còn hàng; sản phẩm khác không trả thông tin lô/hạn.
 
 ### `GET /api/products` và `GET /api/products/{id}`
 
@@ -646,6 +665,7 @@ Ngoài `gia_ban` (giá gốc để tương thích), mỗi sản phẩm có:
 - `phan_tram_giam`: mức giảm hiệu lực, không cộng dồn.
 - `gia_ban_hieu_luc`: giá VND sau khi làm tròn, không âm.
 - `nhan_khuyen_mai`: `THU_SAU`, `CAN_HAN` hoặc `null`.
+- Chỉ khi `nhan_khuyen_mai` là `CAN_HAN`, response có thêm `han_su_dung` của lô gần nhất còn hàng; nhãn khác không trả hạn hoặc dữ liệu lô.
 
 Danh sách hỗ trợ `near_expiry=1` để chỉ lọc sản phẩm có lô cận hạn còn hàng. Tham số `now=YYYY-MM-DD` chỉ được dùng trong `APP_ENV=development`; gửi tham số này ở môi trường khác hoặc sai định dạng trả `422`.
 
@@ -653,7 +673,7 @@ Danh sách hỗ trợ `near_expiry=1` để chỉ lọc sản phẩm có lô c�
 
 Không cần CSRF hoặc đăng nhập. Trả các chương trình đang bật và trong thời hạn hôm nay, kèm sản phẩm đang hiển thị, danh mục đang hiển thị và còn hàng. Với chương trình `THU_SAU`, chỉ trả vào đúng thứ trong cấu hình (mặc định Thứ Sáu). Sản phẩm đã ẩn/hết hàng vẫn giữ trong danh sách Admin nhưng không xuất hiện công khai.
 
-**Response — 200:** `data.promotions[]` gồm `id`, `ma_khuyen_mai`, `ten_chuong_trinh`, `loai`, `phan_tram_giam`, thời hạn và `products[]`. Sản phẩm kèm giá hiệu lực, nhãn khuyến mãi, ảnh và `con_hang`; không kèm lô hay hạn sử dụng. `?now=YYYY-MM-DD` chỉ dùng trong development.
+**Response — 200:** `data.promotions[]` gồm `id`, `ma_khuyen_mai`, `ten_chuong_trinh`, `loai`, `phan_tram_giam`, thời hạn và `products[]`. Sản phẩm kèm giá hiệu lực, nhãn khuyến mãi, `anh_thumb` và `con_hang`; không kèm lô hay hạn sử dụng. `?now=YYYY-MM-DD` chỉ dùng trong development.
 
 ## 21. Quản lý khuyến mãi Admin
 
@@ -735,18 +755,18 @@ Trả tất cả danh mục, gồm cả danh mục ẩn, với `id`, `ten_danh_m
 
 ### `POST /api/admin/categories`
 
-**Body:**
+**Body:** Chỉ nhận `ten_danh_muc` và `thu_tu`; slug được tự tạo duy nhất, icon đặt mặc định `box`.
 
 ```json
-{"ten_danh_muc": "Đồ khô", "icon": "basket", "thu_tu": 6}
+{"ten_danh_muc": "Đồ khô", "thu_tu": 6}
 ```
 
-Tên là bắt buộc và không trùng; slug được tạo từ tên. `icon` và `thu_tu` tùy chọn.
+Tên là bắt buộc và không trùng; slug tự tạo từ tên, bỏ dấu, chữ thường, gạch ngang; nếu trùng slug, thêm hậu tố số. `thu_tu` tùy chọn. API không nhận `slug`, `icon` hoặc `nhom_con`.
 **Response — 201:** `{"success":true,"message":"Đã tạo danh mục","data":{"id":12},"errors":null}`
 
 ### `PUT /api/admin/categories/{id}`
 
-**Body:** giống API tạo danh mục. Tên mới không được trùng; slug được cập nhật theo tên.
+**Body:** giống API tạo danh mục. Tên mới không được trùng; slug được cập nhật tự động và duy nhất.
 **Response — 200:** `{"success":true,"message":"Đã cập nhật danh mục","data":{"id":12},"errors":null}`
 
 ### `PATCH /api/admin/categories/{id}/visibility`
@@ -756,16 +776,16 @@ Tên là bắt buộc và không trùng; slug được tạo từ tên. `icon` v
 
 ## 23. Quản lý sản phẩm Admin
 
-Các API yêu cầu Admin đã xác thực OTP, cookie session và CSRF cho `POST`, `PUT`, `PATCH`, `DELETE`. Sản phẩm có thể được tạo/cập nhật với `ten_san_pham`, `danh_muc_id`, `gia_ban` (số nguyên VND dương), `don_vi_tinh` và `mo_ta`. Nội dung HTML bị loại bỏ trước khi lưu. Trường tồn kho, hạn sử dụng và các trường trạng thái nội bộ không được nhận từ payload cập nhật; sản phẩm mới bắt đầu với tồn kho `0`. Thay ảnh qua endpoint upload riêng.
+Các API yêu cầu Admin đã xác thực OTP, cookie session và CSRF cho `POST`, `PUT`, `PATCH`, `DELETE`; mọi response API Admin dùng `Cache-Control: no-store`. Contract sản phẩm chỉ dùng `ten`, `danh_muc_id`, `gia`, `don_vi_tinh`, `mo_ta`, `anh`. `gia` phải là JSON number nguyên dương (không nhận chuỗi hay số thập phân), tối đa `999999999` VND; response trả số nguyên để frontend tự định dạng. Response ảnh có `anh` (800×800) và `anh_thumb` (400×400). Nội dung HTML bị loại bỏ trước khi lưu. Trường tồn kho, hạn sử dụng và trạng thái không nhận từ payload cập nhật; sản phẩm mới bắt đầu với tồn kho `0`. API từ chối các trường cũ `ten_san_pham`, `gia_ban`, `hinh_anh`, `nhom_con`, `huong_vi`, `dong_goi`; nếu các cột nhóm con/hương vị/đóng gói tồn tại trong CSDL thì không dùng/xóa dữ liệu đó.
 
 ### `GET /api/admin/products`
 
 **Query tùy chọn:** `page` (mặc định 1), `per_page` (mặc định 20, tối đa 50), `q`, `category_id`, `trang_thai` (`0` hoặc `1`). Không lọc trạng thái thì trả cả sản phẩm đang bán và đang ẩn.
-**Response — 200:** `data.products` kèm `data.pagination`; mỗi sản phẩm có `id`, `danh_muc_id`, `ten_danh_muc`, `ten_san_pham`, `mo_ta`, `hinh_anh`, `don_vi_tinh`, `gia_ban`, `so_luong_ton`, `muc_ton_toi_thieu`, `trang_thai`, thông tin giảm cận hạn, `luot_ban`, `ngay_tao`, `ngay_cap_nhat`. Hạn sử dụng không thuộc bảng sản phẩm; API không trả hạn sử dụng.
+**Response — 200:** `data.products` kèm `data.pagination`; mỗi sản phẩm có `id`, `danh_muc_id`, `ten_danh_muc`, `ten`, `gia` (JSON integer), `don_vi_tinh`, `mo_ta`, `anh`, `anh_thumb` (có thể `null` nếu ảnh được lưu nguyên bản khi GD chưa bật), `so_luong_ton`, `muc_ton_toi_thieu`, `trang_thai`. Chi tiết Admin bổ sung lô và hạn sử dụng.
 
 ### `GET /api/admin/products/{id}`
 
-Trả chi tiết cùng các trường sản phẩm như danh sách; `404` nếu không tồn tại.
+Trả các trường sản phẩm như danh sách, cùng `tong_ton_kho`, `han_su_dung_gan_nhat` và danh sách `lo_hang` còn tồn có số lượng từng lô; `404` nếu không tồn tại.
 
 ### `POST /api/admin/products`
 
@@ -773,11 +793,12 @@ Trả chi tiết cùng các trường sản phẩm như danh sách; `404` nếu 
 
 ```json
 {
-  "ten_san_pham": "Bánh quy mẫu",
+  "ten": "Bánh quy mẫu",
   "danh_muc_id": 1,
-  "gia_ban": 25000,
+  "gia": 25000,
   "don_vi_tinh": "gói",
-  "mo_ta": "Mô tả sản phẩm"
+  "mo_ta": "Mô tả sản phẩm",
+  "anh": null
 }
 ```
 
@@ -799,7 +820,7 @@ Nếu sản phẩm xuất hiện trong chi tiết đơn hàng hoặc phiếu nh�
 
 ### `POST /api/admin/products/{id}/image`
 
-Gửi `multipart/form-data` với trường tệp `image`, cookie Admin và `X-CSRF-Token` (không tự đặt `Content-Type` để client tạo multipart boundary). Chỉ nhận JPEG, PNG hoặc WebP; kích thước tối đa 2 MB. Loại tệp được kiểm bằng `finfo`, tên lưu ngẫu nhiên trong `backend/uploads/products/`; ảnh cũ do API này quản lý được xóa sau khi thay thế thành công.
+Gửi `multipart/form-data` với trường tệp `image`, cookie Admin và `X-CSRF-Token` (không tự đặt `Content-Type` để client tạo multipart boundary). Chỉ nhận JPEG, PNG hoặc WebP; kích thước tối đa 2 MB. MIME được kiểm bằng `finfo`; GD giải mã rồi tạo ảnh vuông 800×800 và thumbnail 400×400 trên nền trắng, giữ trọn ảnh theo tỉ lệ (không crop), chất lượng khoảng 82. Ảnh được mã hóa lại nên EXIF bị loại bỏ. Ưu tiên WebP nếu encoder GD khả dụng, nếu không thì JPEG. Tên file ngẫu nhiên trong `backend/uploads/products/`; ảnh cũ chỉ bị xóa sau khi các file mới được lưu và cập nhật CSDL thành công. Nếu GD chưa bật, vẫn trả `200`, lưu ảnh gốc theo MIME đã kiểm tra và trả cảnh báo cùng `anh_thumb: null`.
 
 **Response — 200:**
 
@@ -809,8 +830,10 @@ Gửi `multipart/form-data` với trường tệp `image`, cookie Admin và `X-C
   "message": "Đã cập nhật ảnh sản phẩm",
   "data": {
     "id": 25,
-    "hinh_anh": "uploads/products/0123456789abcdef0123456789abcdef.webp",
-    "url": "http://localhost/monsmokee/backend/uploads/products/0123456789abcdef0123456789abcdef.webp"
+    "anh": "uploads/products/0123456789abcdef0123456789abcdef.webp",
+    "anh_thumb": "uploads/products/0123456789abcdef0123456789abcdef_thumb.webp",
+    "url": "http://localhost/monsmokee/backend/uploads/products/0123456789abcdef0123456789abcdef.webp",
+    "thumb_url": "http://localhost/monsmokee/backend/uploads/products/0123456789abcdef0123456789abcdef_thumb.webp"
   },
   "errors": null
 }
@@ -819,6 +842,8 @@ Gửi `multipart/form-data` với trường tệp `image`, cookie Admin và `X-C
 **Lỗi chung:** `401` chưa đăng nhập; `403` không phải Admin/OTP chưa xác thực hoặc CSRF sai; `404` danh mục/sản phẩm không tồn tại; `409` tên danh mục trùng hoặc xóa sản phẩm bị cản bởi liên kết; `413` tệp vượt giới hạn cấu hình PHP; `422` dữ liệu không hợp lệ hoặc ảnh sai loại/kích thước; `500` lỗi hệ thống.
 
 Mọi thao tác ghi thành công được ghi vào `backend/storage/logs/admin_audit.log` dưới dạng thời gian, Admin ID, hành động, loại bản ghi và ID; không ghi payload, mật khẩu hay OTP.
+
+Ảnh tĩnh trong `backend/uploads/products/` được cache `public, max-age=31536000, immutable` vì tên file ngẫu nhiên, và thư mục uploads chặn thực thi PHP. Nếu GD chưa bật, ảnh vẫn được lưu nguyên bản sau khi kiểm tra MIME thật; response có `warning`, `anh_thumb` và `thumb_url` là `null`, đồng thời ghi cảnh báo vào log. Khi GD đã bật, chạy `php backend/scripts/regenerate_images.php` từ thư mục gốc để chuẩn hóa ảnh cũ; script chỉ xóa ảnh cũ sau khi đã ghi xong cả hai biến thể và cập nhật các bản ghi CSDL.
 
 ## 24. Phiếu nhập kho, lô hàng và lịch sử kho Admin
 
@@ -882,8 +907,141 @@ Query tùy chọn `product_id`, `page`, `per_page` (tối đa 50). Trả loại 
 
 ### Chi tiết sản phẩm Admin
 
-`GET /api/admin/products/{id}` trả thêm `tong_ton_kho`, `lo_hang` còn tồn và `han_su_dung_gan_nhat`. Hạn sử dụng và tồn chính xác chỉ xuất hiện ở API Admin; API sản phẩm công khai không trả các trường này.
+`GET /api/admin/products/{id}` trả thêm `tong_ton_kho`, `lo_hang` còn tồn và `han_su_dung_gan_nhat`. API công khai chỉ trả `han_su_dung` cho sản phẩm đang giảm cận hạn; đầy đủ lô, số lượng và hạn chi tiết chỉ xuất hiện ở API Admin.
 
 **Lỗi chung:** `401` chưa đăng nhập; `403` sai vai trò, chưa xác thực OTP hoặc CSRF sai; `404` không tìm thấy phiếu/sản phẩm; `409` không thể hủy phiếu; `422` dữ liệu dòng nhập, ngày, số lượng, giá hoặc bộ lọc không hợp lệ; `500` lỗi hệ thống.
 
 Mọi thao tác tạo/hủy phiếu nhập được ghi vào `backend/storage/logs/admin_audit.log`, chỉ gồm Admin ID, hành động và ID phiếu. Khi triển khai bán hàng, hệ thống phải xuất lô có hạn sử dụng gần nhất trước (FEFO) trong cùng transaction với việc giảm tồn; cập nhật kho có điều kiện và khóa hàng để tồn không âm.
+
+## 25. Khu vực giao hàng, báo phí ship và thông tin cửa hàng
+
+### `GET /api/shipping/areas`
+
+Trả danh sách khu vực đang hỗ trợ giao hàng dưới dạng danh sách phẳng có `tinh`, `quan_huyen`, `phuong_xa`, `id` và `khoang_cach_km`. Dropdown có thể lấy danh sách tỉnh duy nhất, sau đó lọc bằng `?tinh=...` và `?tinh=...&quan_huyen=...`.
+
+**Response — 200:**
+
+```json
+{
+  "success": true,
+  "message": "Danh sách khu vực giao hàng",
+  "data": {
+    "areas": [
+      {
+        "id": 1,
+        "tinh": "Quảng Bình",
+        "quan_huyen": "TP. Đồng Hới",
+        "phuong_xa": "Phường Bắc Lý",
+        "khoang_cach_km": 4.5
+      }
+    ]
+  },
+  "errors": null
+}
+```
+
+### `POST /api/shipping/quote`
+
+**Headers:** `Content-Type: application/json`, cookie session, `X-CSRF-Token`.
+**Body:**
+
+```json
+{"khu_vuc_id": 1, "tien_hang_sau_giam": 50000}
+```
+
+**Response — 200:**
+
+```json
+{
+  "success": true,
+  "message": "Báo phí giao hàng tạm tính",
+  "data": {
+    "phi_ship_tam_tinh": 15000,
+    "mien_phi": false,
+    "ly_do": "Phí vận chuyển tạm tính theo khu vực",
+    "cho_phep_cod": true,
+    "ly_do_khong_cod": null,
+    "khoang_cach_km": 4.5,
+    "giao_duoc": true
+  },
+  "errors": null
+}
+```
+
+Các ngưỡng được đọc từ `backend/config/business.php`: miễn phí nếu tiền hàng sau giảm đạt `free_ship_min_order` hoặc khoảng cách không vượt `free_ship_max_km`; ngoài hai điều kiện đó, phí chuẩn `fee_default` áp dụng từ `delivery_min_order` trở lên trong bán kính `max_service_km`. Đơn dưới ngưỡng giao tối thiểu và ở ngoài bán kính miễn phí chỉ hỗ trợ Click & Collect. Ngoài bán kính phục vụ hoặc khu vực tắt thì `giao_duoc=false`. COD chỉ được bật khi đạt `cod_min_order` và khu vực thuộc `service_area`; trường hợp khác trả lý do và gợi ý Click & Collect. Phí trả về chỉ là tạm tính, Admin chốt phí thực tế ở bước đơn hàng.
+
+**Lỗi:** `403` CSRF không hợp lệ; `422` ID khu vực hoặc tiền hàng không hợp lệ; `500` lỗi hệ thống.
+
+### `GET /api/store-info`
+
+Trả `ten_cua_hang`, `dia_chi`, `hotline`, `gio_mo_cua` và `gio_dong_cua` từ cấu hình `store` trong `backend/config/business.php`. Response thành công là `200`; lỗi hệ thống là `500`.
+
+```json
+{
+  "success": true,
+  "message": "Thông tin cửa hàng",
+  "data": {
+    "ten_cua_hang": "MON SMOKEE",
+    "dia_chi": "(cập nhật) Đồng Hới, Quảng Bình",
+    "hotline": "(cập nhật)",
+    "gio_mo_cua": "07:00",
+    "gio_dong_cua": "21:30"
+  },
+  "errors": null
+}
+```
+
+## 26. Admin quản lý khu vực giao hàng
+
+Tất cả API yêu cầu Admin đã đăng nhập và xác thực OTP; mọi thao tác ghi cần cookie session và `X-CSRF-Token`. Địa chỉ khu vực không được trùng tổ hợp tỉnh/quận-huyện/phường-xã; khoảng cách là số không âm, tối đa một chữ số thập phân. Không có API xóa cứng; khu vực đã dùng trong đơn có thể được tắt bằng trạng thái `ho_tro=0`.
+
+### `GET /api/admin/delivery-areas`
+
+Trả `200` và tất cả khu vực, gồm khu vực đang tắt:
+
+```json
+{
+  "success": true,
+  "message": "Danh sách khu vực giao hàng",
+  "data": {
+    "areas": [
+      {
+        "id": 1,
+        "tinh": "Quảng Bình",
+        "quan_huyen": "TP. Đồng Hới",
+        "phuong_xa": "Phường Bắc Lý",
+        "khoang_cach_km": 4.5,
+        "ho_tro": 1
+      }
+    ]
+  },
+  "errors": null
+}
+```
+
+### `POST /api/admin/delivery-areas`
+
+**Body:**
+
+```json
+{
+  "tinh": "Quảng Bình",
+  "quan_huyen": "TP. Đồng Hới",
+  "phuong_xa": "Khu vực mẫu",
+  "khoang_cach_km": 3.2,
+  "ho_tro": 1
+}
+```
+
+Trả `201` và ID mới. `409` nếu địa chỉ đã tồn tại; `422` nếu tên, khoảng cách hoặc trạng thái không hợp lệ.
+
+### `PUT /api/admin/delivery-areas/{id}`
+
+Nhận các trường giống POST để cập nhật đầy đủ khu vực. Trả `200`; `404` nếu không tồn tại; `409` nếu trùng; `422` nếu dữ liệu sai.
+
+### `PATCH /api/admin/delivery-areas/{id}/status`
+
+Body `{"ho_tro": 0}` để tắt hoặc `{"ho_tro": 1}` để bật khu vực. Trả `200`; `404` nếu ID không tồn tại; `422` nếu trạng thái không phải 0/1.
+
+Thao tác tạo, sửa và bật/tắt được ghi vào `backend/storage/logs/admin_audit.log` với Admin ID, hành động và ID khu vực.
+Lỗi chung: `401` chưa đăng nhập; `403` sai vai trò, chưa xác thực OTP hoặc CSRF sai; `404` không tìm thấy khu vực; `409` địa chỉ trùng; `422` dữ liệu không hợp lệ; `500` lỗi hệ thống.

@@ -14,20 +14,42 @@ $adminOtpSender = match ($adminMailConfig['driver']) {
 $adminAuthController = new App\Controllers\Admin\AdminAuthController(
     $adminDatabase,
     new Validator(),
-    new App\Services\OtpService($adminDatabase, $adminOtpSender, $adminBusinessConfig),
-    $adminBusinessConfig
+    new App\Services\OtpService(
+        $adminDatabase,
+        new App\Services\Mail\MultiRecipientOtpSender(
+            $adminOtpSender,
+            $adminMailConfig['admin_otp_extra_emails'] ?? []
+        ),
+        $adminBusinessConfig
+    ),
+    $adminBusinessConfig,
+    $adminMailConfig['admin_otp_extra_emails'] ?? []
 );
 $categoryAdminController = new App\Controllers\Admin\CategoryAdminController($adminDatabase);
-$productAdminController = new App\Controllers\Admin\ProductAdminController($adminDatabase);
+$productAdminController = new App\Controllers\Admin\ProductAdminController(
+    $adminDatabase,
+    new App\Services\ProductImageService()
+);
 $stockAdminController = new App\Controllers\Admin\StockAdminController($adminDatabase);
 $promotionAdminController = new App\Controllers\Admin\PromotionAdminController(
     $adminDatabase,
     $adminBusinessConfig
 );
+$deliveryAreaAdminController = new App\Controllers\Admin\DeliveryAreaAdminController($adminDatabase);
 $requireVerifiedAdmin = static fn(Request $request): bool =>
     App\Middleware\AdminMiddleware::handle($request);
 $requireAdminCsrf = static fn(Request $request): bool =>
     CsrfMiddleware::handle($request);
+$requireLogoutCsrf = static function (Request $request): bool {
+    if (Session::get('session_expired') === true) {
+        Session::destroy();
+        Response::error('Phiên đã hết hạn, vui lòng đăng nhập lại', 401, [
+            'code' => 'SESSION_EXPIRED',
+        ]);
+        return false;
+    }
+    return CsrfMiddleware::handle($request);
+};
 
 $router->post(
     '/api/admin/auth/login',
@@ -44,12 +66,37 @@ $router->post(
     [$adminAuthController, 'resendOtp'],
     [static fn(Request $request): bool => CsrfMiddleware::handle($request)]
 );
+$router->post(
+    '/api/admin/auth/logout',
+    [$adminAuthController, 'logout'],
+    [$requireLogoutCsrf]
+);
 $router->get(
     '/api/admin/me',
     [$adminAuthController, 'me'],
     [$requireVerifiedAdmin]
 );
 $router->get('/api/admin/categories', [$categoryAdminController, 'index'], [$requireVerifiedAdmin]);
+$router->get(
+    '/api/admin/delivery-areas',
+    [$deliveryAreaAdminController, 'index'],
+    [$requireVerifiedAdmin]
+);
+$router->post(
+    '/api/admin/delivery-areas',
+    [$deliveryAreaAdminController, 'create'],
+    [$requireVerifiedAdmin, $requireAdminCsrf]
+);
+$router->put(
+    '/api/admin/delivery-areas/{id}',
+    [$deliveryAreaAdminController, 'update'],
+    [$requireVerifiedAdmin, $requireAdminCsrf]
+);
+$router->patch(
+    '/api/admin/delivery-areas/{id}/status',
+    [$deliveryAreaAdminController, 'updateStatus'],
+    [$requireVerifiedAdmin, $requireAdminCsrf]
+);
 $router->post(
     '/api/admin/categories',
     [$categoryAdminController, 'create'],

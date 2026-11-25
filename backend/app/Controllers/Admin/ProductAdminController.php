@@ -6,6 +6,8 @@ namespace App\Controllers\Admin;
 use PDO;
 use PDOException;
 use Logger;
+use App\Services\ProductImageService;
+use InvalidArgumentException;
 use Request;
 use Response;
 use RuntimeException;
@@ -17,9 +19,12 @@ final class ProductAdminController
     private const DEFAULT_PER_PAGE = 20;
     private const MAX_PER_PAGE = 50;
     private const MAX_IMAGE_BYTES = 2097152;
-    private const MAX_PRICE = 999999999999;
+    private const MAX_PRICE = 999999999;
 
-    public function __construct(private PDO $pdo)
+    public function __construct(
+        private PDO $pdo,
+        private ProductImageService $imageService
+    )
     {
     }
 
@@ -108,7 +113,7 @@ final class ProductAdminController
             $list->bindValue(count($values) + 2, $offset, PDO::PARAM_INT);
             $list->execute();
             $products = array_map(
-                static fn(array $row): array => self::mapProduct($row),
+                fn(array $row): array => $this->mapProduct($row),
                 $list->fetchAll(PDO::FETCH_ASSOC)
             );
         }
@@ -180,7 +185,7 @@ final class ProductAdminController
             ],
             $batchQuery->fetchAll(PDO::FETCH_ASSOC)
         );
-        $product = self::mapProduct($row);
+        $product = $this->mapProduct($row);
         $product['tong_ton_kho'] = $product['so_luong_ton'];
         $product['han_su_dung_gan_nhat'] = $batches[0]['han_su_dung'] ?? null;
         $product['lo_hang'] = $batches;
@@ -204,16 +209,17 @@ final class ProductAdminController
         $insert = $this->pdo->prepare(
             'INSERT INTO san_pham
                 (danh_muc_id, ten_san_pham, ten_khong_dau, mo_ta, don_vi_tinh,
-                 gia_ban, so_luong_ton, trang_thai)
-             VALUES (?, ?, ?, ?, ?, ?, 0, 1)'
+                 gia_ban, hinh_anh, so_luong_ton, trang_thai)
+             VALUES (?, ?, ?, ?, ?, ?, ?, 0, 1)'
         );
         $insert->execute([
             $input['danh_muc_id'],
-            $input['ten_san_pham'],
-            $this->normalizeKeyword($input['ten_san_pham']),
+            $input['ten'],
+            $this->normalizeKeyword($input['ten']),
             $input['mo_ta'],
             $input['don_vi_tinh'],
-            $input['gia_ban'],
+            $input['gia'],
+            $input['anh'],
         ]);
         $id = (int) $this->pdo->lastInsertId();
         $this->audit('product.created', $id);
@@ -242,16 +248,23 @@ final class ProductAdminController
         $update = $this->pdo->prepare(
             'UPDATE san_pham
              SET danh_muc_id = ?, ten_san_pham = ?, ten_khong_dau = ?,
-                 mo_ta = ?, don_vi_tinh = ?, gia_ban = ?
+                 mo_ta = ?, don_vi_tinh = ?, gia_ban = ?, hinh_anh = ?
              WHERE id = ?'
         );
+        $image = $input['anh'];
+        if (!array_key_exists('anh', $request->all())) {
+            $currentImage = $this->pdo->prepare('SELECT hinh_anh FROM san_pham WHERE id = ?');
+            $currentImage->execute([$id]);
+            $image = $currentImage->fetchColumn();
+        }
         $update->execute([
             $input['danh_muc_id'],
-            $input['ten_san_pham'],
-            $this->normalizeKeyword($input['ten_san_pham']),
+            $input['ten'],
+            $this->normalizeKeyword($input['ten']),
             $input['mo_ta'],
             $input['don_vi_tinh'],
-            $input['gia_ban'],
+            $input['gia'],
+            $image,
             $id,
         ]);
         $this->audit('product.updated', $id);
@@ -395,19 +408,45 @@ final class ProductAdminController
             Response::error('Tệp ảnh không hợp lệ', 422, ['image' => 'Không đọc được dữ liệu ảnh']);
             return;
         }
-
+        $gdAvailable = ProductImageService::isGdAvailable();
         $directory = dirname(__DIR__, 3) . '/uploads/products';
         if (!is_dir($directory) && !mkdir($directory, 0755, true) && !is_dir($directory)) {
             throw new RuntimeException('Không thể tạo thư mục lưu ảnh sản phẩm.');
         }
-        $filename = bin2hex(random_bytes(16)) . '.' . $extensions[$mime];
-        $absolutePath = $directory . '/' . $filename;
-        if (!move_uploaded_file((string) $file['tmp_name'], $absolutePath)) {
-            throw new RuntimeException('Không thể lưu ảnh sản phẩm.');
-        }
-        $relativePath = 'uploads/products/' . $filename;
-
+        $randomName = bin2hex(random_bytes(16));
+        $generated = null;
+        $finalMainPath = null;
+        $finalThumbnailPath = null;
+        $relativePath = '';
+        $relativeThumbnailPath = null;
         try {
+            if ($gdAvailable) {
+                $temporaryPrefix = $directory . '/.tmp-' . $randomName;
+                $generated = $this->imageService->createVariants(
+                    (string) $file['tmp_name'],
+                    $mime,
+                    $temporaryPrefix
+                );
+                $mainFilename = $randomName . '.' . $generated['extension'];
+                $thumbnailFilename = $randomName . '_thumb.' . $generated['extension'];
+                $finalThumbnailPath = $directory . '/' . $thumbnailFilename;
+                $relativeThumbnailPath = 'uploads/products/' . $thumbnailFilename;
+            } else {
+                $mainFilename = $randomName . '_original.' . $extensions[$mime];
+            }
+            $finalMainPath = $directory . '/' . $mainFilename;
+            $relativePath = 'uploads/products/' . $mainFilename;
+            if ($gdAvailable) {
+                if (
+                    !rename($generated['main_path'], $finalMainPath)
+                    || !rename($generated['thumbnail_path'], (string) $finalThumbnailPath)
+                ) {
+                    throw new RuntimeException('Không thể công bố các biến thể ảnh sản phẩm.');
+                }
+            } elseif (!move_uploaded_file((string) $file['tmp_name'], $finalMainPath)) {
+                throw new RuntimeException('Không thể lưu ảnh sản phẩm gốc.');
+            }
+
             $find = $this->pdo->prepare('SELECT hinh_anh FROM san_pham WHERE id = ?');
             $find->execute([$id]);
             $oldImage = $find->fetchColumn();
@@ -417,37 +456,81 @@ final class ProductAdminController
             $update = $this->pdo->prepare('UPDATE san_pham SET hinh_anh = ? WHERE id = ?');
             $update->execute([$relativePath, $id]);
         } catch (Throwable $error) {
-            if (is_file($absolutePath) && !unlink($absolutePath)) {
-                Logger::error('Không thể dọn ảnh tải lên sau lỗi lưu CSDL; product_id=' . $id);
+            $cleanupPaths = [
+                $generated['main_path'] ?? null,
+                $generated['thumbnail_path'] ?? null,
+                $finalMainPath,
+                $finalThumbnailPath,
+            ];
+            foreach ($cleanupPaths as $cleanupPath) {
+                if (is_string($cleanupPath) && is_file($cleanupPath) && !unlink($cleanupPath)) {
+                    Logger::error('Không thể dọn ảnh tải lên sau lỗi lưu CSDL; product_id=' . $id);
+                }
+            }
+            if ($error instanceof InvalidArgumentException) {
+                Response::error('Tệp ảnh không hợp lệ hoặc không thể giải mã', 422, [
+                    'image' => 'Hãy tải lên ảnh JPEG, PNG hoặc WebP hợp lệ',
+                ]);
+                return;
             }
             throw $error;
         }
 
+        if (!$gdAvailable) {
+            Logger::write(
+                'app.log',
+                'WARNING: Product image saved without GD normalization or thumbnail; product_id=' . $id
+            );
+        }
         $this->removeStoredImage($oldImage);
         $this->audit('product.image_uploaded', $id);
-        Response::success('Đã cập nhật ảnh sản phẩm', [
+        $responseData = [
             'id' => $id,
-            'hinh_anh' => $relativePath,
-            'url' => $this->publicImageUrl($relativePath),
-        ]);
+            'anh' => $relativePath,
+            'anh_thumb' => $relativeThumbnailPath,
+            'url' => $this->publicImageUrl((string) $relativePath),
+            'thumb_url' => $relativeThumbnailPath === null
+                ? null
+                : $this->publicImageUrl($relativeThumbnailPath),
+        ];
+        if (!$gdAvailable) {
+            $responseData['warning'] = 'Ảnh được lưu nguyên bản; chưa tạo thumbnail vì GD chưa bật.';
+        }
+        Response::success(
+            $gdAvailable ? 'Đã cập nhật ảnh sản phẩm' : 'Đã lưu ảnh sản phẩm nguyên bản',
+            $responseData
+        );
     }
 
     private function validatedInput(array $input): array
     {
         $errors = [];
-        $name = $input['ten_san_pham'] ?? null;
+        foreach ([
+            'ten_san_pham',
+            'gia_ban',
+            'hinh_anh',
+            'nhom_con',
+            'huong_vi',
+            'dong_goi',
+        ] as $unsupportedField) {
+            if (array_key_exists($unsupportedField, $input)) {
+                $errors[$unsupportedField] = 'Trường này không còn được API quản trị hỗ trợ';
+            }
+        }
+
+        $name = $input['ten'] ?? null;
         $name = is_string($name) ? trim(strip_tags($name)) : '';
         if ($name === '' || mb_strlen($name) > 200) {
-            $errors['ten_san_pham'] = 'Tên sản phẩm là bắt buộc và tối đa 200 ký tự';
+            $errors['ten'] = 'Tên sản phẩm là bắt buộc và tối đa 200 ký tự';
         }
 
         $categoryId = $this->positiveInteger($input['danh_muc_id'] ?? null);
         if ($categoryId === null) {
             $errors['danh_muc_id'] = 'danh_muc_id phải là số nguyên dương';
         }
-        $price = $this->positiveInteger($input['gia_ban'] ?? null);
+        $price = $this->positiveJsonInteger($input['gia'] ?? null);
         if ($price === null || $price > self::MAX_PRICE) {
-            $errors['gia_ban'] = 'gia_ban phải là số nguyên VND dương';
+            $errors['gia'] = 'gia phải là số nguyên JSON dương, tối đa 999999999 VND';
             $price = null;
         }
 
@@ -469,14 +552,32 @@ final class ProductAdminController
                 $description = null;
             }
         }
+        $image = $input['anh'] ?? null;
+        if (
+            $image !== null
+            && (
+                !is_string($image)
+                || (
+                    $image !== 'placeholder-product.svg'
+                    && preg_match(
+                        '#\Auploads/products/[a-f0-9]{32}\.(?:jpg|png|webp)\z#',
+                        $image
+                    ) !== 1
+                )
+            )
+        ) {
+            $errors['anh'] = 'anh phải là đường dẫn ảnh tải lên hợp lệ hoặc null';
+            $image = null;
+        }
 
         return $errors === []
             ? [
-                'ten_san_pham' => $name,
+                'ten' => $name,
                 'danh_muc_id' => $categoryId,
-                'gia_ban' => $price,
+                'gia' => $price,
                 'don_vi_tinh' => $unit,
                 'mo_ta' => $description,
+                'anh' => $image,
             ]
             : ['errors' => $errors];
     }
@@ -529,13 +630,23 @@ final class ProductAdminController
     {
         if (
             !is_string($relativePath)
-            || !preg_match('#\Auploads/products/[a-f0-9]{32}\.(?:jpg|png|webp)\z#', $relativePath)
+            || preg_match(
+                '#\Auploads/products/([a-f0-9]{32})(_original)?\.(jpg|png|webp)\z#',
+                $relativePath,
+                $matches
+            ) !== 1
         ) {
             return;
         }
-        $path = dirname(__DIR__, 3) . '/' . $relativePath;
-        if (is_file($path) && !unlink($path)) {
-            Logger::error('Không thể xóa ảnh sản phẩm cũ; path=' . basename($path));
+        $directory = dirname(__DIR__, 3) . '/uploads/products/';
+        $paths = [$directory . $matches[1] . ($matches[2] ?? '') . '.' . $matches[3]];
+        if (($matches[2] ?? '') !== '_original') {
+            $paths[] = $directory . $matches[1] . '_thumb.' . $matches[3];
+        }
+        foreach ($paths as $path) {
+            if (is_file($path) && !unlink($path)) {
+                Logger::error('Không thể xóa ảnh sản phẩm cũ; path=' . basename($path));
+            }
         }
     }
 
@@ -565,27 +676,28 @@ final class ProductAdminController
         );
     }
 
-    private static function mapProduct(array $row): array
+    private function mapProduct(array $row): array
     {
+        $image = $row['hinh_anh'];
         return [
             'id' => (int) $row['id'],
             'danh_muc_id' => (int) $row['danh_muc_id'],
             'ten_danh_muc' => $row['ten_danh_muc'],
-            'ten_san_pham' => $row['ten_san_pham'],
-            'ten_khong_dau' => $row['ten_khong_dau'],
-            'mo_ta' => $row['mo_ta'],
-            'hinh_anh' => $row['hinh_anh'],
+            'ten' => $row['ten_san_pham'],
+            'gia' => (int) $row['gia_ban'],
             'don_vi_tinh' => $row['don_vi_tinh'],
-            'gia_ban' => (int) $row['gia_ban'],
+            'mo_ta' => $row['mo_ta'],
+            'anh' => $image,
+            'anh_thumb' => $this->imageService->cardImagePath($image),
             'so_luong_ton' => (int) $row['so_luong_ton'],
             'muc_ton_toi_thieu' => (int) $row['muc_ton_toi_thieu'],
             'trang_thai' => (int) $row['trang_thai'],
-            'giam_can_han' => (bool) $row['giam_can_han'],
-            'phan_tram_giam_can_han' => (int) $row['phan_tram_giam_can_han'],
-            'luot_ban' => (int) $row['luot_ban'],
-            'ngay_tao' => $row['ngay_tao'],
-            'ngay_cap_nhat' => $row['ngay_cap_nhat'],
         ];
+    }
+
+    private function positiveJsonInteger(mixed $value): ?int
+    {
+        return is_int($value) && $value > 0 ? $value : null;
     }
 
     private function positiveInteger(mixed $value): ?int

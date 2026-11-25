@@ -7,7 +7,8 @@ Website tạp hóa MON SMOKEE xây dựng bằng PHP thuần, MySQL và Bootstra
 - MySQL 8 hoặc MariaDB 10.4+
 - XAMPP/Laragon
 - Composer
-- Apache bật `mod_rewrite`
+- Apache bật `mod_rewrite`, `mod_headers`, `mod_deflate`
+- PHP bật `gd` và `fileinfo` để kiểm tra/chuẩn hóa ảnh upload
 
 ## Cài đặt cho thành viên mới
 
@@ -18,6 +19,7 @@ Website tạp hóa MON SMOKEE xây dựng bằng PHP thuần, MySQL và Bootstra
    - MySQL: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS`.
    - Tài khoản Admin: `ADMIN_PHONE`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NAME`.
    - Email OTP: để `MAIL_DRIVER=log` khi phát triển cục bộ; nếu dùng Gmail SMTP, cấu hình `MAIL_DRIVER`, `MAIL_HOST`, `MAIL_PORT`, `MAIL_ENCRYPTION`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM`, `MAIL_FROM_NAME` theo mục bên dưới.
+   - Email OTP Admin phụ là tùy chọn: `ADMIN_OTP_EXTRA_EMAILS` nhận tối đa hai email phân tách bằng dấu phẩy. Chỉ cấu hình hộp thư thuộc người quản trị. Gửi OTP đến nhiều hộp thư làm tăng bề mặt rủi ro và nên tránh nếu không cần.
    - Session: `SESSION_NAME`, `SESSION_LIFETIME_SECONDS`, `SESSION_IDLE_TIMEOUT_SECONDS` (mặc định 2 giờ), `ADMIN_SESSION_IDLE_TIMEOUT_SECONDS` (mặc định 30 phút).
    Không commit `backend/.env`; file này chứa thông tin riêng.
 4. Mở PowerShell/CMD tại thư mục dự án và cài dependency trong đúng thư mục backend:
@@ -30,7 +32,8 @@ Website tạp hóa MON SMOKEE xây dựng bằng PHP thuần, MySQL và Bootstra
    1. `database/schema.sql`
    2. `database/seed.sql`
    3. `database/seed_khu_vuc.sql`
-   4. Các file trong `database/migrations/`, sắp theo tên tăng dần (ví dụ `001_...sql`, `002_...sql`) và chạy lần lượt.
+   4. `database/seed_demo.sql` (tùy chọn, dữ liệu dựng giao diện)
+   5. Các file trong `database/migrations/`, sắp theo tên tăng dần (ví dụ `001_...sql`, `002_...sql`) và chạy lần lượt.
 
    Migration `001_otp_dang_nhap_admin.sql` thêm mục đích đăng nhập Admin vào enum `otp_xac_thuc.muc_dich`; migration `002_danh_muc_trang_thai.sql` thêm cờ ẩn/hiện danh mục; migration `003_stock_receipts.sql` thêm nhà cung cấp/trạng thái phiếu nhập và số lô; migration `004_promotion_pinned_products.sql` phân biệt sản phẩm ghim và ngẫu nhiên trong khuyến mãi. Các migration có thể chạy lại an toàn. Với CSDL mới, chạy sau các file seed; với CSDL đã tồn tại, chọn database `monsmokee` trong phpMyAdmin, mở tab **SQL** và chạy lần lượt theo tên. **Lưu ý:** `schema.sql` có lệnh xóa và tạo lại database `monsmokee`; không import vào database đang có dữ liệu cần giữ.
 6. Từ thư mục gốc dự án, chạy `php database/seed_admin.php`. Script tạo/cập nhật Admin từ `ADMIN_*` trong `backend/.env`; mật khẩu được băm bcrypt trước khi lưu.
@@ -70,6 +73,31 @@ Mặc định OTP dùng `MAIL_DRIVER=log`, mã OTP nằm trong `backend/storage/
 Lệnh kiểm tra gửi thư chỉ xác nhận cấu hình SMTP; nó không tạo tài khoản hay OTP trong CSDL.
 
 Không có tài khoản hoặc mật khẩu Admin mặc định; hãy dùng thông tin riêng và không tái sử dụng mật khẩu cá nhân.
+
+## Bảo mật trước khi chia sẻ qua tunnel
+
+- Dùng `APP_ENV=production` và `APP_DEBUG=false`; ngoài môi trường development, API luôn trả lỗi chung và chỉ ghi chi tiết vào log.
+- Root `.htaccess` chặn file cấu hình, mã nguồn, log/outbox, database, tài liệu, dependency và file ẩn; đồng thời tắt liệt kê thư mục. Giữ các rule này khi deploy.
+- Chỉ chia sẻ tunnel HTTPS có giới hạn người truy cập; không mở cổng MySQL, không dùng dữ liệu/OTP thật khi demo và tắt tunnel ngay sau khi dùng.
+- Thư mục upload chỉ phục vụ ảnh sản phẩm đã chuẩn hóa. Không tải tài liệu riêng tư lên đây; không bật quyền chạy script trong uploads.
+- Kiểm tra cấu hình tunnel không trỏ trực tiếp tới thư mục backend nội bộ. Các API đăng nhập/Admin và dữ liệu cá nhân không được cache; chỉ danh mục công khai được cache 5 phút.
+
+## Bật GD và mod_deflate trong XAMPP
+
+1. Mở **XAMPP Control Panel** → **Apache** → **Config** → **PHP (php.ini)**.
+2. Tìm `;extension=gd`, bỏ dấu `;` để thành `extension=gd`, lưu file.
+3. Trong **Apache** → **Config** → **httpd.conf**, tìm `#LoadModule deflate_module modules/mod_deflate.so`, bỏ dấu `#` để bật module, lưu file.
+4. Chọn **Restart** ở Apache trong XAMPP Control Panel.
+5. Kiểm tra PHP CLI có nạp GD:
+   ```sh
+   php -m | grep -i gd
+   ```
+   Trong PowerShell có thể dùng `php -m | findstr /i gd`. Để xác nhận WebP encoder:
+   ```sh
+   php -r "var_export(function_exists('imagewebp'));"
+   ```
+
+Nếu GD chưa bật trên một máy, API vẫn lưu ảnh gốc sau khi kiểm tra MIME thật; response có cảnh báo và chưa có thumbnail. Sau khi bật GD, chạy `php backend/scripts/regenerate_images.php` để chuẩn hóa lại ảnh.
 
 ## Cron
 Chạy mỗi 15 phút bằng Windows Task Scheduler hoặc Linux cron:

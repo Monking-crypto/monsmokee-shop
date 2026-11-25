@@ -24,7 +24,8 @@ final class AdminAuthController
         private PDO $pdo,
         private Validator $validator,
         private OtpService $otpService,
-        private array $business
+        private array $business,
+        private array $extraOtpEmails = []
     ) {
     }
 
@@ -224,6 +225,7 @@ final class AdminAuthController
         Session::remove('admin_pending_user_id');
         Session::remove('admin_pending_started_at');
         Session::remove('admin_pending_expires_at');
+        Session::remove('session_expired');
         Session::regenerate();
 
         $expiresAt = (new DateTimeImmutable($otp['expires_at']))->getTimestamp();
@@ -235,6 +237,7 @@ final class AdminAuthController
         Response::success('Mã OTP đăng nhập Admin đã được gửi qua email', [
             'requires_otp' => true,
             'email_masked' => $this->maskEmail($outcome['user']['email']),
+            'emails_masked' => $this->maskedAdminEmails((string) $outcome['user']['email']),
             'expires_in_seconds' => $otp['expires_in_seconds'],
             'resend_after_seconds' => (int) $this->business['otp']['resend_cooldown_seconds'],
         ]);
@@ -354,9 +357,16 @@ final class AdminAuthController
 
         Response::success('Đã gửi lại mã OTP đăng nhập Admin', [
             'email_masked' => $this->maskEmail((string) $user['email']),
+            'emails_masked' => $this->maskedAdminEmails((string) $user['email']),
             'expires_in_seconds' => $otp['expires_in_seconds'],
             'resend_after_seconds' => (int) $this->business['otp']['resend_cooldown_seconds'],
         ]);
+    }
+
+    public function logout(Request $request, array $params = []): void
+    {
+        Session::destroy();
+        Response::success('Đăng xuất Admin thành công');
     }
 
     public function me(Request $request, array $params = []): void
@@ -441,5 +451,17 @@ final class AdminAuthController
             . str_repeat('*', max(3, mb_strlen($localPart) - $visibleLength))
             . '@'
             . $domain;
+    }
+
+    private function maskedAdminEmails(string $primaryEmail): array
+    {
+        $emails = array_values(array_unique([
+            strtolower($primaryEmail),
+            ...array_map(
+                static fn(string $email): string => strtolower($email),
+                $this->extraOtpEmails
+            ),
+        ]));
+        return array_map(fn(string $email): string => $this->maskEmail($email), $emails);
     }
 }

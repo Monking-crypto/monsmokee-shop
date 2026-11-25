@@ -1,5 +1,11 @@
-Options -ExecCGI
+Options -Indexes -ExecCGI
 RemoveHandler .php .php3 .php4 .php5 .php7 .php8 .phtml .phar
 <FilesMatch "(?i)\.(php[0-9]*|phtml|phar|pht|phps)$">
     Require all denied
 </FilesMatch>
+
+<IfModule mod_headers.c>
+    <FilesMatch "(?i)\.(?:jpe?g|png|webp)$">
+        Header set Cache-Control "public, max-age=31536000, immutable"
+    </FilesMatch>
+</IfModule>

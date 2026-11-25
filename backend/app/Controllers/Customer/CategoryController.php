@@ -32,6 +32,9 @@ final class CategoryController
             $query->fetchAll(PDO::FETCH_ASSOC)
         );
 
+        header_remove('Pragma');
+        header_remove('Expires');
+        header('Cache-Control: public, max-age=300', true);
         Response::success('Danh sách danh mục', ['categories' => $categories]);
     }
 }
