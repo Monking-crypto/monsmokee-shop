@@ -1,4 +1,6 @@
 (() => {
+  if (window.MSAdminShell) return;
+
   const TITLES = {
     overview: 'Tổng quan',
     categories: 'Danh mục',
@@ -94,7 +96,8 @@
       </main>
     </div>
   </div>`;
-  document.currentScript.insertAdjacentHTML('beforebegin', shell);
+  if (document.currentScript) document.currentScript.insertAdjacentHTML('beforebegin', shell);
+  else document.body.insertAdjacentHTML('afterbegin', shell);
   const shellElement = document.querySelector('.admin-shell');
   const sidebar = document.querySelector('#admin-sidebar');
   const menuButton = document.querySelector('#admin-menu-toggle');

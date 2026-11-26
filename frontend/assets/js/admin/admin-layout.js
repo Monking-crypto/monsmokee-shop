@@ -1,4 +1,5 @@
 // admin-layout.js - xác thực phiên rồi tải dữ liệu trang quản trị
+import './admin-shell.js';
 import { requireAdmin } from '../core/guard.js';
 import { api } from '../core/api.js';
 import { escapeHtml, qs, toast } from '../core/ui.js';
