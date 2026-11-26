@@ -108,11 +108,11 @@ async function loadAccount() {
               <small></small>
             </label>
             <label class="admin-field" for="account-email">Email
-              <input id="account-email" name="email" type="email" value="${escapeHtml(user.email || '')}" autocomplete="email" required maxlength="254">
+              <input id="account-email" name="email" type="email" value="${escapeHtml(user.email || '')}" autocomplete="email" required maxlength="150">
               <small></small>
             </label>
             <label class="admin-field" for="account-phone">Số điện thoại
-              <input id="account-phone" name="so_dien_thoai" value="${escapeHtml(user.so_dien_thoai || '')}" autocomplete="tel" required>
+              <input id="account-phone" name="so_dien_thoai" value="${escapeHtml(user.so_dien_thoai || '')}" autocomplete="tel" inputmode="numeric" pattern="0[0-9]{9}" minlength="10" maxlength="10" title="Số điện thoại phải có 10 chữ số và bắt đầu bằng 0" required>
               <small></small>
             </label>
             <div class="admin-field"><span>Vai trò</span><strong>${escapeHtml(user.vai_tro || '')}</strong></div>

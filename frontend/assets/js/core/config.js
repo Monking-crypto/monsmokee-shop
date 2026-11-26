@@ -4,7 +4,7 @@ const projectPath = frontendPath >= 0 ? location.pathname.slice(0, frontendPath)
 
 export const CONFIG = {
   // Backend dev (cùng origin Apache để dùng PHP Session cookie)
-  API_BASE: `${projectPath}/backend/public/api`,
+  API_BASE: `${location.origin}${projectPath}/backend/public/api`,
   // Routes without an explicit LIVE feature mapping use the local mock when this is true.
   USE_MOCK: true,
   // Customer and Admin sessions use PHP session endpoints.
@@ -14,9 +14,9 @@ export const CONFIG = {
     promotions: true,
     store: true,
     shipping: true,
-    adminInventory: false,
-    adminPromotions: false,
-    adminDeliveryAreas: false,
+    adminInventory: true,
+    adminPromotions: true,
+    adminDeliveryAreas: true,
   },
   FEATURES: {
     bestSellers: true,

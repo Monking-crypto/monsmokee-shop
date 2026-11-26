@@ -15,6 +15,51 @@ function todayValue() {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }
 
+function displayDate(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : '';
+}
+
+function apiDate(value) {
+  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value.trim());
+  if (!match) return '';
+  const [, day, month, year] = match;
+  const iso = `${year}-${month}-${day}`;
+  const date = new Date(`${iso}T00:00:00Z`);
+  return date.getUTCFullYear() === Number(year)
+    && date.getUTCMonth() + 1 === Number(month)
+    && date.getUTCDate() === Number(day)
+    ? iso
+    : '';
+}
+
+function formatDateInput(event) {
+  const input = event.currentTarget;
+  const oldValue = input.value;
+  const oldCaret = input.selectionStart ?? oldValue.length;
+  const digitsBeforeCaret = oldValue.slice(0, oldCaret).replace(/\D/g, '').length;
+  const digits = oldValue.replace(/\D/g, '').slice(0, 8);
+  let value = digits;
+  if (digits.length > 2) value = `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  if (digits.length > 4) value = `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+  input.value = value;
+
+  let caret = 0;
+  let counted = 0;
+  while (caret < value.length && counted < digitsBeforeCaret) {
+    if (/\d/.test(value[caret])) counted += 1;
+    caret += 1;
+  }
+  if (value[caret] === '/' && (digitsBeforeCaret === 2 || digitsBeforeCaret === 4)) caret += 1;
+  input.setSelectionRange(caret, caret);
+}
+
+function formatMoneyInput(event) {
+  const input = event.currentTarget;
+  const digits = input.value.replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+  input.value = digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
 async function loadProducts() {
   const [inventory, categoryData] = await Promise.all([
     api.get(`/admin/products?page=1&per_page=${PAGE_SIZE}`),
@@ -34,17 +79,18 @@ async function loadProducts() {
 
 function renderStockIn(products) {
   const today = todayValue();
+  const todayDisplay = displayDate(today);
   root.innerHTML = `<div class="admin-breadcrumb">Quản trị <span>/</span> Kho <span>/</span> Nhập hàng</div>
     <section class="admin-panel admin-stock-in">
       <div class="admin-panel__head"><div><h2>Tạo phiếu nhập hàng</h2><p class="admin-muted">Phiếu nhập sẽ cập nhật tồn kho và lưu thông tin lô hàng.</p></div></div>
       <form id="stock-in-form" class="admin-form-grid">
         <label class="admin-field">Nhà cung cấp<input name="nha_cung_cap" type="text" maxlength="150"></label>
-        <label class="admin-field">Ngày nhập<input type="date" name="ngay_nhap" value="${today}" max="${today}" required></label>
+        <label class="admin-field">Ngày nhập<div class="admin-date-input"><input name="ngay_nhap" type="text" inputmode="numeric" autocomplete="off" placeholder="dd/mm/yyyy" pattern="[0-9]{2}/[0-9]{2}/[0-9]{4}" maxlength="10" value="${todayDisplay}" required><span class="admin-date-input__icon" aria-hidden="true"><i class="bi bi-calendar3"></i></span><input class="admin-date-input__picker" type="date" data-date-picker="ngay_nhap" max="${today}" aria-label="Chọn ngày nhập" tabindex="-1"></div><small data-error="ngay_nhap"></small></label>
         <label class="admin-field admin-field--wide">Sản phẩm<select name="san_pham_id" required><option value="">Chọn sản phẩm</option>${products.map((product) =>
           `<option value="${Number(product.id)}">${escapeHtml(productName(product))} — tồn ${Number(product.so_luong_ton) || 0}</option>`).join('')}</select><small data-error="san_pham_id"></small></label>
         <label class="admin-field">Số lượng nhập<input name="so_luong" type="number" min="1" step="1" value="1" required><small data-error="so_luong"></small></label>
-        <label class="admin-field">Giá nhập / đơn vị<input name="gia_nhap" type="number" min="0" step="1" value="0" required><small data-error="gia_nhap"></small></label>
-        <label class="admin-field">Ngày hết hạn<input type="date" name="han_su_dung" min="${today}" required><small data-error="han_su_dung"></small></label>
+        <label class="admin-field">Giá nhập / đơn vị<div class="admin-money-input"><input name="gia_nhap" type="text" inputmode="numeric" autocomplete="off" placeholder="0" required><span aria-hidden="true">đ</span></div><small data-error="gia_nhap"></small></label>
+        <label class="admin-field">Ngày hết hạn<div class="admin-date-input"><input name="han_su_dung" type="text" inputmode="numeric" autocomplete="off" placeholder="dd/mm/yyyy" pattern="[0-9]{2}/[0-9]{2}/[0-9]{4}" maxlength="10" required><span class="admin-date-input__icon" aria-hidden="true"><i class="bi bi-calendar3"></i></span><input class="admin-date-input__picker" type="date" data-date-picker="han_su_dung" min="${today}" aria-label="Chọn ngày hết hạn" tabindex="-1"></div><small data-error="han_su_dung"></small></label>
         <label class="admin-field">Số lô<input name="so_lo" type="text" maxlength="100" required><small data-error="so_lo"></small></label>
         <label class="admin-field admin-field--wide">Ghi chú<textarea name="ghi_chu" rows="3" maxlength="255"></textarea></label>
         <div class="admin-form-actions admin-field--wide"><button id="stock-in-submit" class="ms-btn ms-btn--green" type="submit">Xác nhận nhập kho</button></div>
@@ -55,14 +101,43 @@ function renderStockIn(products) {
       <tbody>${products.slice(0, 20).map((product) => `<tr><td>${escapeHtml(productName(product))}</td><td>${escapeHtml(product.category_name || '—')}</td>
         <td>${Number(product.so_luong_ton) || 0}</td><td><span class="admin-status ${Number(product.so_luong_ton) <= 10 ? 'is-hidden' : ''}">${Number(product.so_luong_ton) <= 10 ? 'Sắp hết' : 'Đủ hàng'}</span></td></tr>`).join('')}</tbody></table></div></section>`;
   const form = qs('#stock-in-form');
+  ['ngay_nhap', 'han_su_dung'].forEach((name) => {
+    const input = form.elements[name];
+    const picker = form.querySelector(`[data-date-picker="${name}"]`);
+    input.addEventListener('input', (event) => {
+      formatDateInput(event);
+      picker.value = apiDate(input.value);
+    });
+    picker.addEventListener('change', () => { input.value = displayDate(picker.value); });
+  });
+  form.elements.gia_nhap.addEventListener('input', formatMoneyInput);
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     const data = new FormData(form);
+    const receiptDate = apiDate(String(data.get('ngay_nhap') || ''));
+    const expiryDate = apiDate(String(data.get('han_su_dung') || ''));
+    form.querySelectorAll('[data-error]').forEach((element) => { element.textContent = ''; });
+    if (!receiptDate || receiptDate > today) {
+      form.querySelector('[data-error="ngay_nhap"]').textContent = receiptDate
+        ? 'Ngày nhập không được sau hôm nay.'
+        : 'Nhập ngày hợp lệ theo dd/mm/yyyy.';
+      form.querySelector('[name="ngay_nhap"]').focus();
+      toast(receiptDate ? 'Ngày nhập không được sau hôm nay.' : 'Vui lòng nhập ngày nhập theo dd/mm/yyyy hợp lệ.', 'error');
+      return;
+    }
+    if (!expiryDate || expiryDate < today) {
+      form.querySelector('[data-error="han_su_dung"]').textContent = expiryDate
+        ? 'Ngày hết hạn không được trước hôm nay.'
+        : 'Nhập ngày hợp lệ theo dd/mm/yyyy.';
+      form.querySelector('[name="han_su_dung"]').focus();
+      toast(expiryDate ? 'Ngày hết hạn không được trước hôm nay.' : 'Vui lòng nhập ngày hết hạn theo dd/mm/yyyy hợp lệ.', 'error');
+      return;
+    }
     const line = {
       san_pham_id: Number(data.get('san_pham_id')),
       so_luong: Number(data.get('so_luong')),
-      gia_nhap: Number(data.get('gia_nhap')),
-      han_su_dung: String(data.get('han_su_dung') || ''),
+      gia_nhap: Number(String(data.get('gia_nhap') || '').replace(/\D/g, '')),
+      han_su_dung: expiryDate,
       so_lo: String(data.get('so_lo') || '').trim(),
     };
     const button = qs('#stock-in-submit');
@@ -70,7 +145,7 @@ function renderStockIn(products) {
     form.querySelectorAll('[data-error]').forEach((element) => { element.textContent = ''; });
     try {
       await api.post('/admin/stock-receipts', {
-        ngay_nhap: String(data.get('ngay_nhap') || ''),
+        ngay_nhap: receiptDate,
         nha_cung_cap: String(data.get('nha_cung_cap') || '').trim() || null,
         ghi_chu: String(data.get('ghi_chu') || '').trim() || null,
         chi_tiet: [line],

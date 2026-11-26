@@ -73,7 +73,7 @@ export function imageUrl(path) {
   }
   if (/^(https?:)?\/\//i.test(value)) return value;
   if (/^uploads\//i.test(value)) {
-    const backendRoot = CONFIG.API_BASE.replace(/\/api\/?$/, '');
+    const backendRoot = CONFIG.API_BASE.replace(/\/public\/api\/?$/, '');
     return new URL(value, `${backendRoot}/`).href;
   }
   return value;

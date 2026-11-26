@@ -146,6 +146,13 @@
 .admin-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 16px}
 .admin-field{display:grid;align-content:start;gap:5px;font-size:var(--fs-sm);font-weight:600}
 .admin-field input:not([type=checkbox]),.admin-field select,.admin-field textarea{width:100%;min-height:42px;padding:8px 10px;border:1px solid var(--ms-border);border-radius:var(--ms-radius-sm);background:#fff;font:inherit;font-size:var(--fs-sm)}
+.admin-date-input{position:relative}
+.admin-date-input>input[name]{padding-right:42px!important}
+.admin-date-input__icon{position:absolute;top:50%;right:12px;transform:translateY(-50%);color:var(--ms-muted);pointer-events:none}
+.admin-date-input__picker{position:absolute;top:0;right:0;width:42px!important;height:42px;min-height:42px!important;padding:0!important;opacity:0;cursor:pointer}
+.admin-money-input{position:relative}
+.admin-money-input input{padding-right:34px!important}
+.admin-money-input span{position:absolute;top:50%;right:12px;transform:translateY(-50%);color:var(--ms-muted);pointer-events:none}
 .admin-field textarea{resize:vertical}
 .admin-field small{min-height:14px;color:var(--ms-red);font-size:var(--fs-xs);font-weight:400}
 .admin-field--wide{grid-column:1/-1}

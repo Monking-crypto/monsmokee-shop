@@ -5,7 +5,7 @@
 - Ngày kiểm tra: 2026-11-26.
 - Nhánh frontend: `Frontend`, `HEAD` tại `98d8c30`; các thay đổi của đợt bàn giao này chưa commit.
 - Backend đối chiếu: `origin/main` tại `22f0ffd`. Không dùng thay đổi backend cục bộ làm hợp đồng.
-- URL XAMPP hiện tại: `http://localhost/monsmokee-shop/frontend/`; API được ghép thành `/monsmokee-shop/backend/public/api`.
+- URL XAMPP hiện tại: `http://localhost/monsmokee-shop/frontend/`; `API_BASE` là URL tuyệt đối, ghép từ `location.origin` và đường dẫn dự án trước `/frontend/`, nên hoạt động với cả `monsmokee` và `monsmokee-shop`.
 
 ## Cấu hình kết nối
 
@@ -17,9 +17,9 @@
 | Siêu sale công khai | `promotions: true` | Đã kiểm tra GET thành công |
 | Thông tin cửa hàng | `store: true` | Đã kiểm tra GET thành công |
 | Khu vực và báo phí giao hàng | `shipping: true` | GET và POST quote an toàn đã kiểm tra |
-| Nhập kho, lịch sử, lô hàng | `adminInventory: false` | Chưa bật; cần phiên Admin và kiểm thử có kiểm soát |
-| Quản lý khuyến mãi Admin | `adminPromotions: false` | Chưa bật; cần phiên Admin và kiểm thử có kiểm soát |
-| Khu vực giao hàng Admin | `adminDeliveryAreas: false` | Chưa bật; cần phiên Admin và kiểm thử có kiểm soát |
+| Nhập kho, lịch sử, lô hàng | `adminInventory: true` | Đã bật gọi API thật; chưa smoke-test bằng phiên Admin |
+| Quản lý khuyến mãi Admin | `adminPromotions: true` | Đã bật gọi API thật; chưa smoke-test bằng phiên Admin |
+| Khu vực giao hàng Admin | `adminDeliveryAreas: true` | Đã bật gọi API thật; chưa smoke-test bằng phiên Admin |
 
 `frontend/assets/js/core/api.js` gửi `credentials: 'same-origin'` cho mọi request; request ghi dữ liệu lấy CSRF qua `GET /csrf`, gửi `X-CSRF-Token` và thử lại một lần khi nhận `403` với `errors.code = CSRF_INVALID`. API client đọc envelope `{success, message, data, errors}`, xử lý các mã lỗi HTTP và nhận `SESSION_EXPIRED`. API cùng origin để PHP session cookie hoạt động.
 
@@ -36,21 +36,21 @@
 | Khu vực giao hàng | `GET /shipping/areas` → `areas[]` | Chọn khu vực từ `tinh`, `quan_huyen`, `phuong_xa`, `khoang_cach_km`. |
 | Báo phí | `POST /shipping/quote` | JSON gồm `khu_vuc_id` và `tien_hang_sau_giam` là số nguyên; đọc `phi_ship_tam_tinh`, `mien_phi`, `ly_do`, `cho_phep_cod`, `giao_duoc`. |
 
-Ảnh backend có dạng `uploads/products/...`; `frontend/assets/js/core/catalog.js` ghép thành URL dưới `backend/public`. Ảnh placeholder dùng tài nguyên frontend.
+Ảnh backend có dạng `uploads/products/...`; file được lưu dưới `backend/uploads`, nên `frontend/assets/js/core/catalog.js` ghép URL dưới `/backend/uploads` (không phải `/backend/public/uploads`). Ảnh placeholder dùng tài nguyên frontend.
 
-## Admin đã chuẩn bị nhưng đang để mock
+## Admin đã nối API nhưng chưa smoke-test với phiên thật
 
 - **Kho:** `GET /admin/products`, `GET /admin/categories`, `POST /admin/stock-receipts` với `ngay_nhap`, `nha_cung_cap`, `ghi_chu`, `chi_tiet[{san_pham_id, so_luong, gia_nhap, han_su_dung, so_lo}]`; lịch sử dùng `GET /admin/stock-history`, cảnh báo lô dùng `GET /admin/batches?expiring_within_days=10`.
 - **Khuyến mãi:** dùng `GET/POST /admin/promotions`, `GET/PUT /admin/promotions/{id}`, `POST /admin/promotions/{id}/random-products`; chọn sản phẩm gửi trong `san_pham_ids`, bật/tắt bằng `trang_thai`.
 - **Khu vực giao hàng:** có trang Admin mới; dùng `GET/POST /admin/delivery-areas`, `PUT /admin/delivery-areas/{id}`, `PATCH /admin/delivery-areas/{id}/status` với các trường đúng validator (`tinh`, `quan_huyen`, `phuong_xa`, `khoang_cach_km`, `ho_tro`).
 
-Các nhóm này chưa bật live vì chưa thể xác minh thao tác với phiên Admin thật; không tự gửi request ghi dữ liệu để kiểm thử. Hãy bật từng cờ `LIVE` sau khi kiểm thử thủ công trên dữ liệu thử nghiệm.
+Các nhóm này đã bật live theo đúng routes và trường request trong backend. Chưa có phiên Admin thử nghiệm để xác minh tại runtime; không gửi request ghi dữ liệu trong lần kiểm tra này. Trước khi dùng thao tác ghi trên dữ liệu thực, hãy smoke-test với tài khoản và dữ liệu thử nghiệm.
 
 ## Chưa nối hoặc còn phụ thuộc backend
 
 - Giỏ hàng, đặt hàng và phần lớn dữ liệu Admin khác vẫn theo chế độ mock; không kết luận các chức năng này đã nối API thật.
 - Backend `origin/main` không hỗ trợ `sort=best`; trang Bán chạy được ẩn khi catalog live.
-- Backend `origin/main` hiện chỉ có `GET /admin/me`, chưa có route cập nhật hồ sơ/mật khẩu. Frontend có thông báo khi endpoint cập nhật trả `404/405`, nhưng **đổi tên Admin chưa thể hoạt động với bản backend này**; cần backend công bố và triển khai route cập nhật.
+- Backend `origin/main` hiện chỉ có `GET /admin/me`, chưa có route cập nhật hồ sơ/mật khẩu. Frontend đã gửi `PUT /admin/me` và `PATCH /admin/me/password`, tương thích với phần route/controller đang sửa cục bộ trong workspace; các route này **chưa có trong backend đã push lên `origin/main`**, nên đổi tên Admin chưa thể hoạt động khi chỉ dùng phiên bản Git hiện tại. Cần backend push/merge hai route trước khi kiểm thử end-to-end.
 - Không dựa vào `/api/home`; trang chủ tải các nhóm dữ liệu riêng từ API.
 - Đăng nhập khách và Admin tiếp tục là hai luồng/trang riêng. Backend dùng endpoint, rate limit và kiểm tra quyền riêng; tài khoản khách không được đổi sang Admin chỉ bằng giao diện.
 - `/admin/dashboard` trong `origin/main` còn là stub; dữ liệu dashboard không được coi là nối thật.

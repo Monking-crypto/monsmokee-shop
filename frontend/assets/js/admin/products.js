@@ -112,6 +112,16 @@ function setError(key, message) {
   if (element) element.textContent = message;
 }
 
+function showApiErrors(errors) {
+  const messages = [];
+  Object.entries(errors || {}).forEach(([key, message]) => {
+    if (key === 'code' || typeof message !== 'string') return;
+    setError(key === 'anh' ? 'image' : key, message);
+    messages.push(message);
+  });
+  return [...new Set(messages)].join(' ');
+}
+
 function openForm(product = null) {
   if (saving) return;
   editingProduct = product || null;
@@ -200,7 +210,7 @@ async function saveProduct(event) {
   let productSaved = false;
   let uploadWarning = '';
   try {
-    const payload = { ...values, anh: editingProduct?.anh || null };
+    const payload = { ...values };
     if (editingProduct) {
       await api.put(`/admin/products/${productId}`, payload);
     } else {
@@ -237,7 +247,11 @@ async function saveProduct(event) {
       toast(`Thông tin sản phẩm đã lưu nhưng ảnh chưa tải lên được: ${error.message}`, 'error');
       await loadProducts();
     } else {
-      toast(error instanceof ApiError ? error.message : 'Không thể lưu sản phẩm. Vui lòng thử lại.', 'error');
+      const details = error instanceof ApiError ? showApiErrors(error.errors) : '';
+      const message = error instanceof ApiError
+        ? error.message
+        : 'Không thể lưu sản phẩm. Vui lòng thử lại.';
+      toast(details || message, 'error');
     }
   } finally {
     button.disabled = false;
