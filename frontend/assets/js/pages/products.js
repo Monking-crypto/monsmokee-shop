@@ -1,5 +1,5 @@
-// products.js - danh mục, bộ lọc và sắp xếp sản phẩm
-import { api } from '../core/api.js';
+// products.js - danh mục, bộ lọc và tải thêm sản phẩm theo trang
+import { getCategories, getProducts } from '../core/catalog.js';
 import { escapeHtml, qs } from '../core/ui.js';
 import { mountHeader } from '../components/header.js';
 import { mountFooter } from '../components/footer.js';
@@ -7,9 +7,16 @@ import { mountBottomNav } from '../components/bottom-nav.js';
 import { productCard, productSkeletons, bindProductCards } from '../components/product-card.js';
 
 const root = qs('#products-content');
+const PAGE_SIZE = 12;
+let categories = [];
+let category = null;
 let params = new URLSearchParams(location.search);
-const categorySlug = params.get('category') || '';
-const categoryName = (c) => c?.ten_danh_muc || 'Tất cả sản phẩm';
+let products = [];
+let pagination = { page: 1, total: 0, has_more: false };
+let loading = false;
+let observer;
+
+const categoryName = () => category?.ten_danh_muc || 'Tất cả sản phẩm';
 const selectedValues = (key) => params.get(key) || '';
 
 function urlFor(changes = {}) {
@@ -20,74 +27,114 @@ function urlFor(changes = {}) {
 }
 
 function appliedFilters() {
-  const keys = [
-    ['in_stock', 'Còn hàng'], ['discount', 'Đang giảm giá'],
-    ['sort', 'Sắp xếp'], ['flavor', 'Hương vị'], ['pack', 'Đóng gói'],
-  ];
-  const titles = { best: 'Bán chạy', price_asc: 'Giá tăng', price_desc: 'Giá giảm', newest: 'Mới nhất' };
-  return keys.filter(([key]) => params.has(key)).map(([key, label]) => {
+  const names = { in_stock: 'Còn hàng', discount: 'Đang giảm giá' };
+  const sortNames = { price_asc: 'Giá tăng', price_desc: 'Giá giảm', newest: 'Mới nhất' };
+  return [...Object.keys(names), 'sort'].filter((key) => params.has(key)).map((key) => {
     const value = params.get(key);
-    return `<button type="button" class="filter-chip" data-remove="${key}">${label}: ${escapeHtml(titles[value] || value || 'Có')} ×</button>`;
+    const label = key === 'sort' ? sortNames[value] || value : names[key];
+    return `<button type="button" class="filter-chip" data-remove="${key}">${label}: ${key === 'sort' ? '' : 'Có'} ×</button>`;
   }).join('');
 }
 
-function renderSubcategories(category) {
-  const selected = params.get('sub') || '';
-  return `<div class="subcategory-rail">
-    <a class="subcategory-card${selected ? '' : ' is-selected'}" href="${urlFor({ sub: '' })}"><i class="bi bi-grid" aria-hidden="true"></i><span>Tất cả</span></a>
-    ${(category?.children || []).map((child) =>
-      `<a class="subcategory-card${selected === child.slug ? ' is-selected' : ''}" href="${urlFor({ sub: child.slug })}"><i class="bi bi-box-seam" aria-hidden="true"></i><span>${escapeHtml(child.ten)}</span></a>`).join('')}
-  </div>`;
-}
-
-function filterOptions(items, field) {
-  return [...new Set(items.map((p) => p[field]).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'vi'));
-}
-
-function renderFilters(items) {
-  const flavors = filterOptions(items, 'huong_vi'), packs = filterOptions(items, 'dong_goi');
+function renderFilters() {
   return `<form id="product-filters" class="product-filters">
     <label class="filter-check"><input name="in_stock" type="checkbox" value="1" ${params.has('in_stock') ? 'checked' : ''}> Chỉ hàng còn</label>
     <label class="filter-check"><input name="discount" type="checkbox" value="1" ${params.has('discount') ? 'checked' : ''}> Đang giảm giá</label>
     <label><span>Sắp xếp</span><select name="sort">
-      <option value="">Mặc định</option><option value="best" ${selectedValues('sort') === 'best' ? 'selected' : ''}>Bán chạy</option>
-      <option value="price_asc" ${selectedValues('sort') === 'price_asc' ? 'selected' : ''}>Giá tăng</option><option value="price_desc" ${selectedValues('sort') === 'price_desc' ? 'selected' : ''}>Giá giảm</option>
-      <option value="newest" ${selectedValues('sort') === 'newest' ? 'selected' : ''}>Mới nhất</option></select></label>
-    <label><span>Hương vị</span><select name="flavor"><option value="">Tất cả</option>${flavors.map((x) => `<option ${params.get('flavor') === x ? 'selected' : ''} value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join('')}</select></label>
-    <label><span>Đóng gói</span><select name="pack"><option value="">Tất cả</option>${packs.map((x) => `<option ${params.get('pack') === x ? 'selected' : ''} value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join('')}</select></label>
+      <option value="newest" ${selectedValues('sort') === 'newest' || !selectedValues('sort') ? 'selected' : ''}>Mới nhất</option>
+      <option value="price_asc" ${selectedValues('sort') === 'price_asc' ? 'selected' : ''}>Giá tăng</option>
+      <option value="price_desc" ${selectedValues('sort') === 'price_desc' ? 'selected' : ''}>Giá giảm</option>
+    </select></label>
     <button class="ms-btn ms-btn--green" type="submit">Bộ lọc</button>
   </form>`;
 }
 
 function renderSkeleton() {
-  root.querySelector('#product-results').innerHTML = `<div class="ms-grid">${productSkeletons(10)}</div>`;
+  root.querySelector('#product-results').innerHTML = `<div class="ms-grid">${productSkeletons(8)}</div>`;
 }
 
-async function loadProducts() {
-  renderSkeleton();
-  const query = new URLSearchParams(location.search);
-  try {
-    const data = await api.get(`/products?${query.toString()}`);
-    const result = root.querySelector('#product-results');
-    result.innerHTML = data.items.length
-      ? `<p class="products-count">Tìm thấy ${data.total} sản phẩm</p><div class="ms-grid">${data.items.map((p) => productCard(p)).join('')}</div>`
+function filteredProducts() {
+  return products.filter((product) => {
+    const inStock = typeof product.con_hang === 'boolean'
+      ? product.con_hang
+      : Number(product.so_luong_ton) > 0;
+    return (!params.has('in_stock') || inStock)
+      && (!params.has('discount') || Number(product.phan_tram_giam) > 0);
+  });
+}
+
+function renderResults() {
+  observer?.disconnect();
+  const result = root.querySelector('#product-results');
+  const visible = filteredProducts();
+  const count = `<p class="products-count">Đã tải ${products.length} / ${pagination.total} sản phẩm · Đang hiển thị ${visible.length}</p>`;
+  const grid = visible.length
+    ? `<div class="ms-grid">${visible.map((product) => productCard(product)).join('')}</div>`
+    : pagination.has_more
+      ? `<div class="ms-state"><strong>Đang tìm sản phẩm phù hợp</strong>Danh sách sẽ tự tải thêm khi bạn cuộn xuống.</div>`
       : '<div class="ms-state"><strong>Không tìm thấy sản phẩm</strong>Thử thay đổi hoặc xóa bớt bộ lọc.</div>';
-  } catch {
-    root.querySelector('#product-results').innerHTML = '<div class="ms-state"><strong>Không tải được sản phẩm</strong>Vui lòng thử lại sau.</div>';
+  const more = pagination.has_more
+    ? `<div class="products-load-more"><button class="ms-btn ms-btn--ghost" id="products-load-more" type="button" ${loading ? 'disabled' : ''}>${loading ? 'Đang tải…' : 'Tải thêm sản phẩm'}</button><span id="products-load-sentinel" aria-hidden="true"></span></div>`
+    : '';
+  result.innerHTML = `${count}${grid}${more}`;
+  qs('#products-load-more')?.addEventListener('click', loadMore);
+  const sentinel = qs('#products-load-sentinel');
+  if (sentinel && 'IntersectionObserver' in window) {
+    observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) loadMore();
+    }, { rootMargin: '300px' });
+    observer.observe(sentinel);
   }
+}
+
+function buildQuery(page) {
+  const query = new URLSearchParams({ page: String(page), per_page: String(PAGE_SIZE) });
+  const sort = params.get('sort');
+  if (['newest', 'price_asc', 'price_desc'].includes(sort)) query.set('sort', sort);
+  if (params.get('q')) query.set('q', params.get('q'));
+  if (category?.id) query.set('category_id', String(category.id));
+  return query;
+}
+
+async function loadPage(pageNumber, append = false) {
+  if (loading) return;
+  loading = true;
+  if (append) renderResults();
+  else renderSkeleton();
+  try {
+    const data = await getProducts(buildQuery(pageNumber));
+    products = append ? [...products, ...data.products] : data.products;
+    pagination = data.pagination;
+    renderResults();
+  } catch (error) {
+    root.querySelector('#product-results').innerHTML = `<div class="ms-state"><strong>Không tải được sản phẩm</strong>${escapeHtml(error.message)}<div class="mt-3"><button class="ms-btn ms-btn--green" id="products-retry" type="button">Thử lại</button></div></div>`;
+    qs('#products-retry')?.addEventListener('click', () => loadPage(pageNumber, append));
+  } finally {
+    loading = false;
+    const button = qs('#products-load-more');
+    if (button) {
+      button.disabled = false;
+      button.textContent = 'Tải thêm sản phẩm';
+    }
+  }
+}
+
+async function loadMore() {
+  if (loading || !pagination.has_more) return;
+  await loadPage(pagination.page + 1, true);
 }
 
 async function render() {
   params = new URLSearchParams(location.search);
   root.innerHTML = '<div class="ms-skeleton products-skeleton"></div>';
   try {
-    const categories = await api.get('/categories');
-    const category = categories.find((c) => c.slug === categorySlug);
-    const base = await api.get(`/products${category ? `?category=${encodeURIComponent(category.slug)}` : ''}`);
+    categories = await getCategories();
+    const categorySlug = params.get('category') || '';
+    category = categories.find((item) => item.slug === categorySlug) || null;
     const ageRestricted = ['bia', 'thuoc-la'].includes(category?.slug);
-    root.innerHTML = `<div class="products-top"><button type="button" data-back aria-label="Quay lại">‹</button><h1>${escapeHtml(categoryName(category))}</h1><span></span></div>
+    root.innerHTML = `<div class="products-top"><button type="button" data-back aria-label="Quay lại">‹</button><h1>${escapeHtml(categoryName())}</h1><span></span></div>
       ${ageRestricted ? '<p class="age-notice">Sản phẩm dành cho người từ 18 tuổi trở lên</p>' : ''}
-      ${renderSubcategories(category)}${renderFilters(base.items)}<div class="applied-filters">${appliedFilters()}</div><div id="product-results"></div>`;
+      ${renderFilters()}<div class="applied-filters">${appliedFilters()}</div><div id="product-results"></div>`;
     root.querySelector('[data-back]').addEventListener('click', () => {
       if (history.length > 1) history.back();
       else location.assign('index.html');
@@ -96,19 +143,23 @@ async function render() {
       event.preventDefault();
       const data = new FormData(event.currentTarget);
       const next = new URLSearchParams(location.search);
-      ['sort', 'flavor', 'pack', 'in_stock', 'discount'].forEach((key) => next.delete(key));
+      ['sort', 'in_stock', 'discount', 'sub', 'flavor', 'pack'].forEach((key) => next.delete(key));
       for (const [key, value] of data.entries()) if (value) next.set(key, value);
       history.pushState(null, '', `${location.pathname}?${next.toString()}`);
       render();
     });
     root.querySelectorAll('[data-remove]').forEach((button) => button.addEventListener('click', () => {
-      const next = new URLSearchParams(location.search); next.delete(button.dataset.remove);
+      const next = new URLSearchParams(location.search);
+      next.delete(button.dataset.remove);
       history.pushState(null, '', `${location.pathname}?${next.toString()}`);
       render();
     }));
-    await loadProducts();
-  } catch {
-    root.innerHTML = '<div class="ms-state"><strong>Không tải được danh mục</strong>Vui lòng thử lại sau.</div>';
+    products = [];
+    pagination = { page: 1, total: 0, has_more: false };
+    await loadPage(1);
+  } catch (error) {
+    root.innerHTML = `<div class="ms-state"><strong>Không tải được danh mục</strong>${escapeHtml(error.message)}<div class="mt-3"><button class="ms-btn ms-btn--green" id="category-retry" type="button">Thử lại</button></div></div>`;
+    qs('#category-retry')?.addEventListener('click', render);
   }
 }
 

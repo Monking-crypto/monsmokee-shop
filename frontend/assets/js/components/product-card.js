@@ -6,44 +6,83 @@ import { confirmDialog } from './confirm-dialog.js';
 
 const productRecords = new Map();
 
+function normalizeProduct(product) {
+  const category = product.danh_muc || {};
+  const image = product.anh_thumb || product.hinh_anh || product.anh || '';
+  return {
+    ...product,
+    ten_san_pham: product.ten_san_pham || product.ten || 'Sản phẩm',
+    gia_ban: Number(product.gia_goc ?? product.gia_ban ?? product.gia) || 0,
+    gia_hieu_luc: Number(product.gia_ban_hieu_luc ?? product.gia_hieu_luc ?? product.gia_ban ?? product.gia) || 0,
+    hinh_anh: image,
+    don_vi_tinh: product.don_vi_tinh || '',
+    hsd: product.hsd || product.han_su_dung || '',
+    danh_muc_id: product.danh_muc_id ?? category.id,
+    danh_muc_slug: product.danh_muc_slug || category.slug || '',
+    con_hang: typeof product.con_hang === 'boolean'
+      ? product.con_hang
+      : Number(product.so_luong_ton) > 0,
+  };
+}
+
+function productImageUrl(path) {
+  const value = String(path || '');
+  if (!value) return 'assets/img/placeholder-product.svg';
+  if (/^(https?:|data:|blob:)/i.test(value) || value.startsWith('/')) return value;
+  return value.startsWith('uploads/') ? `../backend/${value}` : value;
+}
+
 export function productCard(product, options = {}) {
-  const recordKey = `${product.id}:${product.gia_hieu_luc ?? product.gia_ban}:${product.phan_tram_giam}`;
-  productRecords.set(recordKey, product);
-  const sale = Number(product.phan_tram_giam) > 0;
-  const hasStock = product.so_luong_ton !== undefined && product.so_luong_ton !== null
-    && product.so_luong_ton !== '' && Number.isFinite(Number(product.so_luong_ton));
-  const out = hasStock ? Number(product.so_luong_ton) <= 0 : product.con_hang === false;
-  const price = product.gia_hieu_luc ?? product.gia_ban;
-  const flag = product.sap_dien_ra
+  const item = normalizeProduct(product);
+  const recordKey = `${item.id}:${item.gia_hieu_luc}:${item.phan_tram_giam}`;
+  productRecords.set(recordKey, item);
+  const sale = Number(item.phan_tram_giam) > 0;
+  const hasStock = item.so_luong_ton !== undefined && item.so_luong_ton !== null
+    && item.so_luong_ton !== '' && Number.isFinite(Number(item.so_luong_ton));
+  const out = hasStock ? Number(item.so_luong_ton) <= 0 : item.con_hang === false;
+  const price = item.gia_hieu_luc;
+  const expiryDays = Number(item.near_expiry_days) || daysUntil(item.hsd);
+  const flag = item.sap_dien_ra
     ? '<span class="pc__flag pc__flag--soon">Sắp diễn ra</span>'
-    : sale ? `<span class="pc__flag">-${Number(product.phan_tram_giam)}%</span>` : '';
+    : sale ? `<span class="pc__flag">-${Number(item.phan_tram_giam)}%</span>` : '';
   const urgency = options.nearExpiry
-    ? `<span class="expiry-days expiry-days--${product.near_expiry_days <= 3 ? 'urgent' : product.near_expiry_days <= 7 ? 'soon' : 'later'}">Còn ${Number(product.near_expiry_days)} ngày</span>`
+    ? `<span class="expiry-days expiry-days--${expiryDays <= 3 ? 'urgent' : expiryDays <= 7 ? 'soon' : 'later'}">Còn ${expiryDays} ngày</span>`
     : '';
   const stock = options.showStock
-    ? `<span class="pc__stock">${out ? 'Hết hàng' : hasStock ? `Còn ${Number(product.so_luong_ton)} sản phẩm` : product.con_hang ? 'Còn hàng' : ''}</span>`
+    ? `<span class="pc__stock">${out ? 'Hết hàng' : hasStock ? `Còn ${Number(item.so_luong_ton)} sản phẩm` : item.con_hang ? 'Còn hàng' : ''}</span>`
     : '';
   const rank = options.rank
     ? `<span class="best-rank${options.rank <= 3 ? ' best-rank--top' : ''}" aria-label="Hạng ${options.rank}">${options.rank}</span>`
     : '';
-  const sold = options.showSold ? `<span class="best-sold">Đã bán ${compactCount(product.luot_ban)}</span>` : '';
+  const sold = options.showSold ? `<span class="best-sold">Đã bán ${compactCount(item.luot_ban)}</span>` : '';
   const cls = ['pc', options.nearExpiry && 'pc--near-expiry', options.rank && 'pc--ranked', options.rank <= 3 && 'pc--rank-top', out && 'is-out-of-stock'].filter(Boolean).join(' ');
-  const href = `chi-tiet-san-pham.html?id=${encodeURIComponent(product.id)}`;
-  return `<article class="${cls}" data-id="${escapeHtml(product.id)}" data-product-key="${escapeHtml(recordKey)}" data-category-key="${escapeHtml(options.categoryKey || '')}">
+  const href = `chi-tiet-san-pham.html?id=${encodeURIComponent(item.id)}`;
+  const categoryKey = options.categoryKey || item.danh_muc_slug || item.danh_muc_id || '';
+  const image = productImageUrl(item.hinh_anh);
+  return `<article class="${cls}" data-id="${escapeHtml(item.id)}" data-product-key="${escapeHtml(recordKey)}" data-category-key="${escapeHtml(categoryKey)}">
     ${rank}
     <a class="pc__media" href="${href}" tabindex="-1" aria-hidden="true">
-      <img src="${escapeHtml(product.hinh_anh || 'assets/img/placeholder-product.svg')}" alt="" loading="lazy" width="200" height="200">${flag}${out ? '<span class="pc__soldout">Hết hàng</span>' : ''}</a>
+      <img src="${escapeHtml(image)}" alt="" loading="lazy" decoding="async" width="200" height="200">${flag}${out ? '<span class="pc__soldout">Hết hàng</span>' : ''}</a>
     <div class="pc__body">
-      <a class="pc__name ms-line-clamp-2" href="${href}">${escapeHtml(product.ten_san_pham)}</a>
+      <a class="pc__name ms-line-clamp-2" href="${href}">${escapeHtml(item.ten_san_pham)}</a>
       ${urgency}
-      <span class="pc__unit">${escapeHtml(product.don_vi_tinh || '')}</span>
-      ${options.showHsd && product.hsd ? `<span class="pc__hsd">HSD: ${formatDate(product.hsd)}</span>` : ''}
+      <span class="pc__unit">${escapeHtml(item.don_vi_tinh)}</span>
+      ${options.showHsd && item.hsd ? `<span class="pc__hsd">HSD: ${formatDate(item.hsd)}</span>` : ''}
       ${stock}
       ${sold}
       <div class="pc__foot">
-        <div class="shelf-tag${sale ? ' is-sale' : ''}"><span class="shelf-tag__price">${formatVnd(price)}</span>${sale ? `<s class="shelf-tag__old">${formatVnd(product.gia_ban)}</s>` : ''}</div>
-        <div class="pc__action"><button class="pc__add" type="button" data-add ${out ? 'disabled' : ''} aria-label="Thêm ${escapeHtml(product.ten_san_pham)} vào giỏ">${out ? 'Hết hàng' : 'Thêm'}</button></div>
+        <div class="shelf-tag${sale ? ' is-sale' : ''}"><span class="shelf-tag__price">${formatVnd(price)}</span>${sale ? `<s class="shelf-tag__old">${formatVnd(item.gia_ban)}</s>` : ''}</div>
+        <div class="pc__action"><button class="pc__add" type="button" data-add ${out ? 'disabled' : ''} aria-label="Thêm ${escapeHtml(item.ten_san_pham)} vào giỏ">${out ? 'Hết hàng' : 'Thêm'}</button></div>
       </div></div></article>`;
+}
+
+function daysUntil(value) {
+  if (!value) return 0;
+  const expiry = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(expiry.getTime())) return 0;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.max(0, Math.ceil((expiry.getTime() - today.getTime()) / 86400000));
 }
 
 function compactCount(value) {

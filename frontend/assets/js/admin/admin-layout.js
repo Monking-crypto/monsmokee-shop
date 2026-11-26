@@ -27,7 +27,7 @@ const STOCK_NAV = [
 ];
 const STEPS = {
   overview: ['Tổng hợp doanh thu, đơn hàng, tồn kho và cảnh báo.', 'Hiển thị biểu đồ thống kê và các đơn mới nhất.'],
-  categories: ['Xem danh sách danh mục.', 'Thêm, sửa, ẩn hoặc xóa danh mục.', 'Kiểm tra sản phẩm thuộc danh mục trước khi xóa.'],
+  categories: ['Xem danh sách danh mục.', 'Thêm, sửa và ẩn hoặc hiện danh mục.'],
   orders: ['Tìm và lọc đơn hàng.', 'Xem chi tiết, xác nhận hoặc cập nhật trạng thái đơn.', 'Gửi thông tin trạng thái cho khách hàng.'],
   'order-detail': ['Kiểm tra thông tin khách và địa chỉ nhận hàng.', 'Xem các dòng sản phẩm, số lượng, giá và tổng tiền.', 'Cập nhật trạng thái đơn và lịch sử xử lý.'],
   'stock-in': ['Tạo phiếu nhập hàng và chọn nhà cung cấp.', 'Thêm sản phẩm, số lượng, giá nhập và hạn sử dụng.', 'Xác nhận phiếu nhập để cập nhật tồn kho.'],
@@ -35,7 +35,7 @@ const STEPS = {
   'stock-alerts': ['Theo dõi sản phẩm sắp hết hàng.', 'Theo dõi các lô hàng sắp hết hạn.', 'Lập phiếu nhập hoặc xử lý hàng cận hạn.'],
   customers: ['Tìm khách hàng theo tên, số điện thoại hoặc email.', 'Xem hồ sơ, đơn hàng và lịch sử mua.', 'Khóa hoặc mở tài khoản khi cần.'],
   statistics: ['Chọn khoảng thời gian báo cáo.', 'Xem doanh thu, đơn hàng và sản phẩm bán chạy.', 'Xuất hoặc đối chiếu báo cáo.'],
-  account: ['Xem thông tin tài khoản quản trị.', 'Đổi mật khẩu và cập nhật thông tin liên hệ.', 'Kết thúc phiên đăng nhập an toàn.'],
+  account: ['Xem thông tin tài khoản quản trị.', 'Đăng xuất an toàn khỏi phiên hiện tại.'],
 };
 const USE_CASES = {
   overview: 'QT12', categories: 'UC06/QT13', products: 'UC07/QT13', promotions: 'UC12/QT13',
@@ -48,6 +48,14 @@ const page = document.body.dataset.page || 'overview';
 const title = TITLES[page] || 'Quản trị';
 
 if (await requireAdmin()) {
+  let redirectingToLogin = false;
+  const redirectToLogin = () => {
+    if (redirectingToLogin) return;
+    redirectingToLogin = true;
+    const target = `${location.pathname.split('/').pop()}${location.search}`;
+    location.replace(`login.html?${new URLSearchParams({ redirect: target, auth_required: '1' })}`);
+  };
+  window.addEventListener('ms:admin-session-expired', redirectToLogin, { once: true });
   document.title = `${title} - MON SMOKEE`;
   const active = page === 'order-detail' ? 'orders' : page;
   document.body.innerHTML = `<div class="admin-shell">
@@ -119,6 +127,19 @@ if (await requireAdmin()) {
     if (error?.status === 0) toast('Không tải được số đơn chờ xử lý.', 'error');
   }
   qs('#admin-logout').addEventListener('click', async () => {
-    toast('Backend chưa cung cấp API đăng xuất Admin.', 'error');
+    const button = qs('#admin-logout');
+    button.disabled = true;
+    try {
+      await api.post('/admin/auth/logout');
+      toast('Đã đăng xuất');
+      redirectToLogin();
+    } catch (error) {
+      if (error?.status === 401) {
+        redirectToLogin();
+        return;
+      }
+      toast(error?.message || 'Không thể đăng xuất. Vui lòng thử lại.', 'error');
+      button.disabled = false;
+    }
   });
 }

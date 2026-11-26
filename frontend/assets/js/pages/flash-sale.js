@@ -1,4 +1,5 @@
-import { api } from '../core/api.js';
+import { api, ApiError } from '../core/api.js';
+import { getProducts } from '../core/catalog.js';
 import { escapeHtml, qs } from '../core/ui.js';
 import { formatVnd } from '../core/format.js';
 import { mountHeader } from '../components/header.js';
@@ -194,17 +195,22 @@ function startClock(target, times, state) {
 
 async function loadBestSellers() {
   try {
-    const data = await api.get('/products?sort=best&per_page=5&page=1');
-    const products = (data.items || []).slice(0, 5);
+    const data = await getProducts(new URLSearchParams({ sort: 'best', per_page: '5', page: '1' }));
+    const products = data.products.slice(0, 5);
     const content = qs('#flash-best-content', root);
     if (!content) return;
     content.innerHTML = products.length
       ? products.map((product) => productCard(product)).join('')
       : '<p class="ms-state">Chưa có sản phẩm bán chạy.</p>';
     bestProductsLoaded = true;
-  } catch {
+  } catch (error) {
     const content = qs('#flash-best-content', root);
     if (!content) return;
+    if (error instanceof ApiError && error.status === 422) {
+      content.innerHTML = '<p class="ms-state">API hiện tại chưa cung cấp dữ liệu xếp hạng bán chạy.</p>';
+      bestProductsLoaded = true;
+      return;
+    }
     content.innerHTML = `<div class="flash-error"><strong>Không tải được sản phẩm bán chạy</strong><p>Thử tải lại danh sách.</p><button class="ms-btn ms-btn--ghost" type="button" data-best-retry>Thử lại</button></div>`;
     content.querySelector('[data-best-retry]').addEventListener('click', loadBestSellers);
   }
@@ -215,7 +221,19 @@ async function load() {
   loading = true;
   root.setAttribute('aria-busy', 'true');
   try {
-    const data = await api.get('/promotions/friday-sale');
+    const response = await api.get('/promotions/active');
+    const promotion = response.promotions?.find((item) => item.loai === 'THU_SAU');
+    const data = {
+      active: Boolean(promotion),
+      ended: false,
+      server_time: response.server_time,
+      starts_at: promotion?.ngay_bat_dau,
+      ends_at: promotion?.ngay_ket_thuc,
+      next_start: nextFridayTimestamp(),
+      discount_percent: promotion?.phan_tram_giam || 10,
+      max_products: 10,
+      products: promotion?.products || [],
+    };
     const serverTime = Date.parse(data.server_time);
     serverOffset = Number.isFinite(serverTime) ? serverTime - Date.now() : 0;
     renderPage(data);

@@ -96,7 +96,7 @@ const isoDateAfterDays = (days) => {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 };
 function nearExpiryProducts() {
-  return allProducts().filter((p) => p.trang_thai !== 'an').slice(0, 8).map((p, index) => {
+  return allProducts().filter(productIsVisible).slice(0, 8).map((p, index) => {
     const days = index + 1;
     return withSale(p, 50, { near_expiry_days: days, hsd: isoDateAfterDays(days) });
   });
@@ -156,7 +156,7 @@ function fridaySaleWindow(now = new Date()) {
 const getFridayActive = () => fridaySaleWindow().active;
 function fridaySaleData() {
   const window = fridaySaleWindow();
-  const products = allProducts().filter((product) => product.trang_thai !== 'an');
+  const products = allProducts().filter(productIsVisible);
   const promo = fridayProgram() || { id: 'friday-sale', enabled: true, productIds: [] };
   if (!promo.productIds.length) {
     promo.productIds = [...products].filter((product) => product.so_luong_ton > 0)
@@ -194,6 +194,31 @@ export function setMockAdminAuthenticated(authenticated) {
 }
 const allProducts = () => store.get('products', PRODUCTS);
 const allCategories = () => store.get('categories', CATS).slice().sort((a, b) => (a.thu_tu || a.id) - (b.thu_tu || b.id));
+const categoryIsVisible = (category) => category.trang_thai === undefined || Number(category.trang_thai) === 1;
+const productIsVisible = (product) => product.trang_thai !== 'an' && Number(product.trang_thai) !== 0;
+const categorySlug = (value) => String(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  .replace(/đ/gi, 'd').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+function uniqueCategorySlug(name, categories, exceptId = null) {
+  const base = categorySlug(name);
+  let candidate = base;
+  let suffix = 2;
+  while (categories.some((category) => Number(category.id) !== Number(exceptId) && category.slug === candidate)) {
+    candidate = `${base}-${suffix++}`;
+  }
+  return candidate;
+}
+function adminProduct(product) {
+  const category = allCategories().find((item) => Number(item.id) === Number(product.danh_muc_id));
+  return {
+    ...product,
+    ten: product.ten || product.ten_san_pham,
+    ten_danh_muc: product.ten_danh_muc || category?.ten_danh_muc || '',
+    gia: Number(product.gia ?? product.gia_ban) || 0,
+    anh: product.anh || product.hinh_anh || null,
+    anh_thumb: product.anh_thumb || product.hinh_anh || null,
+    trang_thai: product.trang_thai === 'an' || Number(product.trang_thai) === 0 ? 0 : 1,
+  };
+}
 function cartData() {
   const quantities = store.get('cart', {});
   const saleProducts = new Map(fridaySaleData().products.map((product) => [Number(product.id), product]));
@@ -241,6 +266,7 @@ function adminCategories() {
   const products = allProducts();
   return allCategories().map((category) => ({
     ...category,
+    trang_thai: category.trang_thai === undefined ? 1 : Number(category.trang_thai),
     product_count: products.filter((product) => Number(product.danh_muc_id) === Number(category.id)).length,
   }));
 }
@@ -337,10 +363,13 @@ function listProducts(params) {
   const q = normalizeKeyword(params.get('q') || '');
   const categories = allCategories();
   const cat = categories.find((c) => c.slug === params.get('category'));
+  const categoryId = Number(params.get('category_id')) || 0;
   const sub = params.get('sub') || '';
-  let list = (params.get('near_expiry') === '1' ? nearExpiryProducts() : allProducts()).filter((p) => p.trang_thai !== 'an'
+  let list = (params.get('near_expiry') === '1' ? nearExpiryProducts() : allProducts()).filter((p) => productIsVisible(p)
     && (!q || normalizeKeyword(p.ten_san_pham).includes(q))
     && (!cat || p.danh_muc_id === cat.id)
+    && (!categoryId || Number(p.danh_muc_id) === categoryId)
+    && categoryIsVisible(categories.find((category) => Number(category.id) === Number(p.danh_muc_id)) || {})
     && (!sub || normalizeKeyword(p.nhom_con) === normalizeKeyword(cat?.children.find((x) => x.slug === sub)?.ten || sub))
     && (!params.get('in_stock') || p.so_luong_ton > 0)
     && (!params.get('discount') || p.phan_tram_giam > 0)
@@ -370,8 +399,52 @@ export async function handle(method, path, body = {}) {
   if (route === '/csrf') return ok({ token: 'mock' });
   if (route === '/home') return ok(home());
   if (route === '/promotions/friday-sale' && method === 'GET') return ok(fridaySaleData());
-  if (route === '/categories') return ok(allCategories());
+  if (route === '/categories') return ok(allCategories().filter(categoryIsVisible));
+  if (route === '/promotions/active' && method === 'GET') {
+    const friday = fridaySaleData();
+    return ok({
+      promotions: friday.active ? [{
+        id: 'friday-sale',
+        ma_khuyen_mai: 'FRIDAY-SALE',
+        ten_chuong_trinh: 'Siêu sale Thứ 6',
+        loai: 'THU_SAU',
+        phan_tram_giam: friday.discount_percent,
+        ngay_bat_dau: friday.starts_at,
+        ngay_ket_thuc: friday.ends_at,
+        products: friday.products,
+      }] : [],
+    });
+  }
   if (route === '/products' && method === 'GET') return ok(listProducts(params));
+  const productMatch = route.match(/^\/products\/(\d+)$/);
+  if (productMatch && method === 'GET') {
+    const id = Number(productMatch[1]);
+    const product = allProducts().find((item) => Number(item.id) === id && item.trang_thai !== 'an');
+    if (!product) return fail(404, 'Không tìm thấy sản phẩm');
+    const category = allCategories().find((item) => Number(item.id) === Number(product.danh_muc_id));
+    const fridayProduct = fridaySaleData().products.find((item) => Number(item.id) === id);
+    const current = fridayProduct || product;
+    return ok({
+      product: {
+        id,
+        ten_san_pham: current.ten_san_pham,
+        mo_ta: current.mo_ta || '',
+        anh: current.hinh_anh || 'assets/img/placeholder-product.svg',
+        anh_thumb: current.hinh_anh || 'assets/img/placeholder-product.svg',
+        don_vi_tinh: current.don_vi_tinh || '',
+        gia_ban: Number(current.gia_ban) || 0,
+        gia_goc: Number(product.gia_ban) || 0,
+        phan_tram_giam: Number(current.phan_tram_giam) || 0,
+        gia_ban_hieu_luc: Number(current.gia_hieu_luc ?? current.gia_ban) || 0,
+        nhan_khuyen_mai: fridayProduct ? 'THU_SAU' : (current.nhan_khuyen_mai || null),
+        danh_muc: category
+          ? { id: category.id, ten_danh_muc: category.ten_danh_muc, slug: category.slug }
+          : null,
+        con_hang: Number(current.so_luong_ton) > 0,
+        ...(current.nhan_khuyen_mai === 'CAN_HAN' && current.hsd ? { han_su_dung: current.hsd } : {}),
+      },
+    });
+  }
   if (route === '/locations/provinces') return ok([{ id: 'quang-binh', ten: 'Quảng Bình' }, { id: 'quang-tri', ten: 'Quảng Trị' }]);
   if (route === '/locations/districts') return ok(params.get('province') === 'quang-binh' ? [{ id: 'dong-hoi', ten: 'TP. Đồng Hới' }, { id: 'bo-trach', ten: 'Huyện Bố Trạch' }] : [{ id: 'dong-ha', ten: 'TP. Đông Hà' }]);
   if (route === '/locations/wards') {
@@ -470,43 +543,48 @@ export async function handle(method, path, body = {}) {
   }
   if (route.startsWith('/admin/') && !store.get('adminAuth', false)) return fail(401, 'Chưa đăng nhập quản trị');
   if (route === '/admin/dashboard' && method === 'GET') return ok(dashboardData());
-  if (route === '/admin/categories' && method === 'GET') return ok(adminCategories());
+  if (route === '/admin/categories' && method === 'GET') return ok({ categories: adminCategories() });
   if (route === '/admin/categories' && method === 'POST') {
     const categories = allCategories();
-    if (!String(body.ten_danh_muc || '').trim() || !String(body.slug || '').trim()
-      || categories.some((category) => category.slug === body.slug)) {
-      return fail(422, 'Tên và đường dẫn danh mục là bắt buộc và phải duy nhất');
-    }
+    const name = String(body.ten_danh_muc || '').trim();
+    if (!name || name.length > 100) return fail(422, 'Tên danh mục là bắt buộc và tối đa 100 ký tự');
     const category = {
       id: Math.max(0, ...categories.map((entry) => Number(entry.id))) + 1,
-      ten_danh_muc: String(body.ten_danh_muc).trim(), slug: body.slug, icon: body.icon || 'box',
-      thu_tu: Number(body.thu_tu) || categories.length + 1, children: Array.isArray(body.children) ? body.children : [],
+      ten_danh_muc: name,
+      slug: uniqueCategorySlug(name, categories),
+      icon: 'box',
+      thu_tu: Number.isInteger(Number(body.thu_tu)) && Number(body.thu_tu) >= 0 ? Number(body.thu_tu) : 0,
+      trang_thai: 1,
     };
     store.set('categories', [...categories, category]);
-    return ok(category, 'Đã thêm danh mục');
+    return ok({ id: category.id }, 'Đã tạo danh mục');
   }
   if (/^\/admin\/categories\/\d+$/.test(route) && method === 'PUT') {
     const id = Number(route.split('/').pop()), categories = allCategories();
     const index = categories.findIndex((category) => Number(category.id) === id);
     if (index < 0) return fail(404, 'Không tìm thấy danh mục');
-    if (!String(body.ten_danh_muc || '').trim() || !String(body.slug || '').trim()
-      || categories.some((category) => Number(category.id) !== id && category.slug === body.slug)) {
-      return fail(422, 'Tên và đường dẫn danh mục là bắt buộc và phải duy nhất');
-    }
+    const name = String(body.ten_danh_muc || '').trim();
+    if (!name || name.length > 100) return fail(422, 'Tên danh mục là bắt buộc và tối đa 100 ký tự');
     categories[index] = {
-      ...categories[index], ...body, id, ten_danh_muc: String(body.ten_danh_muc).trim(),
-      thu_tu: Number(body.thu_tu) || categories[index].thu_tu,
-      children: Array.isArray(body.children) ? body.children : categories[index].children,
+      ...categories[index],
+      id,
+      ten_danh_muc: name,
+      slug: uniqueCategorySlug(name, categories, id),
+      icon: 'box',
+      thu_tu: Number.isInteger(Number(body.thu_tu)) && Number(body.thu_tu) >= 0 ? Number(body.thu_tu) : 0,
     };
     store.set('categories', categories);
-    return ok(categories[index], 'Đã lưu danh mục');
+    return ok({ id }, 'Đã cập nhật danh mục');
   }
-  if (/^\/admin\/categories\/\d+$/.test(route) && method === 'DELETE') {
-    const id = Number(route.split('/').pop()), category = adminCategories().find((entry) => Number(entry.id) === id);
+  if (/^\/admin\/categories\/\d+\/visibility$/.test(route) && method === 'PATCH') {
+    const id = Number(route.split('/')[3]), categories = allCategories();
+    const category = categories.find((entry) => Number(entry.id) === id);
+    const visible = Number(body.trang_thai);
     if (!category) return fail(404, 'Không tìm thấy danh mục');
-    if (category.product_count > 0) return fail(409, `Không thể xóa vì danh mục còn ${category.product_count} sản phẩm`);
-    store.set('categories', allCategories().filter((entry) => Number(entry.id) !== id));
-    return ok({}, 'Đã xóa danh mục');
+    if (![0, 1].includes(visible)) return fail(422, 'trang_thai phải là 0 hoặc 1');
+    category.trang_thai = visible;
+    store.set('categories', categories);
+    return ok({ id, trang_thai: visible }, 'Đã cập nhật trạng thái danh mục');
   }
   if (route === '/admin/orders' && method === 'GET') {
     const q = normalizeKeyword(params.get('q') || ''), status = params.get('status') || '', methodFilter = params.get('method') || '';
@@ -552,21 +630,100 @@ export async function handle(method, path, body = {}) {
     return ok(order, 'Đã cập nhật phí giao hàng');
   }
   if (route === '/admin/products' && method === 'GET') {
-    const all = allProducts();
-    return ok({ items: all, categories: allCategories() });
+    const search = normalizeKeyword(params.get('q') || '');
+    const categoryId = Number(params.get('category_id')) || 0;
+    const status = params.has('trang_thai') ? Number(params.get('trang_thai')) : null;
+    const list = allProducts().filter((product) => {
+      const item = adminProduct(product);
+      return (!search || normalizeKeyword(item.ten).includes(search))
+        && (!categoryId || Number(item.danh_muc_id) === categoryId)
+        && (status === null || item.trang_thai === status);
+    }).map(adminProduct);
+    const currentPage = Math.max(1, Number(params.get('page')) || 1);
+    const perPage = Math.min(50, Math.max(1, Number(params.get('per_page')) || 20));
+    const total = list.length;
+    const totalPages = Math.ceil(total / perPage);
+    return ok({
+      products: list.slice((currentPage - 1) * perPage, currentPage * perPage),
+      pagination: { page: currentPage, per_page: perPage, total, total_pages: totalPages },
+    });
   }
   if (route === '/admin/products' && method === 'POST') {
     const all = allProducts();
-    const product = { ...body, id: Math.max(0, ...all.map((p) => p.id)) + 1, gia_hieu_luc: body.gia_ban, phan_tram_giam: 0, luot_ban: 0 };
+    const product = {
+      id: Math.max(0, ...all.map((p) => Number(p.id))) + 1,
+      ten: String(body.ten || '').trim(),
+      ten_san_pham: String(body.ten || '').trim(),
+      danh_muc_id: Number(body.danh_muc_id),
+      gia: Number(body.gia),
+      gia_ban: Number(body.gia),
+      gia_hieu_luc: Number(body.gia),
+      don_vi_tinh: String(body.don_vi_tinh || ''),
+      mo_ta: String(body.mo_ta || ''),
+      anh: body.anh || null,
+      anh_thumb: null,
+      hinh_anh: body.anh || 'assets/img/placeholder-product.svg',
+      so_luong_ton: 0,
+      trang_thai: 'dang_ban',
+      phan_tram_giam: 0,
+      luot_ban: 0,
+    };
     store.set('products', [...all, product]);
-    return ok(product, 'Đã thêm sản phẩm');
+    return ok({ id: product.id }, 'Đã tạo sản phẩm');
   }
   if (/^\/admin\/products\/\d+$/.test(route) && method === 'PUT') {
     const id = Number(route.split('/').pop()), all = allProducts();
     const index = all.findIndex((p) => p.id === id);
     if (index < 0) return fail(404, 'Không tìm thấy sản phẩm');
-    all[index] = { ...all[index], ...body, id, gia_hieu_luc: body.gia_ban };
-    store.set('products', all); return ok(all[index], 'Đã lưu thay đổi');
+    const updated = {
+      ...all[index],
+      ten: String(body.ten || '').trim(),
+      ten_san_pham: String(body.ten || '').trim(),
+      danh_muc_id: Number(body.danh_muc_id),
+      gia: Number(body.gia),
+      gia_ban: Number(body.gia),
+      gia_hieu_luc: Number(body.gia),
+      don_vi_tinh: String(body.don_vi_tinh || ''),
+      mo_ta: String(body.mo_ta || ''),
+      id,
+    };
+    if (Object.prototype.hasOwnProperty.call(body, 'anh')) {
+      updated.anh = body.anh;
+      updated.hinh_anh = body.anh || 'assets/img/placeholder-product.svg';
+    }
+    all[index] = updated;
+    store.set('products', all); return ok({ id }, 'Đã cập nhật sản phẩm');
+  }
+  if (/^\/admin\/products\/\d+\/visibility$/.test(route) && method === 'PATCH') {
+    const id = Number(route.split('/')[3]), all = allProducts();
+    const product = all.find((item) => Number(item.id) === id);
+    const visible = Number(body.trang_thai);
+    if (!product) return fail(404, 'Không tìm thấy sản phẩm');
+    if (![0, 1].includes(visible)) return fail(422, 'trang_thai phải là 0 hoặc 1');
+    product.trang_thai = visible ? 'dang_ban' : 'an';
+    store.set('products', all);
+    return ok({ id, trang_thai: visible }, 'Đã cập nhật trạng thái sản phẩm');
+  }
+  if (/^\/admin\/products\/\d+\/image$/.test(route) && method === 'POST') {
+    const id = Number(route.split('/')[3]), all = allProducts();
+    const product = all.find((item) => Number(item.id) === id);
+    const file = body instanceof FormData ? body.get('image') : null;
+    if (!product) return fail(404, 'Không tìm thấy sản phẩm');
+    if (!(file instanceof File) || !['image/jpeg', 'image/png', 'image/webp'].includes(file.type)
+      || file.size < 1 || file.size > 2 * 1024 * 1024) {
+      return fail(422, 'Ảnh phải là JPEG, PNG hoặc WebP và không quá 2 MB');
+    }
+    const image = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error('Không đọc được ảnh.'));
+      reader.readAsDataURL(file);
+    });
+    product.anh = image;
+    product.anh_thumb = image;
+    product.hinh_anh = image;
+    store.set('products', all);
+    return ok({ id, anh: image, anh_thumb: image }, 'Đã cập nhật ảnh sản phẩm');
   }
   if (/^\/admin\/products\/\d+$/.test(route) && method === 'DELETE') {
     const id = Number(route.split('/').pop()), all = allProducts();

@@ -68,7 +68,7 @@
 .admin-table th,.admin-table td{padding:10px 12px;border-bottom:1px solid var(--ms-border);text-align:left;white-space:nowrap}
 .admin-table th{background:#f7faf8;color:#526259;font-size:var(--fs-xs)}
 .admin-table tbody tr:last-child td{border-bottom:0}
-.admin-product-thumb{width:48px;height:48px;object-fit:contain;border-radius:6px;background:var(--ms-green-soft)}
+.admin-product-thumb{width:48px;height:48px;object-fit:cover;border-radius:6px;background:var(--ms-green-soft)}
 .admin-table-actions{display:flex;gap:6px}
 .admin-status{display:inline-flex;padding:4px 8px;border-radius:var(--ms-radius-pill);background:var(--ms-green-soft);color:var(--ms-green-dark);font-size:var(--fs-xs);font-weight:700}
 .admin-status.is-hidden{background:#eef0ef;color:#67736b}

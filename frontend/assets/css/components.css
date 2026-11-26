@@ -40,7 +40,7 @@
   border-radius:var(--ms-radius);overflow:hidden;transition:border-color .15s}
 .pc:hover{border-color:var(--ms-green)}
 .pc__media{position:relative;display:block;aspect-ratio:1/1;background:var(--ms-green-soft)}
-.pc__media img{width:100%;height:100%;object-fit:contain;padding:10%}
+.pc__media img{display:block;width:100%;height:100%;object-fit:cover}
 .pc__flag{position:absolute;top:8px;left:8px;padding:2px 8px;border-radius:var(--ms-radius-pill);background:var(--ms-red);
   color:#fff;font-size:var(--fs-xs);font-weight:800}
 .pc__flag--soon{background:var(--ms-muted)}

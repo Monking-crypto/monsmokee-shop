@@ -19,7 +19,15 @@ const isAuthPath = (path) => path === '/csrf'
   || path === '/admin/me';
 
 function useMock(path) {
-  return isAuthPath(path) ? CONFIG.USE_AUTH_MOCK : CONFIG.USE_MOCK;
+  if (isAuthPath(path)) return CONFIG.USE_AUTH_MOCK;
+  const route = path.split('?')[0];
+  if (
+    route === '/admin/categories'
+    || route.startsWith('/admin/categories/')
+    || route === '/admin/products'
+    || route.startsWith('/admin/products/')
+  ) return false;
+  return CONFIG.USE_MOCK;
 }
 
 function parseRetryAfter(response, errors) {
@@ -70,15 +78,18 @@ async function fetchCsrf() {
 
 async function fetchApi(method, path, body, csrfToken) {
   const headers = { Accept: 'application/json' };
+  const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;
   if (MUTATING_METHODS.has(method)) {
     headers['X-CSRF-Token'] = csrfToken;
-    headers['Content-Type'] = 'application/json';
+    if (!isFormData) headers['Content-Type'] = 'application/json';
   }
   const response = await fetch(CONFIG.API_BASE + path, {
     method,
     headers,
     credentials: 'same-origin',
-    body: MUTATING_METHODS.has(method) ? JSON.stringify(body ?? {}) : undefined,
+    body: MUTATING_METHODS.has(method)
+      ? (isFormData ? body : JSON.stringify(body ?? {}))
+      : undefined,
   });
   return { response, json: await parseResponse(response) };
 }
@@ -116,6 +127,14 @@ export async function request(method, path, body) {
   if (status >= 200 && status < 300 && json?.success) return json.data;
   const errors = json?.errors ?? null;
   const csrfFailure = status === 403 && isCsrfFailure(json);
+  if (
+    status === 401
+    && path.startsWith('/admin/')
+    && !path.startsWith('/admin/auth/')
+    && typeof window !== 'undefined'
+  ) {
+    window.dispatchEvent(new CustomEvent('ms:admin-session-expired'));
+  }
   if (status === 501 && !isAuthPath(path)) notImplemented();
   throw new ApiError(
     status,

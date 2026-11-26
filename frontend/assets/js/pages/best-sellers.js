@@ -1,5 +1,6 @@
 // best-sellers.js - bảng xếp hạng bán chạy có lọc danh mục và phân trang
-import { api } from '../core/api.js';
+import { ApiError } from '../core/api.js';
+import { getCategories, getProducts } from '../core/catalog.js';
 import { escapeHtml, qs } from '../core/ui.js';
 import { mountHeader } from '../components/header.js';
 import { mountFooter } from '../components/footer.js';
@@ -8,11 +9,11 @@ import { productCard, bindProductCards } from '../components/product-card.js';
 
 const categoryRoot = qs('#best-categories');
 const results = qs('#best-results');
-const pageSize = 20;
+const pageSize = 12;
 let categories = [];
 let selectedCategory = '';
 let products = [];
-let total = 0;
+let pagination = { page: 1, total: 0, has_more: false };
 let loading = false;
 
 function renderCategories() {
@@ -31,7 +32,7 @@ function renderResults() {
     productCard(product, { rank: index + 1, showSold: true })).join('')}</div>` : ''}
     ${ranked.length ? `<div class="best-list" aria-label="Các hạng tiếp theo">${ranked.map((product, index) =>
       productCard(product, { rank: index + 4, showSold: true })).join('')}</div>` : ''}
-    ${products.length < total ? '<button id="best-load-more" class="ms-btn ms-btn--ghost best-load-more" type="button">Xem thêm</button>' : ''}`;
+    ${pagination.has_more ? '<button id="best-load-more" class="ms-btn ms-btn--ghost best-load-more" type="button">Xem thêm</button>' : ''}`;
   qs('#best-load-more')?.addEventListener('click', loadMore);
 }
 
@@ -44,19 +45,24 @@ async function load(page = 1) {
   }
   try {
     const query = new URLSearchParams({ sort: 'best', page: String(page), per_page: String(pageSize) });
-    if (selectedCategory) query.set('category', selectedCategory);
-    const data = await api.get(`/products?${query}`);
-    products = page === 1 ? data.items : [...products, ...data.items];
-    total = Number(data.total) || products.length;
+    const category = categories.find((item) => item.slug === selectedCategory);
+    if (category) query.set('category_id', String(category.id));
+    const data = await getProducts(query);
+    products = page === 1 ? data.products : [...products, ...data.products];
+    pagination = data.pagination;
     renderResults();
-  } catch {
-    results.innerHTML = `<div class="ms-state"><strong>Không tải được bảng xếp hạng</strong>Vui lòng thử lại.<div class="mt-3"><button id="best-retry" class="ms-btn ms-btn--green" type="button">Thử lại</button></div></div>`;
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 422) {
+      results.innerHTML = '<div class="ms-state"><strong>Chưa có bảng xếp hạng bán chạy</strong>API hiện tại chưa cung cấp dữ liệu xếp hạng sản phẩm.</div>';
+      return;
+    }
+    results.innerHTML = `<div class="ms-state"><strong>Không tải được bảng xếp hạng</strong>${escapeHtml(error.message)}<div class="mt-3"><button id="best-retry" class="ms-btn ms-btn--green" type="button">Thử lại</button></div></div>`;
     qs('#best-retry').addEventListener('click', () => load(1));
   } finally { loading = false; }
 }
 
 async function loadMore() {
-  if (!loading) await load(Math.floor(products.length / pageSize) + 1);
+  if (!loading && pagination.has_more) await load(pagination.page + 1);
 }
 
 categoryRoot.addEventListener('click', (event) => {
@@ -73,7 +79,7 @@ mountBottomNav(qs('#bottom-nav'));
 bindProductCards(document);
 
 try {
-  categories = await api.get('/categories');
+  categories = await getCategories();
   renderCategories();
   await load();
 } catch {

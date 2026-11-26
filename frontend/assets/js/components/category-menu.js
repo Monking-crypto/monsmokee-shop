@@ -1,5 +1,5 @@
 // category-menu.js - menu danh mục: dropdown trên desktop, bottom sheet trên mobile
-import { api } from '../core/api.js';
+import { getCategories } from '../core/catalog.js';
 import { escapeHtml } from '../core/ui.js';
 
 let panel;
@@ -33,17 +33,10 @@ export async function initCategoryMenu(host) {
     if (e.key === 'Tab') trapFocus(e);
   });
   try {
-    const cats = await api.get('/categories');
-    panel.querySelector('#catmenu-list').innerHTML = cats.map((c) => `<li class="catmenu__item">
-      <div class="catmenu__row"><a href="san-pham.html?category=${encodeURIComponent(c.slug)}"><i class="bi bi-${escapeHtml(c.icon)}" aria-hidden="true"></i>${escapeHtml(c.ten_danh_muc)}</a>
-      <button type="button" aria-label="Mở danh mục con ${escapeHtml(c.ten_danh_muc)}" aria-expanded="false"><i class="bi bi-chevron-down" aria-hidden="true"></i></button></div>
-      <ul class="catmenu__children" hidden>${(c.children || []).map((child) =>
-        `<li><a href="san-pham.html?category=${encodeURIComponent(c.slug)}&sub=${encodeURIComponent(child.slug)}">${escapeHtml(child.ten)}</a></li>`).join('')}</ul></li>`).join('');
-    panel.querySelectorAll('.catmenu__row > button').forEach((btn) => btn.addEventListener('click', () => {
-      const children = btn.closest('.catmenu__item').querySelector('.catmenu__children');
-      children.hidden = !children.hidden;
-      btn.setAttribute('aria-expanded', String(!children.hidden));
-    }));
+    const cats = await getCategories();
+    panel.querySelector('#catmenu-list').innerHTML = cats.map((category) => `<li class="catmenu__item">
+      <div class="catmenu__row"><a href="san-pham.html?category=${encodeURIComponent(category.slug)}"><i class="bi bi-${escapeHtml(category.icon || 'box')}" aria-hidden="true"></i>${escapeHtml(category.ten_danh_muc)}</a></div>
+    </li>`).join('');
   } catch { panel.querySelector('#catmenu-list').innerHTML = '<li class="ms-muted p-2">Không tải được danh mục</li>'; }
 }
 export const toggleCategoryMenu = (event) => {

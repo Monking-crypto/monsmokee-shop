@@ -91,7 +91,7 @@
   .flash-explore__link{min-height:82px;padding:14px}
   .flash-section__head h2{font-size:var(--fs-lg)}
   .home-friday{grid-template-columns:minmax(0,1fr);gap:10px;padding:14px}
-  .home-friday__action{justify-content:space-between}
+  .home-friday__action{justify-content:space-between;flex-wrap:wrap}
   .home-friday__tag{width:50px;height:42px}
   .home-friday h2{font-size:var(--fs-md)}
 }

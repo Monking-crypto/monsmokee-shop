@@ -5,7 +5,7 @@ const projectPath = frontendPath >= 0 ? location.pathname.slice(0, frontendPath)
 export const CONFIG = {
   // Backend dev (cùng origin Apache để dùng PHP Session cookie)
   API_BASE: `${projectPath}/backend/public/api`,
-  // true: dùng dữ liệu mẫu trong mock.js (xem giao diện khi backend chưa xong). Đổi thành false khi backend sẵn sàng.
+  // true: luồng khách hàng dùng dữ liệu mẫu; đăng nhập và CRUD danh mục/sản phẩm Admin vẫn gọi Backend.
   USE_MOCK: true,
   // Auth uses the backend session API while catalog and cart remain mocked.
   USE_AUTH_MOCK: false,

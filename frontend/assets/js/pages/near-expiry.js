@@ -1,5 +1,5 @@
 // near-expiry.js - trang riêng cho sản phẩm cận hạn
-import { api } from '../core/api.js';
+import { getProducts } from '../core/catalog.js';
 import { escapeHtml, qs } from '../core/ui.js';
 import { mountHeader } from '../components/header.js';
 import { mountFooter } from '../components/footer.js';
@@ -23,12 +23,22 @@ async function load() {
   root.innerHTML = '<div class="near-expiry-skeleton" aria-hidden="true"></div>'.repeat(3);
   count.textContent = '';
   try {
-    const data = await api.get('/products?near_expiry=1&sort=hsd&per_page=20');
-    products = data.items.filter((product) => {
-      const days = Number(product.near_expiry_days);
-      return days >= 1 && days <= 10 && Number(product.phan_tram_giam) === 50
-        && product.hsd && new Date(`${product.hsd}T23:59:59`) >= new Date();
-    });
+    const query = new URLSearchParams({ near_expiry: '1', per_page: '50' });
+    let data = await getProducts(query);
+    const all = [...data.products];
+    while (data.pagination.has_more) {
+      query.set('page', String(data.pagination.page + 1));
+      data = await getProducts(query);
+      all.push(...data.products);
+    }
+    products = all.map((product) => {
+      const expiry = product.han_su_dung || product.hsd;
+      const days = expiry ? Math.ceil((new Date(`${expiry}T00:00:00`).getTime() - new Date(new Date().toDateString()).getTime()) / 86400000) : 0;
+      return { ...product, hsd: expiry, near_expiry_days: days };
+    }).filter((product) => Number(product.near_expiry_days) >= 1
+      && Number(product.near_expiry_days) <= 10
+      && Number(product.phan_tram_giam) === 50
+      && product.hsd);
     products.sort((a, b) => Number(a.near_expiry_days) - Number(b.near_expiry_days));
     render();
   } catch (error) {

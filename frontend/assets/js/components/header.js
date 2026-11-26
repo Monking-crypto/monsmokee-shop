@@ -1,6 +1,7 @@
 // header.js - topbar + header sticky + thanh danh mục. Dùng: mountHeader(document.getElementById('site-header'))
 import { CONFIG } from '../core/config.js';
 import { api, ApiError } from '../core/api.js';
+import { getProducts } from '../core/catalog.js';
 import { escapeHtml, debounce, toast } from '../core/ui.js';
 import { formatVnd } from '../core/format.js';
 import { initCategoryMenu, toggleCategoryMenu } from './category-menu.js';
@@ -101,9 +102,9 @@ function setupSearch(form) {
     const q = input.value.trim();
     if (q.length < 1) return hide();
     try {
-      const { items } = await api.get(`/products?q=${encodeURIComponent(q)}&per_page=6`);
-      list.innerHTML = items.length
-        ? items.slice(0, 6).map((p) => `<li><a href="chi-tiet-san-pham.html?id=${p.id}"><span>${escapeHtml(p.ten_san_pham)}</span><b>${formatVnd(p.gia_hieu_luc ?? p.gia_ban)}</b></a></li>`).join('')
+      const { products } = await getProducts(new URLSearchParams({ q, per_page: '6' }));
+      list.innerHTML = products.length
+        ? products.slice(0, 6).map((p) => `<li><a href="chi-tiet-san-pham.html?id=${p.id}"><span>${escapeHtml(p.ten_san_pham || p.ten)}</span><b>${formatVnd(p.gia_ban_hieu_luc ?? p.gia_hieu_luc ?? p.gia_ban ?? p.gia)}</b></a></li>`).join('')
         : '<li class="search__empty">Không tìm thấy sản phẩm phù hợp</li>';
       list.hidden = false; input.setAttribute('aria-expanded', 'true');
     } catch { hide(); }
