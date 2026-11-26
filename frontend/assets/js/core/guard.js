@@ -1,7 +1,7 @@
 // guard.js - bảo vệ mọi trang quản trị bằng phiên đã xác thực OTP
 import { api, ApiError } from './api.js';
 import { CONFIG } from './config.js';
-import { toast } from './ui.js';
+import { escapeHtml, qs, toast } from './ui.js';
 
 async function setMockAdminAuthenticated(authenticated) {
   if (!CONFIG.USE_MOCK || CONFIG.USE_AUTH_MOCK) return;
@@ -17,12 +17,15 @@ export async function requireAdmin() {
   } catch (error) {
     if (!(error instanceof ApiError)) throw error;
     if (error.status === 0) {
-      document.body.textContent = 'Không thể xác thực quyền quản trị do lỗi kết nối. Vui lòng tải lại trang.';
+      qs('#admin-page-content').innerHTML = `<div class="ms-state"><strong>Không thể xác thực quyền quản trị</strong>${escapeHtml(error.message)}<div class="mt-3"><button id="admin-auth-retry" class="ms-btn ms-btn--green" type="button">Thử lại</button></div></div>`;
+      qs('#admin-page-content').setAttribute('aria-busy', 'false');
+      qs('#admin-auth-retry').addEventListener('click', () => location.reload());
       toast(error.message, 'error');
       return false;
     }
     if (error.status !== 401 && error.status !== 403) {
-      document.body.textContent = error.message;
+      qs('#admin-page-content').innerHTML = `<div class="ms-state"><strong>Không thể xác thực quyền quản trị</strong>${escapeHtml(error.message)}</div>`;
+      qs('#admin-page-content').setAttribute('aria-busy', 'false');
       return false;
     }
     await setMockAdminAuthenticated(false);
