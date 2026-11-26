@@ -220,3 +220,11 @@
   .admin-account-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .admin-order-grid>.admin-panel:last-child:nth-child(odd){grid-column:1/-1}
 }
+
+@supports (view-transition-name:admin-sidebar){
+  @view-transition{navigation:auto}
+  .admin-sidebar{view-transition-name:admin-sidebar}
+  .admin-topbar{view-transition-name:admin-topbar}
+  .admin-content{view-transition-name:admin-content}
+  ::view-transition-old(admin-content),::view-transition-new(admin-content){animation-duration:120ms;animation-timing-function:ease-out}
+}

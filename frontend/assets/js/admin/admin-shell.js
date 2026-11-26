@@ -159,6 +159,25 @@
     });
   }, { passive: true });
 
+  const prefetched = new Set();
+  function prefetchNavigation(event) {
+    if (navigator.connection?.saveData || prefetched.size >= 2) return;
+    const link = event.target.closest('.admin-sidebar a[href]');
+    if (!link) return;
+    const target = new URL(link.href, location.href);
+    const adminDirectory = location.pathname.slice(0, location.pathname.lastIndexOf('/') + 1);
+    if (target.origin !== location.origin || !target.pathname.startsWith(adminDirectory)
+      || target.pathname === location.pathname || prefetched.has(target.href)) return;
+    prefetched.add(target.href);
+    const hint = document.createElement('link');
+    hint.rel = 'prefetch';
+    hint.href = target.href;
+    document.head.append(hint);
+  }
+  document.addEventListener('pointerover', prefetchNavigation, { passive: true });
+  document.addEventListener('focusin', prefetchNavigation);
+  document.addEventListener('touchstart', prefetchNavigation, { passive: true });
+
   window.MSAdminShell = {
     page,
     title,
