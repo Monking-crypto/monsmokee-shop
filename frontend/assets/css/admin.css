@@ -1,7 +1,7 @@
 /* admin.css - giao diện khu vực quản trị */
 :root{--admin-sidebar-w:256px;--admin-sidebar-collapsed-w:76px;--admin-topbar-h:76px}
 .admin-shell{min-height:100vh}
-.admin-sidebar{position:fixed;z-index:1100;inset:0 auto 0 0;width:var(--admin-sidebar-w);padding:18px 12px;background:var(--admin-sidebar);color:#e8f4ec;overflow-y:auto;transition:transform .2s,width .2s}
+.admin-sidebar{position:fixed;z-index:1100;inset:0 auto 0 0;width:var(--admin-sidebar-w);padding:18px 12px;background:var(--admin-sidebar);color:#e8f4ec;overflow-y:auto;transition:none}
 .admin-brand{display:flex;align-items:center;gap:12px;padding:8px 10px 22px;color:#fff;font-size:var(--fs-xs);font-weight:800;letter-spacing:.08em}
 .admin-brand:hover{text-decoration:none}
 .admin-brand img{width:142px;height:34px;object-fit:contain;object-position:left;filter:brightness(0) invert(1)}
@@ -18,7 +18,7 @@
 .admin-subnav{display:grid;gap:2px;margin:2px 0 6px 28px;padding:0;list-style:none}
 .admin-subnav[hidden]{display:none}
 .admin-subnav a{min-height:38px;padding-left:14px;font-size:var(--fs-xs)!important}
-.admin-main{min-height:100vh;margin-left:var(--admin-sidebar-w);transition:margin .2s}
+.admin-main{min-height:100vh;margin-left:var(--admin-sidebar-w)}
 .admin-topbar{position:sticky;z-index:100;top:0;display:flex;align-items:center;gap:14px;min-height:var(--admin-topbar-h);padding:12px 24px;background:#fff;border-bottom:1px solid var(--ms-border)}
 .admin-topbar h1{font-size:var(--fs-lg);font-weight:800}
 .admin-topbar p{margin-top:3px;color:var(--ms-muted);font-size:var(--fs-xs)}
@@ -180,7 +180,7 @@
 .admin-login__verify{margin-top:16px}
 
 @media(max-width:900px){
-  .admin-sidebar{transform:translateX(-100%);width:280px;transition:transform .2s}
+  .admin-sidebar{transform:translateX(-100%);width:280px;transition:transform .16s ease}
   .admin-sidebar.is-open{transform:translateX(0)}
   .admin-main,.admin-shell.is-collapsed .admin-main{margin-left:0}
   .admin-scrim.is-visible{position:fixed;z-index:1050;inset:0;display:block;background:rgba(0,0,0,.4)}
