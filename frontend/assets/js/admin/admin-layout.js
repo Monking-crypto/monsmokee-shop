@@ -22,31 +22,6 @@ if (adminUser) {
     if (name) qs('#admin-role-name').textContent = name;
   });
 
-  const shellElement = qs('.admin-shell');
-  const sidebar = qs('#admin-sidebar');
-  const scrim = qs('#admin-scrim');
-  qs('.admin-nav-group__toggle').addEventListener('click', (event) => {
-    const expanded = event.currentTarget.getAttribute('aria-expanded') === 'true';
-    event.currentTarget.setAttribute('aria-expanded', String(!expanded));
-    event.currentTarget.nextElementSibling.hidden = expanded;
-  });
-  const toggle = () => {
-    if (window.matchMedia('(min-width: 901px)').matches) {
-      sidebar.classList.toggle('is-collapsed');
-      shellElement.classList.toggle('is-collapsed');
-    } else {
-      sidebar.classList.toggle('is-open');
-      scrim.classList.toggle('is-visible');
-    }
-  };
-  qs('#admin-menu-toggle').addEventListener('click', toggle);
-  scrim.addEventListener('click', toggle);
-  qs('#admin-quick-search').addEventListener('submit', (event) => {
-    event.preventDefault();
-    const query = event.currentTarget.querySelector('input').value.trim();
-    location.assign(`san-pham.html${query ? `?q=${encodeURIComponent(query)}` : ''}`);
-  });
-
   async function loadPage() {
     if (page === 'overview') await import('./dashboard.js');
     else if (page === 'categories') await import('./categories.js');
@@ -68,10 +43,8 @@ if (adminUser) {
   async function updatePendingCount() {
     try {
       const pending = await api.get('/admin/orders?status=cho_xu_ly&page=1&per_page=1');
-      if (pending.total) {
-        const badge = qs('#admin-pending-count');
-        badge.textContent = pending.total > 99 ? '99+' : pending.total;
-        badge.hidden = false;
+      if (Number.isFinite(Number(pending.total)) && Number(pending.total) >= 0) {
+        shell?.setPendingCount(pending.total);
       }
     } catch (error) {
       if (error?.status === 0) toast('Không tải được số đơn chờ xử lý.', 'error');
