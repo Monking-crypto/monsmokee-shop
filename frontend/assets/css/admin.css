@@ -2,9 +2,10 @@
 :root{--admin-sidebar-w:256px;--admin-sidebar-collapsed-w:76px;--admin-topbar-h:76px}
 .admin-shell{min-height:100vh}
 .admin-sidebar{position:fixed;z-index:1100;inset:0 auto 0 0;width:var(--admin-sidebar-w);padding:18px 12px;background:var(--admin-sidebar);color:#e8f4ec;overflow-y:auto;transition:none}
-.admin-brand{display:flex;align-items:center;gap:12px;padding:8px 10px 22px;color:#fff;font-size:var(--fs-xs);font-weight:800;letter-spacing:.08em}
+.admin-brand{display:flex;flex-wrap:nowrap;align-items:center;gap:8px;padding:8px 10px 22px;color:#fff;font-size:var(--fs-xs);font-weight:800;letter-spacing:.08em}
 .admin-brand:hover{text-decoration:none}
-.admin-brand img{width:142px;height:34px;object-fit:contain;object-position:left;filter:brightness(0) invert(1)}
+.admin-brand span{flex:none;white-space:nowrap}
+.admin-brand img{flex:none;width:136px;height:34px;object-fit:contain;object-position:left;filter:brightness(0) invert(1)}
 .admin-sidebar nav ul{display:grid;gap:4px;margin:0;padding:0;list-style:none}
 .admin-sidebar nav a{display:flex;align-items:center;gap:12px;min-height:44px;padding:0 12px;border-radius:var(--ms-radius-sm);color:#c4d2c8;font-size:var(--fs-sm);font-weight:600}
 .admin-sidebar nav a i{width:20px;text-align:center;font-size:1.1rem}
@@ -28,7 +29,7 @@
 .admin-quick-search input{width:100%;height:38px;border:0;outline:0;background:transparent;font:inherit;font-size:var(--fs-xs)}
 .admin-nav-badge{display:inline-grid;place-items:center;min-width:20px;height:20px;margin-left:auto;padding:0 5px;border-radius:var(--ms-radius-pill);background:var(--ms-red);color:#fff;font-size:11px;font-weight:800}
 .admin-nav-badge[hidden]{display:none}
-.admin-icon-btn{width:42px;height:42px;border:0;border-radius:var(--ms-radius-sm);background:transparent;color:var(--ms-text);font-size:1.5rem;cursor:pointer}
+.admin-icon-btn{width:44px;height:44px;flex:none;border:0;border-radius:var(--ms-radius-sm);background:transparent;color:var(--ms-text);font-size:1.5rem;cursor:pointer}
 .admin-icon-btn:hover{background:var(--ms-bg)}
 .admin-logout{display:flex;align-items:center;gap:7px;min-height:40px;padding:0 10px;border:1px solid var(--ms-border);border-radius:var(--ms-radius-sm);background:#fff;color:var(--ms-text);font:inherit;font-size:var(--fs-sm);font-weight:600;cursor:pointer}
 .admin-logout:hover{border-color:var(--ms-red);color:var(--ms-red)}

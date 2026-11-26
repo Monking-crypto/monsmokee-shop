@@ -126,6 +126,9 @@
     menuButton.setAttribute('aria-expanded', 'false');
   }
 
+  window.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && sidebar.classList.contains('is-open')) closeMobileMenu();
+  });
   menuButton.addEventListener('click', () => {
     if (window.matchMedia('(min-width: 901px)').matches) {
       setCollapsed(!shellElement.classList.contains('is-collapsed'));
