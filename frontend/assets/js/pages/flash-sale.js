@@ -1,4 +1,6 @@
 import { api, ApiError } from '../core/api.js';
+import { serverNow } from '../core/api.js';
+import { CONFIG } from '../core/config.js';
 import { getProducts } from '../core/catalog.js';
 import { escapeHtml, qs } from '../core/ui.js';
 import { formatVnd } from '../core/format.js';
@@ -9,7 +11,6 @@ import { bindProductCards, productCard, productSkeletons } from '../components/p
 
 const root = qs('#flash-sale-root');
 let clockTimer;
-let serverOffset = 0;
 let endedStateShown = false;
 let loading = false;
 let bestProductsLoaded = false;
@@ -18,7 +19,9 @@ const vietnamParts = (date = new Date()) => Object.fromEntries(new Intl.DateTime
   timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: 'numeric', day: 'numeric',
 }).formatToParts(date).filter((part) => part.type !== 'literal').map((part) => [part.type, Number(part.value)]));
 
-function nextFridayTimestamp(now = Date.now()) {
+const bestSellersAvailable = CONFIG.FEATURES.bestSellers && !CONFIG.LIVE.catalog;
+
+function nextFridayTimestamp(now = serverNow().getTime()) {
   const { year, month, day } = vietnamParts(new Date(now));
   const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
   const daysUntilFriday = (5 - weekday + 7) % 7 || 7;
@@ -26,15 +29,17 @@ function nextFridayTimestamp(now = Date.now()) {
 }
 
 function resolveTimes(data) {
-  const now = Date.now() + serverOffset;
-  const start = Date.parse(data.starts_at);
-  const end = Date.parse(data.ends_at);
-  const next = Date.parse(data.next_start);
+  const now = serverNow().getTime();
+  const next = nextFridayTimestamp(now);
+  const parts = vietnamParts(new Date(now));
+  const weekday = new Date(Date.UTC(parts.year, parts.month - 1, parts.day)).getUTCDay();
+  const currentFridayStart = Date.UTC(parts.year, parts.month - 1, parts.day - ((weekday - 5 + 7) % 7), -7);
+  const activeFriday = Boolean(data.active) && weekday === 5;
   return {
     now,
-    start: Number.isFinite(start) ? start : nextFridayTimestamp(now),
-    end: Number.isFinite(end) ? end : nextFridayTimestamp(now) + 86400000 - 1000,
-    next: Number.isFinite(next) ? next : nextFridayTimestamp(now),
+    start: activeFriday ? currentFridayStart : next,
+    end: activeFriday ? currentFridayStart + 86400000 - 1000 : next + 86400000 - 1000,
+    next,
   };
 }
 
@@ -104,11 +109,11 @@ function renderExplore() {
     <div class="flash-section__head"><div><h2 id="flash-explore-title">Trong lúc chờ, bạn có thể xem</h2></div></div>
     <div class="flash-explore">
       <a class="flash-explore__link" href="can-han.html"><span><strong>Cận hạn giảm 50%</strong><span>Ưu đãi hàng còn dùng tốt</span></span><i class="bi bi-arrow-up-right" aria-hidden="true"></i></a>
-      <a class="flash-explore__link" href="ban-chay.html"><span><strong>Sản phẩm bán chạy</strong><span>Được khách mua nhiều nhất</span></span><i class="bi bi-arrow-up-right" aria-hidden="true"></i></a>
+      ${bestSellersAvailable ? '<a class="flash-explore__link" href="ban-chay.html"><span><strong>Sản phẩm bán chạy</strong><span>Được khách mua nhiều nhất</span></span><i class="bi bi-arrow-up-right" aria-hidden="true"></i></a>' : ''}
     </div>
-    <div id="flash-best-content" class="flash-best-grid" aria-live="polite">
+    ${bestSellersAvailable ? `<div id="flash-best-content" class="flash-best-grid" aria-live="polite">
       ${productSkeletons(5)}
-    </div>
+    </div>` : ''}
   </section>`;
 }
 
@@ -123,10 +128,11 @@ function normalizeSaleProduct(product) {
   const normalized = {
     ...product,
     ten_san_pham: product.ten_san_pham || product.ten || 'Sản phẩm',
-    hinh_anh: product.hinh_anh || product.anh || '',
+    hinh_anh: product.anh_thumb || product.hinh_anh || product.anh || '',
     gia_ban: Number(product.gia_ban ?? product.gia_goc) || 0,
-    gia_hieu_luc: Number(product.gia_hieu_luc ?? product.gia_ban_hieu_luc ?? product.gia_goc) || 0,
+    gia_hieu_luc: Number(product.gia_ban_hieu_luc ?? product.gia_hieu_luc ?? product.gia_goc) || 0,
     phan_tram_giam: Number(product.phan_tram_giam) || 10,
+    nhan_khuyen_mai: product.nhan_khuyen_mai || 'THU_SAU',
   };
   if (Number.isFinite(Number(product.so_luong_ton))) normalized.so_luong_ton = Number(product.so_luong_ton);
   else if (typeof product.con_hang === 'boolean') normalized.con_hang = product.con_hang;
@@ -159,7 +165,7 @@ function renderPage(data) {
     <p class="flash-clock__sr" id="flash-state-announcement" aria-live="polite">${state === 'active' ? 'Siêu sale đã bắt đầu.' : state === 'empty' ? 'Siêu sale đang mở nhưng cửa hàng chưa công bố sản phẩm.' : state === 'ended' ? 'Siêu sale tuần này đã kết thúc.' : 'Siêu sale chưa mở bán.'}</p>
     ${state === 'active' ? renderSaleProducts(data.products || [], data) : `${waitingPanel(state)}${renderExplore()}`}`;
   root.setAttribute('aria-busy', 'false');
-  if (!bestProductsLoaded && state !== 'active') loadBestSellers();
+  if (bestSellersAvailable && !bestProductsLoaded && state !== 'active') loadBestSellers();
   startClock(target, times, state);
 }
 
@@ -168,7 +174,7 @@ function startClock(target, times, state) {
   const targetTime = state === 'ended' ? Math.min(target, times.now + 4000) : target;
   const clock = qs('[data-flash-clock]', root);
   const update = () => {
-    const seconds = Math.max(0, Math.ceil((targetTime - (Date.now() + serverOffset)) / 1000));
+    const seconds = Math.max(0, Math.ceil((targetTime - serverNow().getTime()) / 1000));
     const values = {
       days: Math.floor(seconds / 86400),
       hours: Math.floor((seconds % 86400) / 3600),
@@ -194,6 +200,7 @@ function startClock(target, times, state) {
 }
 
 async function loadBestSellers() {
+  if (!bestSellersAvailable) return;
   try {
     const data = await getProducts(new URLSearchParams({ sort: 'best', per_page: '5', page: '1' }));
     const products = data.products.slice(0, 5);
@@ -234,12 +241,10 @@ async function load() {
       max_products: 10,
       products: promotion?.products || [],
     };
-    const serverTime = Date.parse(data.server_time);
-    serverOffset = Number.isFinite(serverTime) ? serverTime - Date.now() : 0;
     renderPage(data);
-  } catch {
+  } catch (error) {
     clearInterval(clockTimer);
-    root.innerHTML = `<section class="flash-error"><strong>Không tải được chương trình Siêu sale</strong><p>Kiểm tra kết nối rồi thử lại.</p><button class="ms-btn ms-btn--green" id="flash-retry" type="button">Thử lại</button></section>`;
+    root.innerHTML = `<section class="flash-error"><strong>Không tải được chương trình Siêu sale</strong><p>${escapeHtml(error.message || 'Kiểm tra kết nối rồi thử lại.')}</p><button class="ms-btn ms-btn--green" id="flash-retry" type="button">Thử lại</button></section>`;
     root.setAttribute('aria-busy', 'false');
     qs('#flash-retry').addEventListener('click', load);
   } finally {

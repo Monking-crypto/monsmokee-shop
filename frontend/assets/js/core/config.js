@@ -5,10 +5,22 @@ const projectPath = frontendPath >= 0 ? location.pathname.slice(0, frontendPath)
 export const CONFIG = {
   // Backend dev (cùng origin Apache để dùng PHP Session cookie)
   API_BASE: `${projectPath}/backend/public/api`,
-  // true: luồng khách hàng dùng dữ liệu mẫu; đăng nhập và CRUD danh mục/sản phẩm Admin vẫn gọi Backend.
+  // Routes without an explicit LIVE feature mapping use the local mock when this is true.
   USE_MOCK: true,
-  // Auth uses the backend session API while catalog and cart remain mocked.
+  // Customer and Admin sessions use PHP session endpoints.
   USE_AUTH_MOCK: false,
+  LIVE: {
+    catalog: true,
+    promotions: true,
+    store: true,
+    shipping: true,
+    adminInventory: false,
+    adminPromotions: false,
+    adminDeliveryAreas: false,
+  },
+  FEATURES: {
+    bestSellers: true,
+  },
   STORE_INFO: {
     name: 'MON SMOKEE',
     address: '', // ĐIỀN SAU

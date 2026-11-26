@@ -1,5 +1,6 @@
 // category-menu.js - menu danh mục: dropdown trên desktop, bottom sheet trên mobile
 import { getCategories } from '../core/catalog.js';
+import { CONFIG } from '../core/config.js';
 import { escapeHtml } from '../core/ui.js';
 
 let panel;
@@ -18,7 +19,7 @@ export async function initCategoryMenu(host) {
         <ul class="catmenu__quick-links">
           <li><a href="sieu-sale-thu-6.html">Siêu sale Thứ 6</a></li>
           <li><a href="can-han.html">Cận hạn giảm 50%</a></li>
-          <li><a href="ban-chay.html">Bán chạy</a></li>
+          ${CONFIG.FEATURES.bestSellers && !CONFIG.LIVE.catalog ? '<li><a href="ban-chay.html">Bán chạy</a></li>' : ''}
         </ul>
         <ul id="catmenu-list"></ul>
       </nav></section>`;
@@ -26,18 +27,30 @@ export async function initCategoryMenu(host) {
   panel.addEventListener('click', (e) => {
     if (e.target.closest('[data-close]')) closeCategoryMenu();
     else if (e.target.closest('a')) closeCategoryMenu();
+    else if (e.target.closest('[data-retry-categories]')) loadCategories();
   });
   document.addEventListener('keydown', (e) => {
     if (panel.hidden) return;
     if (e.key === 'Escape') closeCategoryMenu();
     if (e.key === 'Tab') trapFocus(e);
   });
+  await loadCategories();
+}
+
+async function loadCategories() {
+  const list = panel.querySelector('#catmenu-list');
+  list.setAttribute('aria-busy', 'true');
+  list.innerHTML = '<li class="ms-skeleton" aria-label="Đang tải danh mục"></li>';
   try {
     const cats = await getCategories();
-    panel.querySelector('#catmenu-list').innerHTML = cats.map((category) => `<li class="catmenu__item">
-      <div class="catmenu__row"><a href="san-pham.html?category=${encodeURIComponent(category.slug)}"><i class="bi bi-${escapeHtml(category.icon || 'box')}" aria-hidden="true"></i>${escapeHtml(category.ten_danh_muc)}</a></div>
+    list.innerHTML = cats.map((category) => `<li class="catmenu__item">
+      <div class="catmenu__row"><a href="san-pham.html?category=${encodeURIComponent(category.slug)}"><i class="bi bi-${escapeHtml(category.icon)}" aria-hidden="true"></i>${escapeHtml(category.ten_danh_muc)}</a></div>
     </li>`).join('');
-  } catch { panel.querySelector('#catmenu-list').innerHTML = '<li class="ms-muted p-2">Không tải được danh mục</li>'; }
+  } catch (error) {
+    list.innerHTML = `<li class="ms-state"><strong>Không tải được danh mục</strong>${escapeHtml(error.message)}<button class="ms-btn ms-btn--ghost" type="button" data-retry-categories>Thử lại</button></li>`;
+  } finally {
+    list.setAttribute('aria-busy', 'false');
+  }
 }
 export const toggleCategoryMenu = (event) => {
   if (!panel) return;

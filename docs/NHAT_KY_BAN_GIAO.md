@@ -1,53 +1,24 @@
 # Nhật ký bàn giao frontend
 
-## 2026-11-23 — Cập nhật backend và kiểm tra hợp đồng Siêu sale
+## 2026-11-26 — Tích hợp API và hoàn thiện các luồng A1–A11
 
-- Đã merge `origin/main` tới `8320570` (`Buoc 12: admin quan ly danh muc va san pham, upload anh`); trước đó có `c9a00f9` cho quên mật khẩu Customer và `6fe62b2` cho danh mục/sản phẩm.
-- Backend mới có `POST /api/auth/forgot-password/start`, `/verify`, `/resend`, cùng API public `/api/categories` và `/api/products`.
-- Admin có API danh mục và sản phẩm; route Siêu sale public và route quản trị khuyến mãi chưa được đăng ký.
-- `HomeController` và `PromotionAdminController` hiện vẫn là stub; chưa có `/api/home` hoặc `GET /api/promotions/active`.
-- `backend/config/business.php` xác nhận Siêu sale Thứ 6 giảm 10%, tối đa 10 sản phẩm, ngày ISO weekday 5.
-- Không sửa `backend/` hoặc `database/`; không chạy migration hay lệnh thay đổi DB.
-- Local API không phản hồi khi thử GET trong lượt này; đối chiếu hợp đồng dựa trên routes/controller/docs trong source.
+- **API client/catalog:** chuẩn hóa mock theo envelope và schema sản phẩm mới; xử lý CSRF, phiên hết hạn, giờ server và ngày kiểm thử Siêu sale.
+- **Khách hàng:** nối catalog, chi tiết sản phẩm, cận hạn, Siêu sale, thông tin cửa hàng và giao hàng với các API public. Cart/checkout vẫn mock; không gửi thao tác ghi lên các API khác.
+- **Giao diện:** ảnh thẻ cận hạn giữ tỷ lệ vuông tại 360/768/1280px; trang Bán chạy được ẩn khi backend live chưa hỗ trợ `sort=best`.
+- **Admin:** cập nhật kho theo `/admin/stock-receipts`, `/admin/stock-history`, `/admin/batches`; chuyển khuyến mãi sang `/admin/promotions`; thêm trang khu vực giao hàng. Ba cờ Admin liên quan vẫn tắt live do chưa có phiên Admin để xác minh.
+- **Đăng nhập:** giữ trang Customer và Admin tách biệt; bổ sung liên kết chuyển trang. API login và kiểm tra quyền khác nhau, không gộp luồng.
+- **Hồ sơ Admin:** frontend có xử lý lỗi mềm, nhưng `origin/main` tại `22f0ffd` chỉ có `GET /admin/me`; chưa thể xác nhận đổi tên Admin hoạt động với backend chuẩn.
+- **Tài liệu:** cập nhật `docs/FRONTEND_CHO_BACKEND.md` theo API thật và giới hạn đã xác minh.
 
-## 2026-11-22 — Trang Cận hạn riêng (A5)
+### Kiểm tra
 
-- **File:** `frontend/can-han.html`, `frontend/assets/js/pages/near-expiry.js`, `frontend/assets/js/components/product-card.js`, `frontend/assets/css/customer.css`, `docs/FRONTEND_CHO_BACKEND.md`.
-- **API backend cần có:** `GET /products?near_expiry=1&sort=hsd&per_page=20`; mỗi sản phẩm trả `near_expiry_days`, `hsd`, `phan_tram_giam`, `so_luong_ton`. Chi tiết tại mục YC2 — Trang cận hạn trong tài liệu bàn giao.
-- **Tự kiểm tra:** mở `/frontend/can-han.html`, kiểm tra 8 sản phẩm được xếp theo ngày gần nhất, chọn các chip hạn dùng, và thử ở 360px, 768px, 1280px.
+- `node --check` thành công cho 49 file JavaScript trong `frontend/assets/js`.
+- GET `/csrf`, `/products`, `/products?near_expiry=1`, `/categories`, `/store-info`, `/promotions/active`, `/shipping/areas`, `/products/{id}` đều trả 200 và `success=true`.
+- `POST /shipping/quote` gửi kèm CSRF trả 200; endpoint chỉ báo phí, không ghi dữ liệu.
+- Trình duyệt: trang chủ và cận hạn tải được; mô phỏng Thứ 6 cho thấy 10 sản phẩm và countdown khoảng 12 giờ. Có `401` dự kiến từ `/auth/me` do chưa đăng nhập.
+- Chưa xác minh thao tác Admin thật, OTP/email, giỏ hàng/đặt hàng thật hoặc endpoint ghi dữ liệu; không dùng tài khoản thật.
 
-## 2026-11-22 — Giỏ hàng và phí giao hàng (A7)
+### Trạng thái phiên
 
-- **File:** `frontend/gio-hang.html`, `frontend/thanh-toan.html`, `frontend/assets/js/pages/cart.js`, `frontend/assets/js/components/delivery-modal.js`, `frontend/assets/js/core/mock.js`, `frontend/assets/css/customer.css`, `docs/FRONTEND_CHO_BACKEND.md`.
-- **API backend cần có:** `GET /cart`, `PUT /cart/items/{id}`, `DELETE /cart/items/{id}`, `DELETE /cart`; địa chỉ giao hàng cần có `distance_km` hoặc API trả phí vận chuyển. Chi tiết dữ liệu tại mục YC2 — Giỏ hàng trong tài liệu bàn giao.
-- **Tự kiểm tra:** mở `/frontend/gio-hang.html`; kiểm tra tăng/giảm, giới hạn tồn kho, xóa món/giỏ có xác nhận, chọn giao hàng/nhận tại cửa hàng, phí ship và điều kiện đơn tối thiểu.
-
-## 2026-11-22 — Bảng xếp hạng bán chạy (A8)
-
-- **File:** `frontend/ban-chay.html`, `frontend/assets/js/pages/best-sellers.js`, `frontend/assets/js/components/product-card.js`, `frontend/assets/css/customer.css`, `docs/FRONTEND_CHO_BACKEND.md`.
-- **API backend cần có:** `GET /products?sort=best&per_page=20&page={n}` và tham số tùy chọn `category={slug}`; sản phẩm cần có `luot_ban`. Chi tiết tại mục YC2 — Bảng xếp hạng bán chạy.
-- **Tự kiểm tra:** mở `/frontend/ban-chay.html`, đổi các chip danh mục, xem thêm kết quả, kiểm tra thứ hạng và nút Thêm ở 360px, 768px, 1280px.
-
-## 2026-11-22 — Admin đăng nhập, layout và sản phẩm (A9 P1)
-
-- **File:** `frontend/assets/js/admin/admin-layout.js`, `frontend/assets/js/admin/admin-login.js`, `frontend/assets/js/admin/products.js`, `frontend/assets/js/core/mock.js`, `frontend/assets/css/admin.css`, `docs/FRONTEND_CHO_BACKEND.md`.
-- **API backend cần có:** luồng đăng nhập OTP admin, `GET/POST/PUT/DELETE /admin/products`, upload ảnh và xóa hàng loạt; tài khoản khách cần nhận 403. Chi tiết tại mục YC2 — Admin đăng nhập và quản lý sản phẩm.
-- **Tự kiểm tra:** mở `/frontend/admin/login.html`, đăng nhập demo cục bộ qua OTP, thử trang sản phẩm, lọc/tìm, thêm/sửa/xóa/khôi phục dữ liệu mẫu và kiểm tra guard khi chưa đăng nhập.
-
-## 2026-11-22 — Admin dashboard, danh mục, khuyến mãi và đơn hàng (A9 P2)
-
-- **File:** `frontend/admin/index.html`, `frontend/assets/js/admin/admin-layout.js`, `frontend/assets/js/admin/dashboard.js`, `frontend/assets/js/admin/categories.js`, `frontend/assets/js/admin/promotions.js`, `frontend/assets/js/admin/orders.js`, `frontend/assets/js/admin/order-detail.js`, `frontend/assets/js/core/mock.js`, `frontend/assets/js/components/confirm-dialog.js`, `frontend/assets/css/admin.css`, `docs/FRONTEND_CHO_BACKEND.md`.
-- **API backend cần có:** `GET /admin/dashboard`, CRUD `/admin/categories`, danh sách/chi tiết/cập nhật trạng thái/hủy/điều chỉnh phí đơn hàng; xác nhận route khuyến mãi tại phần đề nghị thay đổi API.
-- **Tự kiểm tra:** vào các trang Tổng quan, Danh mục, Khuyến mãi, Đơn hàng; kiểm tra chart, CRUD danh mục, chọn tối đa 10 sản phẩm, chuyển trạng thái COD/nhận tại cửa hàng, hủy có lý do và phí tối đa 100.000đ.
-
-## 2026-11-22 — Admin kho, khách hàng, thống kê và tài khoản (A9 P3)
-
-- **File:** `frontend/assets/js/admin/inventory.js`, `frontend/assets/js/admin/customers.js`, `frontend/assets/js/admin/statistics.js`, `frontend/assets/js/admin/account.js`, `frontend/assets/js/admin/admin-layout.js`, `frontend/assets/js/core/mock.js`, `frontend/assets/css/admin.css`, `frontend/admin/thong-ke.html`, `docs/FRONTEND_CHO_BACKEND.md`.
-- **API backend cần có:** `GET /admin/inventory/movements`, `POST /admin/inventory/receipts`, `GET /admin/customers`, `GET/PATCH /admin/customers/{id}/status`, `GET /admin/reports?from=&to=`, `GET/PATCH /admin/account` và `POST /admin/account/password`. Chi tiết tại mục YC2 — Admin kho, khách hàng, thống kê và tài khoản.
-- **Tự kiểm tra:** mở các trang Nhập hàng, Lịch sử kho, Cảnh báo kho, Khách hàng, Thống kê và Tài khoản; thử lọc dữ liệu và kiểm tra các hành động chưa làm chỉ hiển thị thông báo phát triển.
-
-## 2026-11-22 — Rà soát focus menu và số lượng thêm giỏ (A1/A6)
-
-- **File:** `frontend/assets/js/components/category-menu.js`, `frontend/assets/js/components/product-card.js`, `frontend/assets/js/components/confirm-dialog.js`.
-- **Thay đổi:** khi đóng menu, focus trở về đúng nút đã mở (header hoặc bottom-nav); thông điệp xác nhận thêm giỏ đầy đủ và số lượng được chặn theo tồn kho, tối đa 99.
-- **Tự kiểm tra:** mở/đóng menu bằng Escape từ header và bottom-nav; thử nhập số lượng vượt tồn kho, xác nhận cả thông báo lẫn số lượng gửi vào giỏ.
+- Nhánh `Frontend`, `HEAD` trước bàn giao `98d8c30`; backend chuẩn `origin/main` tại `22f0ffd`.
+- Thay đổi chưa commit/push tại thời điểm ghi nhật ký. Không stage backend hoặc `docs/BAO_CAO_NOI_API.md`.

@@ -1,6 +1,6 @@
 // register.js - đăng ký 2 bước: thông tin → OTP email
-import { CONFIG } from '../core/config.js';
 import { api, ApiError } from '../core/api.js';
+import { getStoreInfo } from '../core/store-info.js';
 import { rules } from '../core/validators.js';
 import { maskEmail } from '../core/format.js';
 import { setFieldError, attachPasswordToggle, safeRedirect, showAlert, lockButtonForRetry } from '../core/form.js';
@@ -10,7 +10,7 @@ import { mountOtp } from '../components/otp-input.js';
 
 const storeInfo = qs('#register-store-info');
 if (storeInfo) {
-  const { name, hours, address } = CONFIG.STORE_INFO;
+  const { name, hours, address } = await getStoreInfo();
   storeInfo.textContent = `${name}${address ? ` · ${address}` : ''} · Giờ mở cửa ${hours}`;
 }
 const form = qs('#reg-form'), stepInfo = qs('#step-info'), stepOtp = qs('#step-otp'), alertBox = qs('#reg-alert');

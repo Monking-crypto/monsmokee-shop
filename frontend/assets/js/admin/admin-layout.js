@@ -6,7 +6,7 @@ import { escapeHtml, qs, toast } from '../core/ui.js';
 const TITLES = {
   overview: 'Tổng quan', categories: 'Danh mục', products: 'Sản phẩm', promotions: 'Khuyến mãi',
   orders: 'Đơn hàng', 'order-detail': 'Chi tiết đơn hàng', 'stock-in': 'Nhập hàng',
-  'stock-history': 'Lịch sử kho', 'stock-alerts': 'Cảnh báo kho', customers: 'Khách hàng',
+  'stock-history': 'Lịch sử kho', 'stock-alerts': 'Cảnh báo kho', 'delivery-areas': 'Khu vực giao hàng', customers: 'Khách hàng',
   statistics: 'Thống kê', account: 'Tài khoản',
 };
 const NAV = [
@@ -14,6 +14,7 @@ const NAV = [
   ['categories', 'Danh mục', 'danh-muc.html', 'grid'],
   ['products', 'Sản phẩm', 'san-pham.html', 'box-seam'],
   ['promotions', 'Khuyến mãi', 'khuyen-mai.html', 'tags'],
+  ['delivery-areas', 'Khu vực giao hàng', 'khu-vuc-giao.html', 'geo-alt'],
   ['orders', 'Đơn hàng', 'don-hang.html', 'receipt'],
   ['stock', 'Kho', '', 'archive'],
   ['customers', 'Khách hàng', 'khach-hang.html', 'people'],
@@ -47,7 +48,8 @@ const USE_CASES = {
 const page = document.body.dataset.page || 'overview';
 const title = TITLES[page] || 'Quản trị';
 
-if (await requireAdmin()) {
+const adminUser = await requireAdmin();
+if (adminUser) {
   let redirectingToLogin = false;
   const redirectToLogin = () => {
     if (redirectingToLogin) return;
@@ -75,7 +77,7 @@ if (await requireAdmin()) {
           <i class="bi bi-search" aria-hidden="true"></i>
           <input type="search" aria-label="Tìm nhanh sản phẩm" placeholder="Tìm nhanh sản phẩm">
         </form>
-        <span class="admin-role">Quản trị tối cao</span>
+        <span class="admin-role" id="admin-role-name">${escapeHtml(typeof adminUser === 'object' ? (adminUser.ho_ten || 'Quản trị tối cao') : 'Quản trị tối cao')}</span>
         <button id="admin-logout" class="admin-logout" type="button"><i class="bi bi-box-arrow-right"></i> Đăng xuất</button></header>
       <main class="admin-content" id="admin-page-content"></main>
     </div>
@@ -85,6 +87,7 @@ if (await requireAdmin()) {
   else if (page === 'categories') await import('./categories.js');
   else if (page === 'products') await import('./products.js');
   else if (page === 'promotions') await import('./promotions.js');
+  else if (page === 'delivery-areas') await import('./delivery-areas.js');
   else if (page === 'orders') await import('./orders.js');
   else if (page === 'order-detail') await import('./order-detail.js');
   else if (page.startsWith('stock-')) await import('./inventory.js');
@@ -97,6 +100,10 @@ if (await requireAdmin()) {
       <section class="admin-placeholder"><i class="bi bi-cone-striped" aria-hidden="true"></i><h2>Đang phát triển</h2>
         <p>${escapeHtml(USE_CASES[page] || '')} · Các bước dự kiến:</p><ol>${steps.map((step) => `<li>${escapeHtml(step)}</li>`).join('')}</ol></section>`;
   }
+  window.addEventListener('ms:admin-profile-updated', (event) => {
+    const name = event.detail?.ho_ten?.trim();
+    if (name) qs('#admin-role-name').textContent = name;
+  });
   const shell = qs('.admin-shell'), sidebar = qs('#admin-sidebar'), scrim = qs('#admin-scrim');
   qs('.admin-nav-group__toggle').addEventListener('click', (event) => {
     const expanded = event.currentTarget.getAttribute('aria-expanded') === 'true';

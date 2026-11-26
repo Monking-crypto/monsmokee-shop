@@ -11,9 +11,9 @@ async function setMockAdminAuthenticated(authenticated) {
 
 export async function requireAdmin() {
   try {
-    await api.get('/admin/me');
+    const data = await api.get('/admin/me');
     await setMockAdminAuthenticated(true);
-    return true;
+    return data?.user || true;
   } catch (error) {
     if (!(error instanceof ApiError)) throw error;
     if (error.status === 0) {

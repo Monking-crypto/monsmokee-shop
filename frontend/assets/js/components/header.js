@@ -6,15 +6,15 @@ import { escapeHtml, debounce, toast } from '../core/ui.js';
 import { formatVnd } from '../core/format.js';
 import { initCategoryMenu, toggleCategoryMenu } from './category-menu.js';
 import { mountDeliveryModal, openDeliveryModal } from './delivery-modal.js';
-
-const S = CONFIG.STORE_INFO;
+import { getStoreInfo } from '../core/store-info.js';
 
 export async function mountHeader(host) {
+  const store = await getStoreInfo();
   host.className = 'site-header-wrap';
   host.innerHTML = `
   <div class="topbar"><div class="ms-container">
     <span>Giao hàng nội thành Đồng Hới. Miễn phí đơn từ ${formatVnd(CONFIG.FREESHIP_FROM)}</span>
-    <span>Mở cửa ${escapeHtml(S.hours)}${S.hotline ? ` · Hotline ${escapeHtml(S.hotline)}` : ''}</span>
+    ${store.hours || store.hotline ? `<span>${store.hours ? `Mở cửa ${escapeHtml(store.hours)}` : ''}${store.hours && store.hotline ? ' · ' : ''}${store.hotline ? `Hotline ${escapeHtml(store.hotline)}` : ''}</span>` : ''}
   </div></div>
   <header class="site-header">
     <div class="ms-container site-header__main">
@@ -37,7 +37,7 @@ export async function mountHeader(host) {
       <button class="catbar__btn" id="cat-btn" type="button" aria-controls="catmenu-dialog" aria-expanded="false"><i class="bi bi-list" aria-hidden="true"></i>Danh mục sản phẩm</button>
       <a class="catbar__link catbar__link--sale" href="sieu-sale-thu-6.html">Siêu sale Thứ 6</a>
       <a class="catbar__link catbar__link--exp" href="can-han.html">Cận hạn giảm 50%</a>
-      <a class="catbar__link" href="ban-chay.html">Bán chạy</a>
+      ${CONFIG.FEATURES.bestSellers && !CONFIG.LIVE.catalog ? '<a class="catbar__link" href="ban-chay.html">Bán chạy</a>' : ''}
     </div></div>
   </header>`;
   initCategoryMenu(host.querySelector('.site-header'));
@@ -57,7 +57,8 @@ export function setCartCount(n) {
   document.querySelectorAll('[data-cart-badge]').forEach((b) => { b.textContent = n > 99 ? '99+' : n; b.hidden = !n; });
 }
 export async function refreshCartCount() {
-  try { setCartCount((await api.get('/cart')).count || 0); } catch { /* giữ nguyên */ }
+  try { setCartCount((await api.get('/cart')).count || 0); }
+  catch (error) { toast(error.message || 'Không thể cập nhật số lượng giỏ hàng.', 'error'); }
 }
 
 async function renderAuth(el) {

@@ -1,7 +1,8 @@
 // product-detail.js - thông tin chi tiết sản phẩm
 import { api, ApiError } from '../core/api.js';
 import { escapeHtml, qs, setBusy, toast } from '../core/ui.js';
-import { formatDate, formatVnd } from '../core/format.js';
+import { formatVnd } from '../core/format.js';
+import { imageUrl } from '../core/catalog.js';
 import { mountHeader } from '../components/header.js';
 import { mountFooter } from '../components/footer.js';
 import { mountBottomNav } from '../components/bottom-nav.js';
@@ -28,13 +29,6 @@ function renderState(title, message, error = false) {
   qs('#detail-retry')?.addEventListener('click', loadProduct);
 }
 
-function imageUrl(path) {
-  const value = String(path || '').trim();
-  if (!value || value === 'placeholder-product.svg') return 'assets/img/placeholder-product.svg';
-  if (/^(https?:|data:|blob:)/i.test(value) || value.startsWith('/')) return value;
-  return value.startsWith('uploads/') ? `../backend/${value}` : value;
-}
-
 function renderProduct(product) {
   const originalPrice = Number(product.gia_goc ?? product.gia_ban ?? product.gia);
   const currentPrice = Number(product.gia_ban_hieu_luc ?? product.gia_hieu_luc ?? product.gia_ban ?? product.gia);
@@ -46,9 +40,6 @@ function renderProduct(product) {
   const categoryName = category.ten_danh_muc || product.ten_danh_muc || '';
   const image = imageUrl(product.anh || product.hinh_anh || product.anh_thumb);
   const description = String(product.mo_ta || '').trim();
-  const expiry = product.nhan_khuyen_mai === 'CAN_HAN' && product.han_su_dung
-    ? `<p class="detail-expiry"><i class="bi bi-calendar-check" aria-hidden="true"></i> Hạn sử dụng: ${escapeHtml(formatDate(product.han_su_dung))}</p>`
-    : '';
   const safeName = escapeHtml(product.ten_san_pham || product.ten || 'Sản phẩm');
 
   root.setAttribute('aria-busy', 'false');
@@ -59,7 +50,7 @@ function renderProduct(product) {
     </nav>
     <article class="detail-layout">
       <div class="detail-gallery">
-        <div class="detail-gallery__image"><img id="detail-image" src="${escapeHtml(image)}" alt="${safeName}"></div>
+        <div class="detail-gallery__image"><img id="detail-image" src="${escapeHtml(image)}" alt="${safeName}" loading="lazy" decoding="async"></div>
       </div>
       <section class="detail-info" aria-labelledby="detail-title">
         ${categoryName ? `<a class="detail-category" href="san-pham.html${category.slug ? `?category=${encodeURIComponent(category.slug)}` : ''}">${escapeHtml(categoryName)}</a>` : ''}
@@ -72,7 +63,6 @@ function renderProduct(product) {
           <strong class="detail-price__current">${formatVnd(currentPrice)}</strong>
           ${discount > 0 ? `<del class="detail-price__old">${formatVnd(originalPrice)}</del><span class="detail-price__discount">-${discount}%</span>` : ''}
         </div>
-        ${expiry}
         <section class="detail-description" aria-labelledby="detail-description-title">
           <h2 id="detail-description-title">Thông tin sản phẩm</h2>
           <p>${description ? escapeHtml(description).replace(/\r?\n/g, '<br>') : 'Thông tin mô tả cho sản phẩm hiện chưa được cập nhật.'}</p>
@@ -98,7 +88,7 @@ function renderProduct(product) {
   const imageElement = qs('#detail-image');
   imageElement.addEventListener('error', () => {
     if (imageElement.src.endsWith('/assets/img/placeholder-product.svg')) return;
-    imageElement.src = 'assets/img/placeholder-product.svg';
+    imageElement.src = imageUrl('placeholder-product.svg');
   }, { once: true });
 
   const quantityInput = qs('#detail-quantity');

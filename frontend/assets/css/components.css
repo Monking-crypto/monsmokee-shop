@@ -44,6 +44,8 @@
 .pc__flag{position:absolute;top:8px;left:8px;padding:2px 8px;border-radius:var(--ms-radius-pill);background:var(--ms-red);
   color:#fff;font-size:var(--fs-xs);font-weight:800}
 .pc__flag--soon{background:var(--ms-muted)}
+.pc__flag--friday{background:#7c2d12}
+.pc__flag--expiry{background:#9a3412}
 .pc__soldout{position:absolute;inset:0;display:grid;place-items:center;background:rgba(255,255,255,.72);
   font-weight:800;color:var(--ms-red);font-size:var(--fs-md)}
 .pc__body{display:flex;flex-direction:column;gap:2px;padding:10px 10px 12px;flex:1}

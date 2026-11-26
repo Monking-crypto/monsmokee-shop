@@ -1,5 +1,6 @@
 // best-sellers.js - bảng xếp hạng bán chạy có lọc danh mục và phân trang
 import { ApiError } from '../core/api.js';
+import { CONFIG } from '../core/config.js';
 import { getCategories, getProducts } from '../core/catalog.js';
 import { escapeHtml, qs } from '../core/ui.js';
 import { mountHeader } from '../components/header.js';
@@ -61,6 +62,13 @@ async function load(page = 1) {
   } finally { loading = false; }
 }
 
+function showUnavailable() {
+  categoryRoot.replaceChildren();
+  results.innerHTML = `<div class="ms-state"><strong>Tính năng Bán chạy đang được phát triển</strong>
+    <p>Bảng xếp hạng sẽ xuất hiện khi backend cung cấp dữ liệu bán hàng.</p>
+    <a class="ms-btn ms-btn--green" href="san-pham.html">Xem tất cả sản phẩm</a></div>`;
+}
+
 async function loadMore() {
   if (!loading && pagination.has_more) await load(pagination.page + 1);
 }
@@ -78,11 +86,15 @@ mountFooter(qs('#site-footer'));
 mountBottomNav(qs('#bottom-nav'));
 bindProductCards(document);
 
-try {
-  categories = await getCategories();
-  renderCategories();
-  await load();
-} catch {
-  categoryRoot.innerHTML = '<p class="ms-state">Không tải được danh mục sản phẩm.</p>';
-  results.innerHTML = '<div class="ms-state"><strong>Không tải được bảng xếp hạng</strong>Vui lòng tải lại trang.</div>';
+if (CONFIG.LIVE.catalog || !CONFIG.FEATURES.bestSellers) {
+  showUnavailable();
+} else {
+  try {
+    categories = await getCategories();
+    renderCategories();
+    await load();
+  } catch (error) {
+    categoryRoot.innerHTML = `<p class="ms-state">Không tải được danh mục sản phẩm: ${escapeHtml(error.message)}</p>`;
+    results.innerHTML = '<div class="ms-state"><strong>Không tải được bảng xếp hạng</strong>Vui lòng tải lại trang.</div>';
+  }
 }

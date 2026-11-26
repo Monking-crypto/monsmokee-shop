@@ -2,6 +2,7 @@
 import { api, ApiError } from '../core/api.js';
 import { debounce, escapeHtml, qs, toast } from '../core/ui.js';
 import { formatVnd } from '../core/format.js';
+import { imageUrl } from '../core/catalog.js';
 import { confirmDialog } from '../components/confirm-dialog.js';
 
 const root = qs('#admin-page-content');
@@ -82,19 +83,10 @@ function formatPriceInput(event) {
   input.value = digits ? Number(digits).toLocaleString('vi-VN') : '';
 }
 
-function productImageSrc(path) {
-  const value = String(path || '');
-  if (!value) return '../assets/img/placeholder-product.svg';
-  if (/^(https?:|data:|blob:)/i.test(value)) return value;
-  if (value.startsWith('uploads/')) return `../../backend/${value}`;
-  if (value.startsWith('assets/')) return `../${value}`;
-  return value;
-}
-
 function renderTable() {
   const rows = products.map((product) => {
     const visible = Number(product.trang_thai) === 1;
-    return `<tr><td><img class="admin-product-thumb" src="${escapeHtml(productImageSrc(product.anh_thumb || product.anh))}" alt="" loading="lazy" decoding="async"></td>
+    return `<tr><td><img class="admin-product-thumb" src="${escapeHtml(imageUrl(product.anh_thumb || product.anh))}" alt="" loading="lazy" decoding="async"></td>
       <td>${escapeHtml(product.ten)}</td><td>${escapeHtml(product.ten_danh_muc || categories.find((category) => Number(category.id) === Number(product.danh_muc_id))?.ten_danh_muc || '')}</td>
       <td>${formatVnd(product.gia)}</td><td>${Number(product.so_luong_ton) || 0}</td>
       <td><span class="admin-status${visible ? '' : ' is-hidden'}">${visible ? 'Đang hiển thị' : 'Đang ẩn'}</span></td>
@@ -135,7 +127,7 @@ function openForm(product = null) {
   qs('#save-product').textContent = product ? 'Lưu thay đổi' : 'Lưu sản phẩm';
   const preview = qs('#product-image-preview');
   preview.hidden = !(product?.anh_thumb || product?.anh);
-  if (!preview.hidden) preview.src = productImageSrc(product.anh_thumb || product.anh);
+  if (!preview.hidden) preview.src = imageUrl(product.anh_thumb || product.anh);
   clearErrors();
   qs('#product-modal').hidden = false;
   form.elements.ten.focus();

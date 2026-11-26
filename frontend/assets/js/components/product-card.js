@@ -2,6 +2,7 @@
 import { api, ApiError } from '../core/api.js';
 import { escapeHtml, toast } from '../core/ui.js';
 import { formatVnd, formatDate } from '../core/format.js';
+import { daysUntilExpiry, imageUrl } from '../core/catalog.js';
 import { confirmDialog } from './confirm-dialog.js';
 
 const productRecords = new Map();
@@ -17,19 +18,13 @@ function normalizeProduct(product) {
     hinh_anh: image,
     don_vi_tinh: product.don_vi_tinh || '',
     hsd: product.hsd || product.han_su_dung || '',
+    nhan_khuyen_mai: product.nhan_khuyen_mai || null,
     danh_muc_id: product.danh_muc_id ?? category.id,
     danh_muc_slug: product.danh_muc_slug || category.slug || '',
     con_hang: typeof product.con_hang === 'boolean'
       ? product.con_hang
       : Number(product.so_luong_ton) > 0,
   };
-}
-
-function productImageUrl(path) {
-  const value = String(path || '');
-  if (!value) return 'assets/img/placeholder-product.svg';
-  if (/^(https?:|data:|blob:)/i.test(value) || value.startsWith('/')) return value;
-  return value.startsWith('uploads/') ? `../backend/${value}` : value;
 }
 
 export function productCard(product, options = {}) {
@@ -41,10 +36,15 @@ export function productCard(product, options = {}) {
     && item.so_luong_ton !== '' && Number.isFinite(Number(item.so_luong_ton));
   const out = hasStock ? Number(item.so_luong_ton) <= 0 : item.con_hang === false;
   const price = item.gia_hieu_luc;
-  const expiryDays = Number(item.near_expiry_days) || daysUntil(item.hsd);
+  const expiryDays = Number(item.near_expiry_days) || daysUntilExpiry(item.hsd);
+  const promotionFlag = item.nhan_khuyen_mai === 'THU_SAU'
+    ? '<span class="pc__flag pc__flag--friday">Siêu sale Thứ 6</span>'
+    : item.nhan_khuyen_mai === 'CAN_HAN'
+      ? '<span class="pc__flag pc__flag--expiry">Cận hạn</span>'
+      : sale ? `<span class="pc__flag">-${Number(item.phan_tram_giam)}%</span>` : '';
   const flag = item.sap_dien_ra
     ? '<span class="pc__flag pc__flag--soon">Sắp diễn ra</span>'
-    : sale ? `<span class="pc__flag">-${Number(item.phan_tram_giam)}%</span>` : '';
+    : promotionFlag;
   const urgency = options.nearExpiry
     ? `<span class="expiry-days expiry-days--${expiryDays <= 3 ? 'urgent' : expiryDays <= 7 ? 'soon' : 'later'}">Còn ${expiryDays} ngày</span>`
     : '';
@@ -58,7 +58,7 @@ export function productCard(product, options = {}) {
   const cls = ['pc', options.nearExpiry && 'pc--near-expiry', options.rank && 'pc--ranked', options.rank <= 3 && 'pc--rank-top', out && 'is-out-of-stock'].filter(Boolean).join(' ');
   const href = `chi-tiet-san-pham.html?id=${encodeURIComponent(item.id)}`;
   const categoryKey = options.categoryKey || item.danh_muc_slug || item.danh_muc_id || '';
-  const image = productImageUrl(item.hinh_anh);
+  const image = imageUrl(item.hinh_anh);
   return `<article class="${cls}" data-id="${escapeHtml(item.id)}" data-product-key="${escapeHtml(recordKey)}" data-category-key="${escapeHtml(categoryKey)}">
     ${rank}
     <a class="pc__media" href="${href}" tabindex="-1" aria-hidden="true">
@@ -74,15 +74,6 @@ export function productCard(product, options = {}) {
         <div class="shelf-tag${sale ? ' is-sale' : ''}"><span class="shelf-tag__price">${formatVnd(price)}</span>${sale ? `<s class="shelf-tag__old">${formatVnd(item.gia_ban)}</s>` : ''}</div>
         <div class="pc__action"><button class="pc__add" type="button" data-add ${out ? 'disabled' : ''} aria-label="Thêm ${escapeHtml(item.ten_san_pham)} vào giỏ">${out ? 'Hết hàng' : 'Thêm'}</button></div>
       </div></div></article>`;
-}
-
-function daysUntil(value) {
-  if (!value) return 0;
-  const expiry = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(expiry.getTime())) return 0;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return Math.max(0, Math.ceil((expiry.getTime() - today.getTime()) / 86400000));
 }
 
 function compactCount(value) {

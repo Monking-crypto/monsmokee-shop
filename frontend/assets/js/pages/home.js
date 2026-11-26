@@ -1,6 +1,8 @@
 // home.js - trang chủ tải từng nhóm sản phẩm khi gần tới viewport
 import { api } from '../core/api.js';
-import { getCategories, getProducts } from '../core/catalog.js';
+import { daysUntilExpiry, getCategories, getProducts } from '../core/catalog.js';
+import { CONFIG } from '../core/config.js';
+import { serverNow } from '../core/api.js';
 import { escapeHtml, qs } from '../core/ui.js';
 import { mountHeader } from '../components/header.js';
 import { mountFooter } from '../components/footer.js';
@@ -36,14 +38,16 @@ function createHome(categories) {
   const parts = [
     saleSection(),
     section('can-han', 'Cận hạn, giảm 50%', 'Còn dùng tốt, giá rẻ một nửa. Số lượng có hạn.', `<div id="expiry-content" data-lazy-section="expiry" aria-busy="true">${skeleton()}</div>`, '<a class="ms-section__more" href="can-han.html">Xem tất cả hàng cận hạn</a>'),
-    section('ban-chay', 'Bán chạy', 'Xếp hạng sẽ hiển thị khi API cung cấp dữ liệu bán hàng.', state('Chưa có dữ liệu xếp hạng', 'API công khai hiện chưa cung cấp bảng xếp hạng bán chạy.'), '<a class="ms-section__more" href="ban-chay.html">Xem trang bán chạy</a>'),
     section('goi-y', 'Sản phẩm mới', 'Các sản phẩm mới nhất tại cửa hàng.', `<div id="latest-content" data-lazy-section="latest" aria-busy="true">${skeleton()}</div>`),
   ];
+  if (CONFIG.FEATURES.bestSellers && !CONFIG.LIVE.catalog) {
+    parts.splice(2, 0, section('ban-chay', 'Bán chạy', 'Sản phẩm được khách mua nhiều nhất.', `<div id="best-content" data-lazy-section="best" aria-busy="true">${skeleton()}</div>`, '<a class="ms-section__more" href="ban-chay.html">Xem bảng xếp hạng</a>'));
+  }
 
   categories.forEach((category) => {
     const id = `category-${category.id}`;
     const more = `<a class="ms-section__more" href="san-pham.html?category=${encodeURIComponent(category.slug)}">Xem tất cả ${escapeHtml(category.ten_danh_muc)}</a>`;
-    parts.push(section(id, category.ten_danh_muc, '', `<div id="${id}-content" data-lazy-section="category" data-category-id="${Number(category.id)}" data-category-slug="${escapeHtml(category.slug)}" aria-busy="true">${skeleton()}</div>`, more));
+    parts.push(section(id, category.ten_danh_muc, '', `<div id="${id}-content" data-lazy-section="category" data-category-id="${Number(category.id)}" data-category-slug="${escapeHtml(category.slug)}" data-category-name="${escapeHtml(category.ten_danh_muc)}" aria-busy="true">${skeleton()}</div>`, more));
   });
   root.innerHTML = parts.join('');
   root.addEventListener('click', (event) => {
@@ -71,20 +75,30 @@ function observeSections() {
 }
 
 function nextFriday() {
-  const now = new Date();
-  const weekday = now.getDay();
+  const now = serverNow();
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: 'numeric', day: 'numeric',
+  }).formatToParts(now).filter((part) => part.type !== 'literal').map((part) => [part.type, Number(part.value)]));
+  const weekday = new Date(Date.UTC(parts.year, parts.month - 1, parts.day)).getUTCDay();
   const daysUntilFriday = (5 - weekday + 7) % 7 || 7;
-  const next = new Date(now);
-  next.setDate(now.getDate() + daysUntilFriday);
-  next.setHours(0, 0, 0, 0);
-  return next;
+  return new Date(Date.UTC(parts.year, parts.month - 1, parts.day + daysUntilFriday, -7));
+}
+
+function currentFridayEnd() {
+  const now = serverNow();
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: 'numeric', day: 'numeric',
+  }).formatToParts(now).filter((part) => part.type !== 'literal').map((part) => [part.type, Number(part.value)]));
+  const weekday = new Date(Date.UTC(parts.year, parts.month - 1, parts.day)).getUTCDay();
+  const daysUntilFriday = (5 - weekday + 7) % 7;
+  return new Date(Date.UTC(parts.year, parts.month - 1, parts.day + daysUntilFriday + 1, -7) - 1000);
 }
 
 function renderSale(data) {
   const promotion = data.promotions?.find((item) => item.loai === 'THU_SAU');
   const target = qs('#sale-thu-6');
   const active = Boolean(promotion);
-  const end = promotion?.ngay_ket_thuc || nextFriday();
+  const end = active ? currentFridayEnd() : nextFriday();
   target.querySelector('.home-friday__tag').textContent = `-${Number(promotion?.phan_tram_giam) || 10}%`;
   target.querySelector('h2').textContent = active ? 'Siêu sale Thứ 6 đang mở bán' : 'Thứ 6 này có ưu đãi mới';
   target.querySelector('.home-friday__lead p').textContent = active
@@ -116,23 +130,31 @@ async function loadSection(id) {
         const query = new URLSearchParams({ per_page: '5' });
         if (kind === 'expiry') query.set('near_expiry', '1');
         if (kind === 'latest') query.set('sort', 'newest');
+        if (kind === 'best') query.set('sort', 'best');
         if (kind === 'category') query.set('category_id', target.dataset.categoryId);
         const data = await getProducts(query);
         const products = kind === 'expiry'
           ? data.products.map((product) => {
-            const expiry = product.han_su_dung || product.hsd;
-            const expiryTime = expiry ? new Date(`${expiry}T00:00:00`).getTime() : NaN;
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const days = Number.isFinite(expiryTime)
-              ? Math.ceil((expiryTime - today.getTime()) / 86400000)
-              : 0;
-            return { ...product, hsd: expiry, near_expiry_days: Number(product.near_expiry_days) || days };
-          }).filter((product) => Number(product.phan_tram_giam) === 50 && product.hsd)
+              const expiry = product.han_su_dung;
+              return { ...product, hsd: expiry, near_expiry_days: daysUntilExpiry(expiry, serverNow()) };
+            }).filter((product) => product.nhan_khuyen_mai === 'CAN_HAN' && product.hsd)
           : data.products;
         target.innerHTML = products.length
           ? rail(products, kind === 'expiry' ? { nearExpiry: true, showHsd: true } : {})
           : state(kind === 'expiry' ? 'Hiện chưa có hàng cận hạn' : 'Chưa có sản phẩm', 'Vui lòng quay lại sau.');
+        if (kind === 'best') {
+          target.innerHTML = products.length
+            ? rail(products)
+            : state('Chưa có dữ liệu bán chạy', 'Hiện chưa có sản phẩm trong bảng xếp hạng.');
+        }
+        if (kind === 'category') {
+          const more = target.closest('.ms-section')?.querySelector('.ms-section__more');
+          const remaining = Math.max(0, data.pagination.total - data.products.length);
+          if (more) {
+            more.hidden = remaining === 0;
+            more.textContent = `Xem thêm ${remaining} sản phẩm ${target.dataset.categoryName || ''}`.trim();
+          }
+        }
         target.setAttribute('aria-busy', 'false');
       }
     } catch (error) {

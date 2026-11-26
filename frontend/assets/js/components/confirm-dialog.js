@@ -1,4 +1,5 @@
 import { escapeHtml } from '../core/ui.js';
+import { imageUrl } from '../core/catalog.js';
 import { formatVnd } from '../core/format.js';
 
 let activeDialog;
@@ -23,7 +24,7 @@ export function confirmDialog({
       <h2 id="confirm-title">${escapeHtml(title)}</h2>
       <p id="confirm-message">${escapeHtml(message)}</p>
       ${product ? `<div class="confirm-dialog__product">
-        <img src="${escapeHtml(product.hinh_anh || 'assets/img/placeholder-product.svg')}" alt="">
+        <img src="${escapeHtml(imageUrl(product.hinh_anh))}" alt="" loading="lazy" decoding="async">
         <div><strong>${escapeHtml(product.ten_san_pham)}</strong><span>${formatVnd(product.gia_hieu_luc ?? product.gia_ban)} / ${escapeHtml(product.don_vi_tinh || '')}</span></div>
       </div>
       <label class="confirm-dialog__quantity">Số lượng

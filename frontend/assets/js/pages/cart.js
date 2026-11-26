@@ -7,11 +7,15 @@ import { mountHeader } from '../components/header.js';
 import { mountFooter } from '../components/footer.js';
 import { mountBottomNav } from '../components/bottom-nav.js';
 import { confirmDialog } from '../components/confirm-dialog.js';
+import { imageUrl } from '../core/catalog.js';
 
 const root = qs('#cart-app');
 let cart = null;
 let fulfillment = localStorage.getItem('ms_fulfillment') || 'delivery';
 let busy = false;
+let shippingQuote = null;
+let shippingQuoteError = '';
+let shippingQuoteLoading = false;
 
 function deliveryAddress() {
   try { return JSON.parse(localStorage.getItem('ms_delivery') || 'null'); }
@@ -43,7 +47,7 @@ function productRow(item) {
   const discounted = Number(product.phan_tram_giam) > 0;
   const href = `chi-tiet-san-pham.html?id=${encodeURIComponent(product.id)}`;
   return `<article class="cart-row${insufficient ? ' is-unavailable' : ''}" data-cart-row="${escapeHtml(product.id)}">
-    <a class="cart-row__image" href="${href}"><img src="${escapeHtml(product.hinh_anh || 'assets/img/placeholder-product.svg')}" alt=""></a>
+    <a class="cart-row__image" href="${href}"><img src="${escapeHtml(imageUrl(product.anh_thumb || product.hinh_anh || product.anh))}" alt="" loading="lazy" decoding="async"></a>
     <div class="cart-row__details">
       <a class="cart-row__name" href="${href}">${escapeHtml(product.ten_san_pham)}</a>
       <span class="cart-row__unit">Đơn vị: ${escapeHtml(product.don_vi_tinh || '')}</span>
@@ -69,17 +73,31 @@ function summary() {
   const subtotal = Math.max(0, Number(cart.tam_tinh) || 0);
   const discount = Math.max(0, Number(cart.giam_gia) || 0);
   const payableGoods = Math.max(0, subtotal - discount);
-  const fee = fulfillment === 'pickup' ? 0 : cart.phi_ship_tam_tinh;
-  const feeKnown = Number.isFinite(Number(fee)) && fee !== null;
+  const fee = fulfillment === 'pickup' ? 0 : shippingQuote?.phi_ship_tam_tinh;
+  const feeKnown = fulfillment === 'pickup'
+    || (Number.isFinite(Number(fee)) && fee !== null && shippingQuote?.giao_duoc === true);
   const total = payableGoods + (feeKnown ? Number(fee) : 0);
-  const minimumMissing = fulfillment === 'delivery' && payableGoods < CONFIG.COD_MIN_ORDER;
-  const freeThresholdMissing = Math.max(0, CONFIG.FREESHIP_FROM - payableGoods);
-  const addressMissing = fulfillment === 'delivery' && !feeKnown;
+  const addressMissing = fulfillment === 'delivery' && !Number(address?.khu_vuc_id);
+  const deliveryUnavailable = fulfillment === 'delivery' && shippingQuote?.giao_duoc === false;
+  const quoteMissing = fulfillment === 'delivery' && !addressMissing && !shippingQuote;
   const inventoryMissing = cart.items.some((item) => Number(item.san_pham.so_luong_ton) < Number(item.so_luong));
-  const orderDisabled = busy || minimumMissing || addressMissing || inventoryMissing;
-  const orderWarning = minimumMissing
-    ? `Đơn giao hàng tối thiểu ${formatVnd(CONFIG.COD_MIN_ORDER)}. Vui lòng mua thêm ${formatVnd(CONFIG.COD_MIN_ORDER - payableGoods)}.`
-    : inventoryMissing ? 'Có sản phẩm hết hàng hoặc vượt tồn kho. Hãy cập nhật giỏ hàng trước khi đặt.' : '';
+  const orderDisabled = busy || addressMissing || quoteMissing || shippingQuoteLoading || deliveryUnavailable || inventoryMissing;
+  const orderWarning = addressMissing
+    ? 'Hãy chọn khu vực giao hàng để kiểm tra khả năng phục vụ.'
+    : deliveryUnavailable
+      ? shippingQuote?.ly_do || 'Khu vực này hiện chưa hỗ trợ giao hàng.'
+      : shippingQuoteError
+        ? shippingQuoteError
+        : inventoryMissing ? 'Có sản phẩm hết hàng hoặc vượt tồn kho. Hãy cập nhật giỏ hàng trước khi đặt.' : '';
+  const shippingLine = fulfillment === 'pickup'
+    ? '0đ · Nhận tại cửa hàng'
+    : shippingQuoteLoading
+      ? 'Đang tính phí…'
+      : shippingQuoteError
+        ? 'Không tính được phí giao hàng'
+        : shippingQuote
+          ? `${formatVnd(shippingQuote.phi_ship_tam_tinh)}${shippingQuote.ly_do ? `<small>${escapeHtml(shippingQuote.ly_do)}</small>` : ''}`
+          : 'Chọn khu vực giao hàng để tính phí';
   return `<aside class="cart-summary">
     <h2>Tóm tắt đơn hàng</h2>
     <fieldset class="cart-fulfillment"><legend>Hình thức nhận hàng</legend>
@@ -88,16 +106,17 @@ function summary() {
     </fieldset>
     ${fulfillment === 'delivery' ? `<div class="cart-address">
       ${address?.short ? `<span>Địa chỉ: ${escapeHtml(address.short)}</span>` : '<span>Chọn khu vực giao hàng để tính phí</span>'}
-      ${!feeKnown ? '<button type="button" class="link-btn" data-action="choose-address">Chọn khu vực giao hàng</button>' : ''}
+      ${addressMissing ? '<button type="button" class="link-btn" data-action="choose-address">Chọn khu vực giao hàng</button>' : ''}
     </div>` : '<p class="cart-address">Nhận tại cửa hàng, không tính phí giao hàng.</p>'}
     <div class="cart-summary__lines">
       <div><span>Tạm tính</span><strong>${formatVnd(subtotal)}</strong></div>
       <div><span>Giảm giá</span><strong>−${formatVnd(discount)}</strong></div>
-      <div><span>Phí giao hàng tạm tính</span><strong>${(fulfillment === 'delivery' && !address) || !feeKnown ? 'Chọn khu vực giao hàng để tính phí' : formatVnd(fee)}</strong></div>
+      <div><span>Phí giao hàng tạm tính</span><strong>${shippingLine}</strong></div>
       <div class="cart-summary__total"><span>Tổng cộng</span><strong>${formatVnd(total)}</strong></div>
     </div>
-    ${fulfillment === 'delivery' ? `<div class="cart-freeship"><div class="cart-freeship__track"><span style="width:${Math.min(100, payableGoods / CONFIG.FREESHIP_FROM * 100)}%"></span></div>
-      <p>${freeThresholdMissing ? `Mua thêm ${formatVnd(freeThresholdMissing)} để được miễn phí giao hàng` : 'Đơn hàng được miễn phí giao hàng'}</p></div>` : ''}
+    ${fulfillment === 'delivery' && shippingQuote ? `<div class="cart-freeship"><p>${shippingQuote.mien_phi ? 'Đơn hàng được miễn phí giao hàng.' : 'Đơn hàng có tính phí giao hàng.'}</p>
+      ${shippingQuote.cho_phep_cod ? '<p>Địa chỉ hỗ trợ thanh toán COD.</p>' : shippingQuote.ly_do_khong_cod ? `<p>${escapeHtml(shippingQuote.ly_do_khong_cod)}</p>` : ''}</div>` : ''}
+    ${shippingQuoteError ? '<button type="button" class="link-btn" data-action="retry-quote">Thử tính phí lại</button>' : ''}
     ${orderWarning ? `<p class="cart-order-warning" role="alert">${orderWarning}</p>` : ''}
     <button type="button" class="ms-btn ms-btn--green ms-btn--block" data-action="checkout" ${orderDisabled ? 'disabled' : ''}>Tiến hành đặt hàng</button>
     <button type="button" class="cart-clear" data-action="clear" ${busy ? 'disabled' : ''}>Xóa giỏ hàng</button>
@@ -119,11 +138,35 @@ async function loadCart() {
   renderSkeleton();
   try {
     cart = await api.get('/cart');
+    await refreshShippingQuote();
     syncBadge();
     render();
   } catch (error) {
     root.innerHTML = `<div class="ms-state"><strong>Không tải được giỏ hàng</strong>${escapeHtml(error.message)}<div class="mt-3"><button class="ms-btn ms-btn--green" id="cart-retry" type="button">Thử lại</button></div></div>`;
     qs('#cart-retry').addEventListener('click', loadCart);
+  }
+}
+
+async function refreshShippingQuote() {
+  shippingQuote = null;
+  shippingQuoteError = '';
+  const address = deliveryAddress();
+  if (fulfillment !== 'delivery' || !cart || !address?.khu_vuc_id) {
+    shippingQuoteLoading = false;
+    return;
+  }
+  shippingQuoteLoading = true;
+  try {
+    shippingQuote = await api.post('/shipping/quote', {
+      khu_vuc_id: Number(address.khu_vuc_id),
+      tien_hang_sau_giam: Math.max(0, Math.trunc(Number(cart.tam_tinh) - Number(cart.giam_gia))),
+    });
+  } catch (error) {
+    shippingQuoteError = error instanceof ApiError
+      ? error.message
+      : 'Không thể tính phí giao hàng. Vui lòng thử lại.';
+  } finally {
+    shippingQuoteLoading = false;
   }
 }
 
@@ -145,6 +188,7 @@ async function updateQuantity(id, quantity) {
   render();
   try {
     cart = await api.put(`/cart/items/${id}`, { so_luong: quantity });
+    await refreshShippingQuote();
     syncBadge();
   } catch (error) {
     if (error instanceof ApiError && error.status) toast(error.message, 'error');
@@ -171,7 +215,7 @@ root.addEventListener('click', async (event) => {
     });
     if (!confirmed) return;
     busy = true;
-    try { cart = await api.del(`/cart/items/${id}`); syncBadge(); toast('Đã xóa sản phẩm khỏi giỏ hàng'); }
+    try { cart = await api.del(`/cart/items/${id}`); await refreshShippingQuote(); syncBadge(); toast('Đã xóa sản phẩm khỏi giỏ hàng'); }
     catch (error) { if (error instanceof ApiError && error.status) toast(error.message, 'error'); }
     finally { busy = false; render(); }
   } else if (action === 'clear') {
@@ -182,11 +226,14 @@ root.addEventListener('click', async (event) => {
     });
     if (!confirmed) return;
     busy = true;
-    try { cart = await api.del('/cart'); syncBadge(); toast('Đã xóa giỏ hàng'); }
+    try { cart = await api.del('/cart'); await refreshShippingQuote(); syncBadge(); toast('Đã xóa giỏ hàng'); }
     catch (error) { if (error instanceof ApiError && error.status) toast(error.message, 'error'); }
     finally { busy = false; render(); }
   } else if (action === 'choose-address') {
     document.getElementById('delivery-open')?.click();
+  } else if (action === 'retry-quote') {
+    await refreshShippingQuote();
+    render();
   } else if (action === 'checkout') {
     try {
       const { user } = await api.get('/auth/me');

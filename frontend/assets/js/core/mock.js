@@ -1,5 +1,6 @@
 // mock.js - dữ liệu mẫu dùng chung cho giao diện khách và quản trị
 import { normalizeKeyword } from './format.js';
+import { CONFIG } from './config.js';
 
 const CATS = [
   ['banh-keo', 'Bánh kẹo', 'cookie', ['Bánh quy', 'Kẹo', 'Snack', 'Bánh ngọt']],
@@ -154,8 +155,8 @@ function fridaySaleWindow(now = new Date()) {
   };
 }
 const getFridayActive = () => fridaySaleWindow().active;
-function fridaySaleData() {
-  const window = fridaySaleWindow();
+function fridaySaleData(now = new Date()) {
+  const window = fridaySaleWindow(now);
   const products = allProducts().filter(productIsVisible);
   const promo = fridayProgram() || { id: 'friday-sale', enabled: true, productIds: [] };
   if (!promo.productIds.length) {
@@ -163,12 +164,13 @@ function fridaySaleData() {
       .sort(() => Math.random() - .5).slice(0, 10).map((product) => product.id);
     saveFridayProgram(promo);
   }
-  const nearExpiryIds = new Set(nearExpiryProducts().map((product) => Number(product.id)));
+  const nearExpiry = new Map(nearExpiryProducts().map((product) => [Number(product.id), product]));
   const saleProducts = window.active && promo.enabled && localStorage.getItem('ms_dev_friday') !== 'empty'
     ? products.filter((product) => promo.productIds.includes(product.id)).slice(0, 10)
       .map((product) => {
         const category = allCategories().find((item) => Number(item.id) === Number(product.danh_muc_id));
-        return withSale(product, nearExpiryIds.has(Number(product.id)) ? 50 : 10, {
+        const expiryProduct = nearExpiry.get(Number(product.id));
+        return withSale(expiryProduct || product, expiryProduct ? 50 : 10, {
           danh_muc: category ? { id: category.id, ten_danh_muc: category.ten_danh_muc, slug: category.slug } : null,
         });
       })
@@ -176,7 +178,7 @@ function fridaySaleData() {
   return {
     active: window.active,
     ended: window.ended,
-    server_time: vietnamIso(Date.now()),
+    server_time: vietnamIso(now.getTime()),
     starts_at: vietnamIso(window.startsAt),
     ends_at: vietnamIso(window.endsAt),
     next_start: vietnamIso(window.nextStart),
@@ -189,6 +191,13 @@ const store = {
   get: (k, d) => { try { return JSON.parse(localStorage.getItem(`ms_mock_${k}`)) ?? d; } catch { return d; } },
   set: (k, v) => localStorage.setItem(`ms_mock_${k}`, JSON.stringify(v)),
 };
+const DEFAULT_DELIVERY_AREAS = [
+  { id: 1, tinh: 'Quảng Bình', quan_huyen: 'TP. Đồng Hới', phuong_xa: 'Đồng Phú', khoang_cach_km: 1.4, ho_tro: 1 },
+  { id: 2, tinh: 'Quảng Bình', quan_huyen: 'TP. Đồng Hới', phuong_xa: 'Nam Lý', khoang_cach_km: 2.1, ho_tro: 1 },
+  { id: 3, tinh: 'Quảng Bình', quan_huyen: 'TP. Đồng Hới', phuong_xa: 'Hải Thành', khoang_cach_km: 2.4, ho_tro: 1 },
+  { id: 4, tinh: 'Quảng Bình', quan_huyen: 'TP. Đồng Hới', phuong_xa: 'Bắc Lý', khoang_cach_km: 3.2, ho_tro: 1 },
+];
+const allDeliveryAreas = () => store.get('deliveryAreas', DEFAULT_DELIVERY_AREAS);
 export function setMockAdminAuthenticated(authenticated) {
   store.set('adminAuth', Boolean(authenticated));
 }
@@ -382,8 +391,43 @@ function listProducts(params) {
   else if (sort === 'hsd') list.sort((a, b) => a.near_expiry_days - b.near_expiry_days);
   else if (sort === 'newest') list.sort((a, b) => b.id - a.id);
   const page = Math.max(1, Number(params.get('page')) || 1);
-  const perPage = Math.min(20, Math.max(1, Number(params.get('per_page')) || 24));
-  return { items: list.slice((page - 1) * perPage, page * perPage), total: list.length, page, per_page: perPage };
+  const perPage = Math.min(50, Math.max(1, Number(params.get('per_page')) || 12));
+  const nowParam = params.get('now');
+  const now = nowParam ? new Date(`${nowParam}T12:00:00+07:00`) : new Date();
+  const fridayProducts = new Map(fridaySaleData(now).products.map((product) => [Number(product.id), product]));
+  const products = list.slice((page - 1) * perPage, page * perPage).map((product) => {
+    const category = categories.find((item) => Number(item.id) === Number(product.danh_muc_id));
+    const saleProduct = fridayProducts.get(Number(product.id));
+    const current = saleProduct || product;
+    return {
+      id: Number(current.id),
+      ten_san_pham: current.ten_san_pham,
+      gia_ban: Number(current.gia_ban) || 0,
+      gia_goc: Number(current.gia_ban) || 0,
+      phan_tram_giam: Number(current.phan_tram_giam) || 0,
+      gia_ban_hieu_luc: Number(current.gia_hieu_luc ?? current.gia_ban) || 0,
+      nhan_khuyen_mai: saleProduct ? 'THU_SAU' : (current.nhan_khuyen_mai || (params.get('near_expiry') === '1' ? 'CAN_HAN' : null)),
+      anh_thumb: current.hinh_anh || 'placeholder-product.svg',
+      don_vi_tinh: current.don_vi_tinh || '',
+      so_luong_ton: Number(current.so_luong_ton) || 0,
+      con_hang: Number(current.so_luong_ton) > 0,
+      danh_muc_id: Number(current.danh_muc_id),
+      danh_muc_slug: category?.slug || '',
+      danh_muc: category ? { id: category.id, ten_danh_muc: category.ten_danh_muc, slug: category.slug } : null,
+      luot_ban: Number(current.luot_ban) || 0,
+      ...(current.hsd ? { han_su_dung: current.hsd } : {}),
+      ...(Number(current.near_expiry_days) ? { near_expiry_days: Number(current.near_expiry_days) } : {}),
+    };
+  });
+  return {
+    products,
+    pagination: {
+      page,
+      per_page: perPage,
+      total: list.length,
+      has_more: page * perPage < list.length,
+    },
+  };
 }
 
 let adminSecrets;
@@ -399,9 +443,50 @@ export async function handle(method, path, body = {}) {
   if (route === '/csrf') return ok({ token: 'mock' });
   if (route === '/home') return ok(home());
   if (route === '/promotions/friday-sale' && method === 'GET') return ok(fridaySaleData());
-  if (route === '/categories') return ok(allCategories().filter(categoryIsVisible));
+  if (route === '/categories') return ok({ categories: allCategories().filter(categoryIsVisible) });
+  if (route === '/store-info' && method === 'GET') return ok({
+    ten_cua_hang: 'MON SMOKEE',
+    dia_chi: 'TP. Đồng Hới, Quảng Bình',
+    hotline: '',
+    gio_mo_cua: '07:00',
+    gio_dong_cua: '21:30',
+  });
+  if (route === '/shipping/areas' && method === 'GET') {
+    return ok({ areas: allDeliveryAreas().filter((area) => Number(area.ho_tro) === 1) });
+  }
+  if (route === '/shipping/quote' && method === 'POST') {
+    const area = allDeliveryAreas().find((item) => Number(item.id) === Number(body.khu_vuc_id));
+    const amount = Number(body.tien_hang_sau_giam);
+    if (!area || !Number.isInteger(amount) || amount < 0) {
+      return fail(422, 'Dữ liệu tính phí giao hàng không hợp lệ', {
+        ...(!area ? { khu_vuc_id: 'Khu vực giao hàng không hợp lệ' } : {}),
+        ...(!Number.isInteger(amount) || amount < 0 ? { tien_hang_sau_giam: 'Phải là số nguyên không âm' } : {}),
+      });
+    }
+    const distance = Number(area.khoang_cach_km);
+    const giaoDuoc = Number(area.ho_tro) === 1
+      && !(amount < CONFIG.COD_MIN_ORDER && distance > CONFIG.FREESHIP_MAX_KM);
+    const mienPhi = giaoDuoc && (amount >= CONFIG.FREESHIP_FROM || distance <= CONFIG.FREESHIP_MAX_KM);
+    const phi = !giaoDuoc || mienPhi ? 0 : 15000;
+    const codAllowed = giaoDuoc && amount >= CONFIG.COD_MIN_ORDER;
+    return ok({
+      khu_vuc_id: Number(area.id),
+      khoang_cach_km: distance,
+      giao_duoc: giaoDuoc,
+      phi_ship_tam_tinh: phi,
+      mien_phi: giaoDuoc && mienPhi,
+      ly_do: !giaoDuoc
+        ? 'Đơn hàng dưới mức tối thiểu giao hàng; vui lòng chọn Click & Collect'
+        : mienPhi ? 'Đủ điều kiện miễn phí giao hàng.' : 'Phí vận chuyển tạm tính theo khu vực',
+      cho_phep_cod: codAllowed,
+      ly_do_khong_cod: codAllowed ? null : 'Đơn hàng chưa đạt mức tối thiểu hỗ trợ COD; vui lòng chọn Click & Collect',
+    });
+  }
   if (route === '/promotions/active' && method === 'GET') {
-    const friday = fridaySaleData();
+    const nowParam = params.get('now');
+    const now = nowParam ? new Date(`${nowParam}T12:00:00+07:00`) : new Date();
+    if (Number.isNaN(now.getTime())) return fail(422, 'Thời gian kiểm thử không hợp lệ', { now: 'now phải là ngày ISO hợp lệ' });
+    const friday = fridaySaleData(now);
     return ok({
       promotions: friday.active ? [{
         id: 'friday-sale',
@@ -419,10 +504,12 @@ export async function handle(method, path, body = {}) {
   const productMatch = route.match(/^\/products\/(\d+)$/);
   if (productMatch && method === 'GET') {
     const id = Number(productMatch[1]);
+    const nowParam = params.get('now');
+    const now = nowParam ? new Date(`${nowParam}T12:00:00+07:00`) : new Date();
     const product = allProducts().find((item) => Number(item.id) === id && item.trang_thai !== 'an');
     if (!product) return fail(404, 'Không tìm thấy sản phẩm');
     const category = allCategories().find((item) => Number(item.id) === Number(product.danh_muc_id));
-    const fridayProduct = fridaySaleData().products.find((item) => Number(item.id) === id);
+    const fridayProduct = fridaySaleData(now).products.find((item) => Number(item.id) === id);
     const current = fridayProduct || product;
     return ok({
       product: {
@@ -734,6 +821,230 @@ export async function handle(method, path, body = {}) {
     store.set('products', allProducts().filter((p) => !ids.has(p.id))); return ok({});
   }
   if (route === '/admin/products/reset' && method === 'POST') { store.set('products', PRODUCTS); return ok({}); }
+  if (route === '/admin/delivery-areas' && method === 'GET') {
+    return ok({ areas: allDeliveryAreas() });
+  }
+  if (route === '/admin/delivery-areas' && method === 'POST') {
+    const areas = allDeliveryAreas();
+    const area = {
+      id: Math.max(0, ...areas.map((item) => Number(item.id))) + 1,
+      tinh: String(body.tinh || '').trim(),
+      quan_huyen: String(body.quan_huyen || '').trim(),
+      phuong_xa: String(body.phuong_xa || '').trim(),
+      khoang_cach_km: Number(body.khoang_cach_km),
+      ho_tro: Number(body.ho_tro),
+    };
+    if (!area.tinh || !area.quan_huyen || !area.phuong_xa
+      || !Number.isFinite(area.khoang_cach_km) || area.khoang_cach_km < 0 || area.khoang_cach_km > 999.9
+      || ![0, 1].includes(area.ho_tro)) return fail(422, 'Dữ liệu khu vực giao hàng không hợp lệ');
+    if (areas.some((item) => item.tinh === area.tinh && item.quan_huyen === area.quan_huyen && item.phuong_xa === area.phuong_xa)) {
+      return fail(409, 'Khu vực giao hàng đã tồn tại');
+    }
+    store.set('deliveryAreas', [...areas, area]);
+    return ok({ id: area.id }, 'Đã tạo khu vực giao hàng');
+  }
+  const deliveryAreaMatch = route.match(/^\/admin\/delivery-areas\/(\d+)(?:\/status)?$/);
+  if (deliveryAreaMatch && method === 'PUT') {
+    const id = Number(deliveryAreaMatch[1]), areas = allDeliveryAreas();
+    const index = areas.findIndex((item) => Number(item.id) === id);
+    if (index < 0) return fail(404, 'Không tìm thấy khu vực giao hàng');
+    areas[index] = {
+      ...areas[index],
+      tinh: String(body.tinh || '').trim(),
+      quan_huyen: String(body.quan_huyen || '').trim(),
+      phuong_xa: String(body.phuong_xa || '').trim(),
+      khoang_cach_km: Number(body.khoang_cach_km),
+      ho_tro: Number(body.ho_tro),
+    };
+    store.set('deliveryAreas', areas);
+    return ok({ id }, 'Đã cập nhật khu vực giao hàng');
+  }
+  const deliveryStatusMatch = route.match(/^\/admin\/delivery-areas\/(\d+)\/status$/);
+  if (deliveryStatusMatch && method === 'PATCH') {
+    const id = Number(deliveryStatusMatch[1]), areas = allDeliveryAreas();
+    const area = areas.find((item) => Number(item.id) === id), status = Number(body.ho_tro);
+    if (!area) return fail(404, 'Không tìm thấy khu vực giao hàng');
+    if (![0, 1].includes(status)) return fail(422, 'ho_tro phải là 0 hoặc 1');
+    area.ho_tro = status;
+    store.set('deliveryAreas', areas);
+    return ok({ id, ho_tro: status }, 'Đã cập nhật trạng thái khu vực giao hàng');
+  }
+  if (route === '/admin/promotions' && method === 'GET') {
+    const list = store.get('apiPromotions', []).filter((item) =>
+      (!params.get('loai') || item.loai === params.get('loai'))
+      && (!params.has('trang_thai') || Number(item.trang_thai) === Number(params.get('trang_thai'))));
+    const page = Math.max(1, Number(params.get('page')) || 1);
+    const perPage = Math.min(50, Math.max(1, Number(params.get('per_page')) || 20));
+    return ok({
+      promotions: list.slice((page - 1) * perPage, page * perPage),
+      pagination: { page, per_page: perPage, total: list.length, total_pages: Math.ceil(list.length / perPage) },
+    });
+  }
+  if (route === '/admin/promotions' && method === 'POST') {
+    const list = store.get('apiPromotions', []);
+    const id = Math.max(0, ...list.map((item) => Number(item.id))) + 1;
+    const promotion = {
+      id,
+      ma_khuyen_mai: String(body.ma_khuyen_mai || ''),
+      ten_chuong_trinh: String(body.ten_chuong_trinh || ''),
+      loai: String(body.loai || ''),
+      phan_tram_giam: Number(body.phan_tram_giam) || 0,
+      so_san_pham: Number(body.so_san_pham) || 10,
+      so_san_pham_da_chon: 0,
+      che_do_chon_sp: Array.isArray(body.san_pham_ids) && body.san_pham_ids.length ? 'THU_CONG' : 'NGAU_NHIEN',
+      ngay_bat_dau: String(body.ngay_bat_dau || ''),
+      ngay_ket_thuc: String(body.ngay_ket_thuc || ''),
+      trang_thai: Number(body.trang_thai) || 0,
+      productIds: [],
+      manualIds: [],
+    };
+    if (!promotion.ma_khuyen_mai || !promotion.ten_chuong_trinh || promotion.loai !== 'THU_SAU'
+      || !/^\d{4}-\d{2}-\d{2}$/.test(promotion.ngay_bat_dau)
+      || !/^\d{4}-\d{2}-\d{2}$/.test(promotion.ngay_ket_thuc)) return fail(422, 'Dữ liệu khuyến mãi không hợp lệ');
+    const selected = [...new Set((body.san_pham_ids || []).map(Number))].filter(Number.isInteger).slice(0, 10);
+    promotion.manualIds = selected;
+    const eligible = allProducts().filter((product) => Number(product.so_luong_ton) > 0 && productIsVisible(product));
+    const random = eligible.filter((product) => !selected.includes(Number(product.id)))
+      .sort(() => Math.random() - 0.5).slice(0, 10 - selected.length).map((product) => Number(product.id));
+    promotion.productIds = [...selected, ...random];
+    promotion.so_san_pham_da_chon = promotion.productIds.length;
+    store.set('apiPromotions', [...list, promotion]);
+    return ok({ id }, 'Đã tạo khuyến mãi');
+  }
+  const promotionIdMatch = route.match(/^\/admin\/promotions\/(\d+)(?:\/(random-products|status))?$/);
+  if (promotionIdMatch) {
+    const id = Number(promotionIdMatch[1]);
+    const promotions = store.get('apiPromotions', []);
+    const promotion = promotions.find((item) => Number(item.id) === id);
+    if (!promotion) return fail(404, 'Không tìm thấy khuyến mãi');
+    const subroute = promotionIdMatch[2] || '';
+    if (subroute === '' && method === 'GET') {
+      return ok({
+        promotion,
+        products: promotion.productIds.map((productId) => {
+          const product = allProducts().find((item) => Number(item.id) === productId);
+          return product ? {
+            id: productId,
+            ten_san_pham: product.ten_san_pham,
+            la_chon_thu_cong: promotion.manualIds.includes(productId),
+            hop_le: Number(product.so_luong_ton) > 0 && productIsVisible(product),
+          } : null;
+        }).filter(Boolean),
+        warning: null,
+        che_do_chon_sp: promotion.che_do_chon_sp,
+      });
+    }
+    if (subroute === '' && method === 'PUT') {
+      promotion.ma_khuyen_mai = String(body.ma_khuyen_mai || promotion.ma_khuyen_mai);
+      promotion.ten_chuong_trinh = String(body.ten_chuong_trinh || promotion.ten_chuong_trinh);
+      promotion.phan_tram_giam = Number(body.phan_tram_giam) || promotion.phan_tram_giam;
+      promotion.ngay_bat_dau = String(body.ngay_bat_dau || promotion.ngay_bat_dau);
+      promotion.ngay_ket_thuc = String(body.ngay_ket_thuc || promotion.ngay_ket_thuc);
+      promotion.trang_thai = Number(body.trang_thai) || 0;
+      promotion.manualIds = [...new Set((body.san_pham_ids || []).map(Number))].filter(Number.isInteger).slice(0, 10);
+      const eligible = allProducts().filter((product) => Number(product.so_luong_ton) > 0 && productIsVisible(product));
+      const random = eligible.filter((product) => !promotion.manualIds.includes(Number(product.id)))
+        .sort(() => Math.random() - 0.5).slice(0, 10 - promotion.manualIds.length).map((product) => Number(product.id));
+      promotion.productIds = [...promotion.manualIds, ...random];
+      promotion.so_san_pham_da_chon = promotion.productIds.length;
+      store.set('apiPromotions', promotions);
+      return ok({ id }, 'Đã cập nhật khuyến mãi');
+    }
+    if (subroute === 'random-products' && method === 'POST') {
+      promotion.manualIds = [];
+      promotion.productIds = allProducts().filter((product) => Number(product.so_luong_ton) > 0 && productIsVisible(product))
+        .sort(() => Math.random() - 0.5).slice(0, 10).map((product) => Number(product.id));
+      promotion.so_san_pham_da_chon = promotion.productIds.length;
+      promotion.che_do_chon_sp = 'NGAU_NHIEN';
+      store.set('apiPromotions', promotions);
+      return ok({ id, products: promotion.productIds.map((productId) => ({ id: productId })) }, 'Đã bốc lại sản phẩm ngẫu nhiên');
+    }
+    if (subroute === 'status' && method === 'PATCH') {
+      const status = Number(body.trang_thai);
+      if (![0, 1].includes(status)) return fail(422, 'trang_thai chỉ nhận 0 hoặc 1');
+      promotion.trang_thai = status;
+      store.set('apiPromotions', promotions);
+      return ok({ id, trang_thai: status }, 'Đã cập nhật trạng thái khuyến mãi');
+    }
+  }
+  if (route === '/admin/stock-history' && method === 'GET') {
+    const history = store.get('stockHistory', []);
+    const page = Math.max(1, Number(params.get('page')) || 1);
+    const perPage = Math.min(50, Math.max(1, Number(params.get('per_page')) || 20));
+    return ok({
+      history: history.slice((page - 1) * perPage, page * perPage),
+      pagination: { page, per_page: perPage, total: history.length, total_pages: Math.ceil(history.length / perPage) },
+    });
+  }
+  if (route === '/admin/batches' && method === 'GET') {
+    const days = Number(params.get('expiring_within_days')) || 0;
+    const batches = (store.get('stockBatches', null) || nearExpiryProducts().map((product, index) => ({
+      id: index + 1,
+      san_pham_id: Number(product.id),
+      ten_san_pham: product.ten_san_pham,
+      han_su_dung: product.hsd,
+      so_luong_nhap: Number(product.so_luong_ton) || 10,
+      so_luong_con: Number(product.so_luong_ton) || 10,
+    }))).filter((batch) => {
+      if (params.get('expired') === '1') return batch.han_su_dung < new Date().toISOString().slice(0, 10);
+      if (days) {
+        const until = new Date();
+        until.setDate(until.getDate() + days);
+        return batch.han_su_dung >= new Date().toISOString().slice(0, 10)
+          && batch.han_su_dung <= until.toISOString().slice(0, 10);
+      }
+      return Number(batch.so_luong_con) > 0;
+    });
+    return ok({ batches });
+  }
+  if (route === '/admin/stock-receipts' && method === 'GET') {
+    const receipts = store.get('stockReceipts', []);
+    return ok({ receipts, pagination: { page: 1, per_page: 20, total: receipts.length, total_pages: receipts.length ? 1 : 0 } });
+  }
+  if (route === '/admin/stock-receipts' && method === 'POST') {
+    const receipt = body || {};
+    if (!Array.isArray(receipt.chi_tiet) || !receipt.chi_tiet.length) return fail(422, 'Phiếu nhập cần có ít nhất một dòng hàng');
+    const products = allProducts();
+    const history = store.get('stockHistory', []);
+    const batches = store.get('stockBatches', []);
+    for (const [index, line] of receipt.chi_tiet.entries()) {
+      const product = products.find((item) => Number(item.id) === Number(line.san_pham_id));
+      if (!product || !Number.isInteger(Number(line.so_luong)) || Number(line.so_luong) < 1
+        || !Number.isInteger(Number(line.gia_nhap)) || Number(line.gia_nhap) < 0
+        || !line.han_su_dung || !String(line.so_lo || '').trim()) {
+        return fail(422, 'Dữ liệu dòng hàng không hợp lệ', { [`chi_tiet[${index}]`]: 'Kiểm tra lại dòng hàng' });
+      }
+      product.so_luong_ton = Number(product.so_luong_ton) + Number(line.so_luong);
+      const id = Date.now() + index;
+      batches.push({
+        id,
+        san_pham_id: Number(product.id),
+        ten_san_pham: product.ten_san_pham,
+        so_lo: String(line.so_lo),
+        han_su_dung: String(line.han_su_dung),
+        so_luong_nhap: Number(line.so_luong),
+        so_luong_con: Number(line.so_luong),
+      });
+      history.unshift({
+        id,
+        san_pham_id: Number(product.id),
+        ten_san_pham: product.ten_san_pham,
+        loai_giao_dich: 'NHAP_KHO',
+        so_luong_thay_doi: Number(line.so_luong),
+        ton_sau_giao_dich: Number(product.so_luong_ton),
+        tham_chieu_id: id,
+        ngay_tao: new Date().toISOString(),
+      });
+    }
+    store.set('products', products);
+    store.set('stockBatches', batches);
+    store.set('stockHistory', history);
+    const receipts = store.get('stockReceipts', []);
+    const id = Date.now();
+    receipts.unshift({ id, ma_phieu: `PN${id}`, admin_id: 1, ngay_nhap: receipt.ngay_nhap, nha_cung_cap: receipt.nha_cung_cap || null, tong_tien_nhap: receipt.chi_tiet.reduce((sum, line) => sum + Number(line.so_luong) * Number(line.gia_nhap), 0), ghi_chu: receipt.ghi_chu || null, trang_thai: 'HOAN_THANH', so_dong: receipt.chi_tiet.length });
+    store.set('stockReceipts', receipts);
+    return ok({ id, ma_phieu: `PN${id}`, tong_tien_nhap: receipts[0].tong_tien_nhap }, 'Đã tạo phiếu nhập kho');
+  }
   if (route === '/admin/promotions/friday' && method === 'GET') return ok(fridayProgram() || { id: 'friday-sale', enabled: true, productIds: [] });
   if (route === '/admin/promotions/friday' && method === 'PUT') {
     const promo = saveFridayProgram({ id: 'friday-sale', name: 'Siêu sale Thứ 6', enabled: Boolean(body.enabled), productIds: [...new Set(body.productIds || [])].slice(0, 10) });

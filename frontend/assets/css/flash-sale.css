@@ -40,7 +40,7 @@
 .flash-locked{min-height:40px;padding:0 18px;border:0;border-radius:var(--ms-radius-sm);background:#dce1dd;color:#68756d;font:inherit;font-size:var(--fs-sm);font-weight:700;cursor:not-allowed}
 .flash-sale-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .flash-sale-grid .pc{min-width:0}
-.flash-sale-grid .pc__media{aspect-ratio:1.08}
+.flash-sale-grid .pc__media{aspect-ratio:1/1}
 .flash-sale-grid .pc__body{padding:12px}
 .flash-sale-grid .shelf-tag{padding:6px 8px 6px 16px}
 .flash-category-filter{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px;padding:0;list-style:none}

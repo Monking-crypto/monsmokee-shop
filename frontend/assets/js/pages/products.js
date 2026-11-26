@@ -1,5 +1,6 @@
 // products.js - danh mục, bộ lọc và tải thêm sản phẩm theo trang
 import { getCategories, getProducts } from '../core/catalog.js';
+import { CONFIG } from '../core/config.js';
 import { escapeHtml, qs } from '../core/ui.js';
 import { mountHeader } from '../components/header.js';
 import { mountFooter } from '../components/footer.js';
@@ -27,6 +28,12 @@ function urlFor(changes = {}) {
 }
 
 function appliedFilters() {
+  if (CONFIG.LIVE.catalog) {
+    const sortNames = { price_asc: 'Giá tăng', price_desc: 'Giá giảm', newest: 'Mới nhất' };
+    return params.has('sort') && sortNames[params.get('sort')]
+      ? `<button type="button" class="filter-chip" data-remove="sort">Sắp xếp: ${sortNames[params.get('sort')]} ×</button>`
+      : '';
+  }
   const names = { in_stock: 'Còn hàng', discount: 'Đang giảm giá' };
   const sortNames = { price_asc: 'Giá tăng', price_desc: 'Giá giảm', newest: 'Mới nhất' };
   return [...Object.keys(names), 'sort'].filter((key) => params.has(key)).map((key) => {
@@ -37,6 +44,16 @@ function appliedFilters() {
 }
 
 function renderFilters() {
+  if (CONFIG.LIVE.catalog) {
+    return `<form id="product-filters" class="product-filters">
+      <label><span>Sắp xếp</span><select name="sort">
+        <option value="newest" ${selectedValues('sort') === 'newest' || !selectedValues('sort') ? 'selected' : ''}>Mới nhất</option>
+        <option value="price_asc" ${selectedValues('sort') === 'price_asc' ? 'selected' : ''}>Giá tăng</option>
+        <option value="price_desc" ${selectedValues('sort') === 'price_desc' ? 'selected' : ''}>Giá giảm</option>
+      </select></label>
+      <button class="ms-btn ms-btn--green" type="submit">Sắp xếp</button>
+    </form>`;
+  }
   return `<form id="product-filters" class="product-filters">
     <label class="filter-check"><input name="in_stock" type="checkbox" value="1" ${params.has('in_stock') ? 'checked' : ''}> Chỉ hàng còn</label>
     <label class="filter-check"><input name="discount" type="checkbox" value="1" ${params.has('discount') ? 'checked' : ''}> Đang giảm giá</label>
@@ -54,6 +71,7 @@ function renderSkeleton() {
 }
 
 function filteredProducts() {
+  if (CONFIG.LIVE.catalog) return products;
   return products.filter((product) => {
     const inStock = typeof product.con_hang === 'boolean'
       ? product.con_hang
@@ -74,7 +92,7 @@ function renderResults() {
       ? `<div class="ms-state"><strong>Đang tìm sản phẩm phù hợp</strong>Danh sách sẽ tự tải thêm khi bạn cuộn xuống.</div>`
       : '<div class="ms-state"><strong>Không tìm thấy sản phẩm</strong>Thử thay đổi hoặc xóa bớt bộ lọc.</div>';
   const more = pagination.has_more
-    ? `<div class="products-load-more"><button class="ms-btn ms-btn--ghost" id="products-load-more" type="button" ${loading ? 'disabled' : ''}>${loading ? 'Đang tải…' : 'Tải thêm sản phẩm'}</button><span id="products-load-sentinel" aria-hidden="true"></span></div>`
+    ? `<div class="products-load-more">${loading ? `<div class="ms-grid">${productSkeletons(4)}</div>` : ''}<button class="ms-btn ms-btn--ghost" id="products-load-more" type="button" ${loading ? 'disabled' : ''}>${loading ? 'Đang tải…' : 'Tải thêm sản phẩm'}</button><span id="products-load-sentinel" aria-hidden="true"></span></div>`
     : '';
   result.innerHTML = `${count}${grid}${more}`;
   qs('#products-load-more')?.addEventListener('click', loadMore);
@@ -107,7 +125,12 @@ async function loadPage(pageNumber, append = false) {
     pagination = data.pagination;
     renderResults();
   } catch (error) {
-    root.querySelector('#product-results').innerHTML = `<div class="ms-state"><strong>Không tải được sản phẩm</strong>${escapeHtml(error.message)}<div class="mt-3"><button class="ms-btn ms-btn--green" id="products-retry" type="button">Thử lại</button></div></div>`;
+    if (append) {
+      renderResults();
+      root.querySelector('#product-results').insertAdjacentHTML('beforeend', `<div class="ms-state"><strong>Không tải được sản phẩm</strong>${escapeHtml(error.message)}<div class="mt-3"><button class="ms-btn ms-btn--green" id="products-retry" type="button">Thử lại</button></div></div>`);
+    } else {
+      root.querySelector('#product-results').innerHTML = `<div class="ms-state"><strong>Không tải được sản phẩm</strong>${escapeHtml(error.message)}<div class="mt-3"><button class="ms-btn ms-btn--green" id="products-retry" type="button">Thử lại</button></div></div>`;
+    }
     qs('#products-retry')?.addEventListener('click', () => loadPage(pageNumber, append));
   } finally {
     loading = false;
