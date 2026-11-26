@@ -1,6 +1,7 @@
 /* admin.css - giao diện khu vực quản trị */
+:root{--admin-sidebar-w:256px;--admin-sidebar-collapsed-w:76px;--admin-topbar-h:76px}
 .admin-shell{min-height:100vh}
-.admin-sidebar{position:fixed;z-index:1100;inset:0 auto 0 0;width:256px;padding:18px 12px;background:var(--admin-sidebar);color:#e8f4ec;overflow-y:auto;transition:transform .2s,width .2s}
+.admin-sidebar{position:fixed;z-index:1100;inset:0 auto 0 0;width:var(--admin-sidebar-w);padding:18px 12px;background:var(--admin-sidebar);color:#e8f4ec;overflow-y:auto;transition:transform .2s,width .2s}
 .admin-brand{display:flex;align-items:center;gap:12px;padding:8px 10px 22px;color:#fff;font-size:var(--fs-xs);font-weight:800;letter-spacing:.08em}
 .admin-brand:hover{text-decoration:none}
 .admin-brand img{width:142px;height:34px;object-fit:contain;object-position:left;filter:brightness(0) invert(1)}
@@ -17,8 +18,8 @@
 .admin-subnav{display:grid;gap:2px;margin:2px 0 6px 28px;padding:0;list-style:none}
 .admin-subnav[hidden]{display:none}
 .admin-subnav a{min-height:38px;padding-left:14px;font-size:var(--fs-xs)!important}
-.admin-main{min-height:100vh;margin-left:256px;transition:margin .2s}
-.admin-topbar{position:sticky;z-index:100;top:0;display:flex;align-items:center;gap:14px;min-height:76px;padding:12px 24px;background:#fff;border-bottom:1px solid var(--ms-border)}
+.admin-main{min-height:100vh;margin-left:var(--admin-sidebar-w);transition:margin .2s}
+.admin-topbar{position:sticky;z-index:100;top:0;display:flex;align-items:center;gap:14px;min-height:var(--admin-topbar-h);padding:12px 24px;background:#fff;border-bottom:1px solid var(--ms-border)}
 .admin-topbar h1{font-size:var(--fs-lg);font-weight:800}
 .admin-topbar p{margin-top:3px;color:var(--ms-muted);font-size:var(--fs-xs)}
 .admin-role{margin-left:auto;padding:6px 10px;border-radius:var(--ms-radius-pill);background:var(--ms-green-soft);color:var(--ms-green-dark);font-size:var(--fs-xs);font-weight:700;white-space:nowrap}
@@ -31,7 +32,12 @@
 .admin-icon-btn:hover{background:var(--ms-bg)}
 .admin-logout{display:flex;align-items:center;gap:7px;min-height:40px;padding:0 10px;border:1px solid var(--ms-border);border-radius:var(--ms-radius-sm);background:#fff;color:var(--ms-text);font:inherit;font-size:var(--fs-sm);font-weight:600;cursor:pointer}
 .admin-logout:hover{border-color:var(--ms-red);color:var(--ms-red)}
-.admin-content{max-width:1600px;margin:auto;padding:24px}
+.admin-content{min-height:calc(100vh - var(--admin-topbar-h));max-width:1600px;margin:auto;padding:24px}
+.admin-shell-loading{display:grid;gap:14px;min-height:400px}
+.admin-shell-loading span{display:block;border-radius:var(--ms-radius);background:#e9eeea}
+.admin-shell-loading__title{width:min(220px,70%);height:18px}
+.admin-shell-loading__filter{width:min(420px,100%);height:44px}
+.admin-shell-loading__panel{min-height:260px}
 .admin-breadcrumb{margin-bottom:18px;color:var(--ms-muted);font-size:var(--fs-sm)}
 .admin-breadcrumb span{padding:0 7px;color:var(--ms-border)}
 .admin-scrim{display:none}
@@ -42,7 +48,7 @@
 .admin-sidebar.is-collapsed nav a{justify-content:center;padding:0}
 .admin-sidebar.is-collapsed .admin-nav-group__toggle{justify-content:center;padding:0}
 .admin-sidebar.is-collapsed .admin-nav-group__toggle span,.admin-sidebar.is-collapsed .admin-nav-group__chevron,.admin-sidebar.is-collapsed .admin-subnav{display:none}
-.admin-shell.is-collapsed .admin-main{margin-left:76px}
+.admin-shell.is-collapsed .admin-main{margin-left:var(--admin-sidebar-collapsed-w)}
 
 /* Trang đang phát triển */
 .admin-placeholder{max-width:760px;margin:8vh auto;padding:36px 28px;background:#fff;border:1px solid var(--ms-border);border-radius:var(--ms-radius);text-align:center}
@@ -174,7 +180,7 @@
 .admin-login__verify{margin-top:16px}
 
 @media(max-width:900px){
-  .admin-sidebar{transform:translateX(-100%);width:280px}
+  .admin-sidebar{transform:translateX(-100%);width:280px;transition:transform .2s}
   .admin-sidebar.is-open{transform:translateX(0)}
   .admin-main,.admin-shell.is-collapsed .admin-main{margin-left:0}
   .admin-scrim.is-visible{position:fixed;z-index:1050;inset:0;display:block;background:rgba(0,0,0,.4)}
