@@ -33,6 +33,15 @@ function apiDate(value) {
     : '';
 }
 
+function validIsoDate(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return date.getUTCFullYear() === Number(match[1])
+    && date.getUTCMonth() + 1 === Number(match[2])
+    && date.getUTCDate() === Number(match[3]);
+}
+
 function formatDateInput(event) {
   const input = event.currentTarget;
   const oldValue = input.value;
@@ -83,14 +92,15 @@ function renderStockIn(products) {
   root.innerHTML = `<div class="admin-breadcrumb">Quản trị <span>/</span> Kho <span>/</span> Nhập hàng</div>
     <section class="admin-panel admin-stock-in">
       <div class="admin-panel__head"><div><h2>Tạo phiếu nhập hàng</h2><p class="admin-muted">Phiếu nhập sẽ cập nhật tồn kho và lưu thông tin lô hàng.</p></div></div>
-      <form id="stock-in-form" class="admin-form-grid">
+      <form id="stock-in-form" class="admin-form-grid" novalidate>
         <label class="admin-field">Nhà cung cấp<input name="nha_cung_cap" type="text" maxlength="150"></label>
         <label class="admin-field">Ngày nhập<div class="admin-date-input"><input name="ngay_nhap" type="text" inputmode="numeric" autocomplete="off" placeholder="dd/mm/yyyy" pattern="[0-9]{2}/[0-9]{2}/[0-9]{4}" maxlength="10" value="${todayDisplay}" required><span class="admin-date-input__icon" aria-hidden="true"><i class="bi bi-calendar3"></i></span><input class="admin-date-input__picker" type="date" data-date-picker="ngay_nhap" max="${today}" aria-label="Chọn ngày nhập" tabindex="-1"></div><small data-error="ngay_nhap"></small></label>
         <label class="admin-field admin-field--wide">Sản phẩm<select name="san_pham_id" required><option value="">Chọn sản phẩm</option>${products.map((product) =>
           `<option value="${Number(product.id)}">${escapeHtml(productName(product))} — tồn ${Number(product.so_luong_ton) || 0}</option>`).join('')}</select><small data-error="san_pham_id"></small></label>
         <label class="admin-field">Số lượng nhập<input name="so_luong" type="number" min="1" step="1" value="1" required><small data-error="so_luong"></small></label>
         <label class="admin-field">Giá nhập / đơn vị<div class="admin-money-input"><input name="gia_nhap" type="text" inputmode="numeric" autocomplete="off" placeholder="0" required><span aria-hidden="true">đ</span></div><small data-error="gia_nhap"></small></label>
-        <label class="admin-field">Ngày hết hạn<div class="admin-date-input"><input name="han_su_dung" type="text" inputmode="numeric" autocomplete="off" placeholder="dd/mm/yyyy" pattern="[0-9]{2}/[0-9]{2}/[0-9]{4}" maxlength="10" required><span class="admin-date-input__icon" aria-hidden="true"><i class="bi bi-calendar3"></i></span><input class="admin-date-input__picker" type="date" data-date-picker="han_su_dung" min="${today}" aria-label="Chọn ngày hết hạn" tabindex="-1"></div><small data-error="han_su_dung"></small></label>
+        <label class="admin-field">Ngày sản xuất<input name="ngay_san_xuat" type="date" max="${today}" required><small data-error="ngay_san_xuat"></small></label>
+        <label class="admin-field">Ngày hết hạn<div class="admin-date-input"><input name="han_su_dung" type="text" inputmode="numeric" autocomplete="off" placeholder="dd/mm/yyyy" pattern="[0-9]{2}/[0-9]{2}/[0-9]{4}" maxlength="10" required><span class="admin-date-input__icon" aria-hidden="true"><i class="bi bi-calendar3"></i></span><input class="admin-date-input__picker" type="date" min="${today}" data-date-picker="han_su_dung" aria-label="Chọn ngày hết hạn" tabindex="-1"></div><small data-error="han_su_dung"></small></label>
         <label class="admin-field">Số lô<input name="so_lo" type="text" maxlength="100" required><small data-error="so_lo"></small></label>
         <label class="admin-field admin-field--wide">Ghi chú<textarea name="ghi_chu" rows="3" maxlength="255"></textarea></label>
         <div class="admin-form-actions admin-field--wide"><button id="stock-in-submit" class="ms-btn ms-btn--green" type="submit">Xác nhận nhập kho</button></div>
@@ -107,8 +117,17 @@ function renderStockIn(products) {
     input.addEventListener('input', (event) => {
       formatDateInput(event);
       picker.value = apiDate(input.value);
+      if (name === 'ngay_nhap') {
+        const receiptDate = apiDate(input.value);
+        form.elements.ngay_san_xuat.max = receiptDate && receiptDate < today ? receiptDate : today;
+      }
     });
-    picker.addEventListener('change', () => { input.value = displayDate(picker.value); });
+    picker.addEventListener('change', () => {
+      input.value = displayDate(picker.value);
+      if (name === 'ngay_nhap') {
+        form.elements.ngay_san_xuat.max = picker.value && picker.value < today ? picker.value : today;
+      }
+    });
   });
   form.elements.gia_nhap.addEventListener('input', formatMoneyInput);
   form.addEventListener('submit', async (event) => {
@@ -116,29 +135,71 @@ function renderStockIn(products) {
     const data = new FormData(form);
     const receiptDate = apiDate(String(data.get('ngay_nhap') || ''));
     const expiryDate = apiDate(String(data.get('han_su_dung') || ''));
+    const manufactureDate = String(data.get('ngay_san_xuat') || '');
+    const productId = Number(data.get('san_pham_id'));
+    const quantity = Number(data.get('so_luong'));
+    const rawCost = String(data.get('gia_nhap') || '').replace(/\D/g, '');
+    const cost = rawCost ? Number(rawCost) : null;
+    const lotNumber = String(data.get('so_lo') || '').trim();
     form.querySelectorAll('[data-error]').forEach((element) => { element.textContent = ''; });
+    const showFieldError = (name, message) => {
+      form.querySelector(`[data-error="${name}"]`).textContent = message;
+      form.elements[name].focus();
+      toast(message, 'error');
+    };
     if (!receiptDate || receiptDate > today) {
-      form.querySelector('[data-error="ngay_nhap"]').textContent = receiptDate
+      showFieldError('ngay_nhap', receiptDate
         ? 'Ngày nhập không được sau hôm nay.'
-        : 'Nhập ngày hợp lệ theo dd/mm/yyyy.';
-      form.querySelector('[name="ngay_nhap"]').focus();
-      toast(receiptDate ? 'Ngày nhập không được sau hôm nay.' : 'Vui lòng nhập ngày nhập theo dd/mm/yyyy hợp lệ.', 'error');
+        : 'Nhập ngày hợp lệ theo dd/mm/yyyy.');
       return;
     }
-    if (!expiryDate || expiryDate < today) {
-      form.querySelector('[data-error="han_su_dung"]').textContent = expiryDate
-        ? 'Ngày hết hạn không được trước hôm nay.'
-        : 'Nhập ngày hợp lệ theo dd/mm/yyyy.';
-      form.querySelector('[name="han_su_dung"]').focus();
-      toast(expiryDate ? 'Ngày hết hạn không được trước hôm nay.' : 'Vui lòng nhập ngày hết hạn theo dd/mm/yyyy hợp lệ.', 'error');
+    if (!Number.isInteger(productId) || productId <= 0) {
+      showFieldError('san_pham_id', 'Vui lòng chọn sản phẩm.');
+      return;
+    }
+    if (!Number.isInteger(quantity) || quantity <= 0 || quantity > 2147483647) {
+      showFieldError('so_luong', 'Số lượng phải là số nguyên dương hợp lệ.');
+      return;
+    }
+    if (cost === null || !Number.isSafeInteger(cost) || cost > 999999999999) {
+      showFieldError('gia_nhap', 'Giá nhập phải là số nguyên không âm hợp lệ.');
+      return;
+    }
+    if (!validIsoDate(manufactureDate)) {
+      showFieldError('ngay_san_xuat', 'Vui lòng chọn ngày sản xuất hợp lệ.');
+      return;
+    }
+    if (manufactureDate > today) {
+      showFieldError('ngay_san_xuat', 'Ngày sản xuất không được ở tương lai.');
+      return;
+    }
+    if (manufactureDate > receiptDate) {
+      showFieldError('ngay_san_xuat', 'Ngày sản xuất không được sau ngày nhập.');
+      return;
+    }
+    if (!expiryDate) {
+      showFieldError('han_su_dung', 'Nhập ngày hợp lệ theo dd/mm/yyyy.');
+      return;
+    }
+    if (expiryDate <= manufactureDate) {
+      showFieldError('han_su_dung', 'Hạn sử dụng phải sau ngày sản xuất.');
+      return;
+    }
+    if (expiryDate <= today || expiryDate <= receiptDate) {
+      showFieldError('han_su_dung', 'Hạn sử dụng phải sau ngày nhập và chưa hết hạn.');
+      return;
+    }
+    if (!lotNumber || lotNumber.length > 100) {
+      showFieldError('so_lo', 'Số lô là bắt buộc và tối đa 100 ký tự.');
       return;
     }
     const line = {
-      san_pham_id: Number(data.get('san_pham_id')),
-      so_luong: Number(data.get('so_luong')),
-      gia_nhap: Number(String(data.get('gia_nhap') || '').replace(/\D/g, '')),
+      san_pham_id: productId,
+      so_luong: quantity,
+      gia_nhap: cost,
+      ngay_san_xuat: manufactureDate,
       han_su_dung: expiryDate,
-      so_lo: String(data.get('so_lo') || '').trim(),
+      so_lo: lotNumber,
     };
     const button = qs('#stock-in-submit');
     button.disabled = true;
@@ -155,7 +216,7 @@ function renderStockIn(products) {
     } catch (error) {
       if (error instanceof ApiError && error.errors) {
         Object.entries(error.errors).forEach(([key, message]) => {
-          const field = key.match(/chi_tiet(?:\[\d+\])?\.(san_pham_id|so_luong|gia_nhap|han_su_dung|so_lo)$/)?.[1] || key;
+          const field = key.match(/chi_tiet(?:\[\d+\])?\.(san_pham_id|so_luong|gia_nhap|ngay_san_xuat|han_su_dung|so_lo)$/)?.[1] || key;
           const target = form.querySelector(`[data-error="${field}"]`);
           if (target && typeof message === 'string') target.textContent = message;
         });
