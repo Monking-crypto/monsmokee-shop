@@ -10,28 +10,58 @@ async function setMockAdminAuthenticated(authenticated) {
 }
 
 export async function requireAdmin() {
+  const target = `admin/${location.pathname.split('/').pop()}${location.search}`;
+  const loginParams = new URLSearchParams({ redirect: target, auth_required: '1' });
+  const redirectToLogin = () => {
+    location.replace(`../dang-nhap.html?${loginParams.toString()}`);
+    return false;
+  };
+  const showError = (message) => {
+    qs('#admin-page-content').innerHTML = `<div class="ms-state"><strong>Không thể xác thực quyền quản trị</strong>${escapeHtml(message)}<div class="mt-3"><button id="admin-auth-retry" class="ms-btn ms-btn--green" type="button">Thử lại</button></div></div>`;
+    qs('#admin-page-content').setAttribute('aria-busy', 'false');
+    qs('#admin-auth-retry').addEventListener('click', () => location.reload());
+    toast(message, 'error');
+    return false;
+  };
+
+  let auth;
   try {
-    const data = await api.get('/admin/me');
-    await setMockAdminAuthenticated(true);
-    return data?.user || true;
+    auth = await api.get('/auth/me');
   } catch (error) {
     if (!(error instanceof ApiError)) throw error;
-    if (error.status === 0) {
-      qs('#admin-page-content').innerHTML = `<div class="ms-state"><strong>Không thể xác thực quyền quản trị</strong>${escapeHtml(error.message)}<div class="mt-3"><button id="admin-auth-retry" class="ms-btn ms-btn--green" type="button">Thử lại</button></div></div>`;
-      qs('#admin-page-content').setAttribute('aria-busy', 'false');
-      qs('#admin-auth-retry').addEventListener('click', () => location.reload());
-      toast(error.message, 'error');
-      return false;
+    if (error.status === 401) {
+      await setMockAdminAuthenticated(false);
+      return redirectToLogin();
     }
-    if (error.status !== 401 && error.status !== 403) {
-      qs('#admin-page-content').innerHTML = `<div class="ms-state"><strong>Không thể xác thực quyền quản trị</strong>${escapeHtml(error.message)}</div>`;
-      qs('#admin-page-content').setAttribute('aria-busy', 'false');
-      return false;
-    }
+    return showError(error.message);
+  }
+
+  const user = auth?.user;
+  if (!user || typeof user !== 'object') {
+    return showError('Máy chủ chưa trả về thông tin tài khoản hợp lệ.');
+  }
+  if (String(user.vai_tro || '').toLowerCase() !== 'admin') {
     await setMockAdminAuthenticated(false);
-    const target = `${location.pathname.split('/').pop()}${location.search}`;
-    const params = new URLSearchParams({ redirect: target, auth_required: '1' });
-    location.replace(`login.html?${params}`);
+    location.replace('../index.html?access_denied=1');
     return false;
+  }
+
+  try {
+    const data = await api.get('/admin/me');
+    if (String(data?.user?.vai_tro || '').toLowerCase() !== 'admin') {
+      return showError('Phiên đăng nhập chưa được xác thực OTP hoặc tài khoản không có quyền quản trị.');
+    }
+    await setMockAdminAuthenticated(true);
+    return data.user;
+  } catch (error) {
+    if (!(error instanceof ApiError)) throw error;
+    if (error.status === 401) {
+      await setMockAdminAuthenticated(false);
+      return redirectToLogin();
+    }
+    if (error.status === 403) {
+      return showError('Bạn không có quyền truy cập khu vực quản trị. Hãy đăng nhập bằng tài khoản Admin đã xác thực OTP.');
+    }
+    return showError(error.message);
   }
 }

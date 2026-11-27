@@ -131,8 +131,19 @@ function handleExpiredSession(path) {
   const frontendRoot = frontendIndex >= 0
     ? `${location.pathname.slice(0, frontendIndex)}/frontend`
     : '';
-  const loginPath = isAdmin ? 'admin/login.html' : 'dang-nhap.html';
-  window.location.replace(`${frontendRoot}/${loginPath}`);
+  const currentPath = frontendIndex >= 0
+    ? location.pathname.slice(frontendIndex + '/frontend/'.length)
+    : '';
+  const destination = currentPath.startsWith('admin/')
+    ? `${currentPath}${location.search}`
+    : new URLSearchParams(location.search).get('redirect');
+  const redirect = destination
+    ? `?${new URLSearchParams({
+      redirect: destination,
+      auth_required: '1',
+    })}`
+    : '';
+  window.location.replace(`${frontendRoot}/dang-nhap.html${redirect}`);
 }
 
 async function parseResponse(response) {

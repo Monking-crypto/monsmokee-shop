@@ -38,8 +38,19 @@
         <div class="auth__row"><span></span><a href="quen-mat-khau.html">Quên mật khẩu?</a></div>
         <button id="login-btn" class="ms-btn ms-btn--primary ms-btn--block" type="submit">Đăng nhập</button>
       </form>
+      <section id="login-otp-step" aria-labelledby="login-otp-title" hidden>
+        <h2 id="login-otp-title">Xác thực quản trị</h2>
+        <p class="lead">Mã xác thực 6 số đã gửi tới <strong id="login-otp-email"></strong>.</p>
+        <div id="login-otp"></div>
+        <p id="login-otp-error" class="field__error" role="alert"></p>
+        <div class="otp-meta">
+          <span>Hết hạn sau <b id="login-otp-ttl">05:00</b></span>
+          <span><button id="login-otp-resend" class="link-btn" type="button" disabled>Gửi lại</button> <b id="login-resend-wait"></b></span>
+        </div>
+        <button id="login-otp-verify" class="ms-btn ms-btn--primary ms-btn--block" type="button">Xác thực và đăng nhập</button>
+        <button id="login-otp-back" class="ms-btn ms-btn--ghost ms-btn--block mt-2" type="button">Quay lại</button>
+      </section>
       <p class="auth__alt">Chưa có tài khoản? <a href="dang-ky.html">Đăng ký</a></p>
-      <p class="auth__alt">Bạn là quản trị viên? <a href="admin/login.html">Đăng nhập quản trị</a></p>
     </div>
   </main>
 </div>

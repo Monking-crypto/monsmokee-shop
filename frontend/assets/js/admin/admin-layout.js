@@ -15,8 +15,8 @@ if (adminUser) {
     qs('#admin-role-name').textContent = adminUser.ho_ten;
   }
   window.addEventListener('ms:admin-session-expired', () => {
-    const target = `${location.pathname.split('/').pop()}${location.search}`;
-    location.replace(`login.html?${new URLSearchParams({ redirect: target, auth_required: '1' })}`);
+    const target = `admin/${location.pathname.split('/').pop()}${location.search}`;
+    location.replace(`../dang-nhap.html?${new URLSearchParams({ redirect: target, auth_required: '1' })}`);
   }, { once: true });
   window.addEventListener('ms:admin-profile-updated', (event) => {
     const name = event.detail?.ho_ten?.trim();

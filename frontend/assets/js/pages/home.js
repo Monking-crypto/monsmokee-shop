@@ -3,7 +3,7 @@ import { api } from '../core/api.js';
 import { daysUntilExpiry, getCategories, getProducts } from '../core/catalog.js';
 import { CONFIG } from '../core/config.js';
 import { serverNow } from '../core/api.js';
-import { escapeHtml, qs } from '../core/ui.js';
+import { escapeHtml, qs, toast } from '../core/ui.js';
 import { mountHeader } from '../components/header.js';
 import { mountFooter } from '../components/footer.js';
 import { mountBottomNav } from '../components/bottom-nav.js';
@@ -14,6 +14,13 @@ const root = qs('#home-sections');
 const loaders = new Map();
 let observer;
 let stopSaleCountdown;
+
+const currentUrl = new URL(location.href);
+if (currentUrl.searchParams.get('access_denied') === '1') {
+  toast('Bạn không có quyền truy cập', 'error');
+  currentUrl.searchParams.delete('access_denied');
+  history.replaceState(null, '', `${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`);
+}
 
 const state = (title, text) => `<div class="ms-state" style="grid-column:1/-1"><strong>${escapeHtml(title)}</strong>${escapeHtml(text)}</div>`;
 const rail = (list, options) => `<div class="ms-rail">${list.map((product) => productCard(product, options)).join('')}</div>`;
