@@ -58,6 +58,12 @@ $locationController = new App\Controllers\Customer\LocationController(
     $shippingService,
     $businessConfig
 );
+$profileController = new App\Controllers\Customer\ProfileController(
+    new App\Services\ProfileService($database),
+    new App\Services\PasswordChangeService($database, $businessConfig)
+);
+$requireCustomer = static fn(Request $request): bool =>
+    App\Middleware\RoleMiddleware::handle($request, 'Customer');
 
 $router->get('/api/csrf', static function (Request $request): void {
     Response::success('CSRF token', [
@@ -97,6 +103,16 @@ $router->post(
     [static fn(Request $request): bool => CsrfMiddleware::handle($request)]
 );
 $router->get('/api/store-info', [$locationController, 'storeInfo']);
+$router->put(
+    '/api/profile',
+    [$profileController, 'update'],
+    [$requireCustomer, static fn(Request $request): bool => CsrfMiddleware::handle($request)]
+);
+$router->patch(
+    '/api/profile/password',
+    [$profileController, 'changePassword'],
+    [$requireCustomer, static fn(Request $request): bool => CsrfMiddleware::handle($request)]
+);
 
 $router->post(
     '/api/auth/register/start',
