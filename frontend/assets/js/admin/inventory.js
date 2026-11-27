@@ -93,15 +93,17 @@ function renderStockIn(products) {
     <section class="admin-panel admin-stock-in">
       <div class="admin-panel__head"><div><h2>Tạo phiếu nhập hàng</h2><p class="admin-muted">Phiếu nhập sẽ cập nhật tồn kho và lưu thông tin lô hàng.</p></div></div>
       <form id="stock-in-form" class="admin-form-grid" novalidate>
-        <label class="admin-field">Nhà cung cấp<input name="nha_cung_cap" type="text" maxlength="150"></label>
-        <label class="admin-field">Ngày nhập<div class="admin-date-input"><input name="ngay_nhap" type="text" inputmode="numeric" autocomplete="off" placeholder="dd/mm/yyyy" pattern="[0-9]{2}/[0-9]{2}/[0-9]{4}" maxlength="10" value="${todayDisplay}" required><span class="admin-date-input__icon" aria-hidden="true"><i class="bi bi-calendar3"></i></span><input class="admin-date-input__picker" type="date" data-date-picker="ngay_nhap" max="${today}" aria-label="Chọn ngày nhập" tabindex="-1"></div><small data-error="ngay_nhap"></small></label>
+        <label class="admin-field admin-stock-in__half">Nhà cung cấp<input name="nha_cung_cap" type="text" maxlength="150"></label>
+        <label class="admin-field admin-stock-in__half">Số lô<input name="so_lo" type="text" maxlength="100" required><small data-error="so_lo"></small></label>
         <label class="admin-field admin-field--wide">Sản phẩm<select name="san_pham_id" required><option value="">Chọn sản phẩm</option>${products.map((product) =>
           `<option value="${Number(product.id)}">${escapeHtml(productName(product))} — tồn ${Number(product.so_luong_ton) || 0}</option>`).join('')}</select><small data-error="san_pham_id"></small></label>
-        <label class="admin-field">Số lượng nhập<input name="so_luong" type="number" min="1" step="1" value="1" required><small data-error="so_luong"></small></label>
-        <label class="admin-field">Giá nhập / đơn vị<div class="admin-money-input"><input name="gia_nhap" type="text" inputmode="numeric" autocomplete="off" placeholder="0" required><span aria-hidden="true">đ</span></div><small data-error="gia_nhap"></small></label>
-        <label class="admin-field">Ngày sản xuất<input name="ngay_san_xuat" type="date" max="${today}" required><small data-error="ngay_san_xuat"></small></label>
-        <label class="admin-field">Ngày hết hạn<div class="admin-date-input"><input name="han_su_dung" type="text" inputmode="numeric" autocomplete="off" placeholder="dd/mm/yyyy" pattern="[0-9]{2}/[0-9]{2}/[0-9]{4}" maxlength="10" required><span class="admin-date-input__icon" aria-hidden="true"><i class="bi bi-calendar3"></i></span><input class="admin-date-input__picker" type="date" min="${today}" data-date-picker="han_su_dung" aria-label="Chọn ngày hết hạn" tabindex="-1"></div><small data-error="han_su_dung"></small></label>
-        <label class="admin-field">Số lô<input name="so_lo" type="text" maxlength="100" required><small data-error="so_lo"></small></label>
+        <label class="admin-field admin-stock-in__half">Số lượng nhập<input name="so_luong" type="number" min="1" step="1" value="1" required><small data-error="so_luong"></small></label>
+        <label class="admin-field admin-stock-in__half">Giá nhập / đơn vị<div class="admin-money-input"><input name="gia_nhap" type="text" inputmode="numeric" autocomplete="off" placeholder="0" required><span aria-hidden="true">đ</span></div><small data-error="gia_nhap"></small></label>
+        <div class="admin-stock-in__date-row">
+          <label class="admin-field">Ngày nhập<div class="admin-date-input"><input name="ngay_nhap" type="text" inputmode="numeric" autocomplete="off" placeholder="dd/mm/yyyy" pattern="[0-9]{2}/[0-9]{2}/[0-9]{4}" maxlength="10" value="${todayDisplay}" required><span class="admin-date-input__icon" aria-hidden="true"><i class="bi bi-calendar3"></i></span><input class="admin-date-input__picker" type="date" data-date-picker="ngay_nhap" max="${today}" aria-label="Chọn ngày nhập" tabindex="-1"></div><small data-error="ngay_nhap"></small></label>
+          <label class="admin-field">Ngày sản xuất<div class="admin-date-input"><input name="ngay_san_xuat" type="text" inputmode="numeric" autocomplete="off" placeholder="dd/mm/yyyy" pattern="[0-9]{2}/[0-9]{2}/[0-9]{4}" maxlength="10" required><span class="admin-date-input__icon" aria-hidden="true"><i class="bi bi-calendar3"></i></span><input class="admin-date-input__picker" type="date" data-date-picker="ngay_san_xuat" max="${today}" aria-label="Chọn ngày sản xuất" tabindex="-1"></div><small data-error="ngay_san_xuat"></small></label>
+          <label class="admin-field">Ngày hết hạn<div class="admin-date-input"><input name="han_su_dung" type="text" inputmode="numeric" autocomplete="off" placeholder="dd/mm/yyyy" pattern="[0-9]{2}/[0-9]{2}/[0-9]{4}" maxlength="10" required><span class="admin-date-input__icon" aria-hidden="true"><i class="bi bi-calendar3"></i></span><input class="admin-date-input__picker" type="date" min="${today}" data-date-picker="han_su_dung" aria-label="Chọn ngày hết hạn" tabindex="-1"></div><small data-error="han_su_dung"></small></label>
+        </div>
         <label class="admin-field admin-field--wide">Ghi chú<textarea name="ghi_chu" rows="3" maxlength="255"></textarea></label>
         <div class="admin-form-actions admin-field--wide"><button id="stock-in-submit" class="ms-btn ms-btn--green" type="submit">Xác nhận nhập kho</button></div>
       </form>
@@ -111,7 +113,7 @@ function renderStockIn(products) {
       <tbody>${products.slice(0, 20).map((product) => `<tr><td>${escapeHtml(productName(product))}</td><td>${escapeHtml(product.category_name || '—')}</td>
         <td>${Number(product.so_luong_ton) || 0}</td><td><span class="admin-status ${Number(product.so_luong_ton) <= 10 ? 'is-hidden' : ''}">${Number(product.so_luong_ton) <= 10 ? 'Sắp hết' : 'Đủ hàng'}</span></td></tr>`).join('')}</tbody></table></div></section>`;
   const form = qs('#stock-in-form');
-  ['ngay_nhap', 'han_su_dung'].forEach((name) => {
+  ['ngay_nhap', 'ngay_san_xuat', 'han_su_dung'].forEach((name) => {
     const input = form.elements[name];
     const picker = form.querySelector(`[data-date-picker="${name}"]`);
     input.addEventListener('input', (event) => {
@@ -119,13 +121,13 @@ function renderStockIn(products) {
       picker.value = apiDate(input.value);
       if (name === 'ngay_nhap') {
         const receiptDate = apiDate(input.value);
-        form.elements.ngay_san_xuat.max = receiptDate && receiptDate < today ? receiptDate : today;
+        form.querySelector('[data-date-picker="ngay_san_xuat"]').max = receiptDate && receiptDate < today ? receiptDate : today;
       }
     });
     picker.addEventListener('change', () => {
       input.value = displayDate(picker.value);
       if (name === 'ngay_nhap') {
-        form.elements.ngay_san_xuat.max = picker.value && picker.value < today ? picker.value : today;
+        form.querySelector('[data-date-picker="ngay_san_xuat"]').max = picker.value && picker.value < today ? picker.value : today;
       }
     });
   });
@@ -135,7 +137,7 @@ function renderStockIn(products) {
     const data = new FormData(form);
     const receiptDate = apiDate(String(data.get('ngay_nhap') || ''));
     const expiryDate = apiDate(String(data.get('han_su_dung') || ''));
-    const manufactureDate = String(data.get('ngay_san_xuat') || '');
+    const manufactureDate = apiDate(String(data.get('ngay_san_xuat') || ''));
     const productId = Number(data.get('san_pham_id'));
     const quantity = Number(data.get('so_luong'));
     const rawCost = String(data.get('gia_nhap') || '').replace(/\D/g, '');
