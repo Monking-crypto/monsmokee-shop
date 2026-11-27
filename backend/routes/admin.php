@@ -6,6 +6,7 @@ $adminDatabaseConfig = require dirname(__DIR__) . '/config/database.php';
 $adminBusinessConfig = require dirname(__DIR__) . '/config/business.php';
 $adminMailConfig = require dirname(__DIR__) . '/config/mail.php';
 $adminDatabase = Database::connection($adminDatabaseConfig);
+$adminCartService = new App\Services\CartService($adminDatabase, $adminBusinessConfig);
 $adminOtpSender = match ($adminMailConfig['driver']) {
     'log' => new App\Services\Mail\LogOtpSender(),
     'smtp' => new App\Services\Mail\EmailOtpSender($adminMailConfig),
@@ -23,14 +24,19 @@ $adminAuthController = new App\Controllers\Admin\AdminAuthController(
         $adminBusinessConfig
     ),
     $adminBusinessConfig,
-    $adminMailConfig['admin_otp_extra_emails'] ?? []
+    $adminMailConfig['admin_otp_extra_emails'] ?? [],
+    $adminCartService
 );
 $categoryAdminController = new App\Controllers\Admin\CategoryAdminController($adminDatabase);
 $productAdminController = new App\Controllers\Admin\ProductAdminController(
     $adminDatabase,
-    new App\Services\ProductImageService()
+    new App\Services\ProductImageService(),
+    $adminBusinessConfig
 );
-$stockAdminController = new App\Controllers\Admin\StockAdminController($adminDatabase);
+$stockAdminController = new App\Controllers\Admin\StockAdminController(
+    $adminDatabase,
+    $adminBusinessConfig
+);
 $promotionAdminController = new App\Controllers\Admin\PromotionAdminController(
     $adminDatabase,
     $adminBusinessConfig
@@ -129,6 +135,11 @@ $router->put(
     [$productAdminController, 'update'],
     [$requireVerifiedAdmin, $requireAdminCsrf]
 );
+$router->put(
+    '/api/admin/products/{id}/cross-sell',
+    [$productAdminController, 'updateCrossSell'],
+    [$requireVerifiedAdmin, $requireAdminCsrf]
+);
 $router->patch(
     '/api/admin/products/{id}/visibility',
     [$productAdminController, 'updateVisibility'],
@@ -173,6 +184,21 @@ $router->get(
     '/api/admin/stock-history',
     [$stockAdminController, 'stockHistory'],
     [$requireVerifiedAdmin]
+);
+$router->get(
+    '/api/admin/inventory/low-stock',
+    [$stockAdminController, 'lowStock'],
+    [$requireVerifiedAdmin]
+);
+$router->get(
+    '/api/admin/inventory/expiring',
+    [$stockAdminController, 'expiring'],
+    [$requireVerifiedAdmin]
+);
+$router->post(
+    '/api/admin/inventory/adjust',
+    [$stockAdminController, 'adjust'],
+    [$requireVerifiedAdmin, $requireAdminCsrf]
 );
 $router->get(
     '/api/admin/promotions',

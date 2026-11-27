@@ -18,7 +18,7 @@ final class StockAdminController
     private const MAX_PRICE = 999999999999;
     private const MAX_RECEIPT_TOTAL = 99999999999999;
 
-    public function __construct(private PDO $pdo)
+    public function __construct(private PDO $pdo, private array $businessConfig = [])
     {
     }
 
@@ -125,7 +125,7 @@ final class StockAdminController
                     $line['san_pham_id'],
                     $line['so_luong'],
                     $line['gia_nhap'],
-                    $input['ngay_nhap'],
+                    $line['ngay_san_xuat'],
                     $line['han_su_dung'],
                     $line['so_lo'],
                 ]);
@@ -133,7 +133,7 @@ final class StockAdminController
                 $insertBatch->execute([
                     $line['san_pham_id'],
                     $detailId,
-                    $input['ngay_nhap'],
+                    $line['ngay_san_xuat'],
                     $line['han_su_dung'],
                     $line['so_luong'],
                     $line['so_luong'],
@@ -509,6 +509,16 @@ final class StockAdminController
 
     public function batches(Request $request, array $params = []): void
     {
+        $this->batchList($request, $params, false);
+    }
+
+    public function expiring(Request $request, array $params = []): void
+    {
+        $this->batchList($request, $params, true);
+    }
+
+    private function batchList(Request $request, array $params, bool $expiringOnly): void
+    {
         $query = $request->query;
         $productId = null;
         $errors = [];
@@ -519,18 +529,26 @@ final class StockAdminController
             }
         }
         $expired = null;
-        if (array_key_exists('expired', $query)) {
+        if (!$expiringOnly && array_key_exists('expired', $query)) {
             $expired = $this->booleanInteger($query['expired']);
             if ($expired === null) {
                 $errors['expired'] = 'expired phải là 0 hoặc 1';
             }
+        } elseif ($expiringOnly && array_key_exists('expired', $query)) {
+            $errors['expired'] = 'Không kết hợp lọc sắp hết hạn với lọc hết hạn';
         }
         $days = null;
-        if (array_key_exists('expiring_within_days', $query)) {
-            $days = $this->positiveInteger($query['expiring_within_days']);
+        $daysParameter = $expiringOnly ? 'days' : 'expiring_within_days';
+        if (array_key_exists($daysParameter, $query)) {
+            $days = $this->positiveInteger($query[$daysParameter]);
             if ($days === null || $days > 3650) {
-                $errors['expiring_within_days'] = 'expiring_within_days phải từ 1 đến 3650';
+                $errors[$daysParameter] = $daysParameter . ' phải từ 1 đến 3650';
             }
+        } elseif ($expiringOnly) {
+            $days = min(
+                3650,
+                max(1, (int) ($this->businessConfig['promotion']['near_expiry_days'] ?? 10))
+            );
         }
         if ($expired === 1 && $days !== null) {
             $errors['expiring_within_days'] = 'Không kết hợp lọc hết hạn với sắp hết hạn';
@@ -549,8 +567,10 @@ final class StockAdminController
         if ($expired === 1) {
             $conditions[] = 'b.han_su_dung < CURDATE()';
         } elseif ($days !== null) {
-            $until = (new DateTimeImmutable('today'))->modify('+' . $days . ' days')->format('Y-m-d');
-            $conditions[] = 'b.han_su_dung >= CURDATE() AND b.han_su_dung <= ?';
+            $today = new DateTimeImmutable('today', new \DateTimeZone('Asia/Ho_Chi_Minh'));
+            $until = $today->modify('+' . $days . ' days')->format('Y-m-d');
+            $conditions[] = 'b.han_su_dung >= ? AND b.han_su_dung <= ?';
+            $values[] = $today->format('Y-m-d');
             $values[] = $until;
         }
         $list = $this->pdo->prepare(
@@ -586,7 +606,207 @@ final class StockAdminController
             ],
             $list->fetchAll(PDO::FETCH_ASSOC)
         );
-        Response::success('Danh sách lô hàng còn tồn', ['batches' => $batches]);
+        Response::success(
+            $expiringOnly ? 'Danh sách lô hàng sắp hết hạn' : 'Danh sách lô hàng còn tồn',
+            ['batches' => $batches]
+        );
+    }
+
+    public function lowStock(Request $request, array $params = []): void
+    {
+        $query = $this->pdo->query(
+            'SELECT id AS san_pham_id, ten_san_pham, so_luong_ton, muc_ton_toi_thieu
+             FROM san_pham
+             WHERE so_luong_ton <= muc_ton_toi_thieu
+             ORDER BY so_luong_ton ASC, id ASC'
+        );
+        $products = array_map(
+            static fn(array $row): array => [
+                'san_pham_id' => (int) $row['san_pham_id'],
+                'ten_san_pham' => $row['ten_san_pham'],
+                'so_luong_ton' => (int) $row['so_luong_ton'],
+                'muc_ton_toi_thieu' => (int) $row['muc_ton_toi_thieu'],
+            ],
+            $query->fetchAll(PDO::FETCH_ASSOC)
+        );
+        Response::success('Danh sách sản phẩm sắp hết hàng', ['products' => $products]);
+    }
+
+    public function adjust(Request $request, array $params = []): void
+    {
+        $input = $request->all();
+        $productId = $this->positiveInteger($input['san_pham_id'] ?? null);
+        $newQuantity = $this->nonNegativeInteger($input['so_luong_moi'] ?? null);
+        $reason = $input['ly_do'] ?? null;
+        $reason = is_string($reason) ? trim(strip_tags($reason)) : '';
+        $errors = [];
+        if ($productId === null) {
+            $errors['san_pham_id'] = 'san_pham_id phải là số nguyên dương';
+        }
+        if ($newQuantity === null || $newQuantity > self::MAX_QUANTITY) {
+            $errors['so_luong_moi'] = 'so_luong_moi phải là số nguyên từ 0 đến giới hạn kho';
+        }
+        if ($reason === '' || mb_strlen($reason) > 255) {
+            $errors['ly_do'] = 'ly_do là bắt buộc và tối đa 255 ký tự';
+        }
+        if ($errors !== []) {
+            Response::error('Dữ liệu điều chỉnh tồn kho không hợp lệ', 422, $errors);
+            return;
+        }
+
+        $this->pdo->beginTransaction();
+        try {
+            $productQuery = $this->pdo->prepare(
+                'SELECT id, so_luong_ton FROM san_pham WHERE id = ? FOR UPDATE'
+            );
+            $productQuery->execute([$productId]);
+            $product = $productQuery->fetch(PDO::FETCH_ASSOC);
+            if ($product === false) {
+                $this->pdo->rollBack();
+                Response::error('Không tìm thấy sản phẩm', 404);
+                return;
+            }
+
+            $oldQuantity = (int) $product['so_luong_ton'];
+            $delta = $newQuantity - $oldQuantity;
+            if ($delta !== 0) {
+                $batchesQuery = $this->pdo->prepare(
+                    'SELECT b.id, b.so_luong_con
+                     FROM lo_hang b
+                     WHERE b.san_pham_id = ? AND b.so_luong_con > 0
+                       AND (
+                           b.chi_tiet_phieu_nhap_id IS NULL
+                           OR EXISTS (
+                               SELECT 1
+                               FROM chi_tiet_phieu_nhap d
+                               JOIN phieu_nhap_kho p ON p.id = d.phieu_nhap_id
+                               WHERE d.id = b.chi_tiet_phieu_nhap_id
+                                 AND p.trang_thai = \'HOAN_THANH\'
+                           )
+                       )
+                     ORDER BY (b.han_su_dung IS NULL) ASC, b.han_su_dung ASC, b.id ASC
+                     FOR UPDATE'
+                );
+                $batchesQuery->execute([$productId]);
+                $batches = $batchesQuery->fetchAll(PDO::FETCH_ASSOC);
+                $batchTotal = array_sum(array_map(
+                    static fn(array $batch): int => (int) $batch['so_luong_con'],
+                    $batches
+                ));
+                if ($batchTotal !== $oldQuantity) {
+                    $this->pdo->rollBack();
+                    Response::error('Tồn sản phẩm và tồn các lô không nhất quán', 409, [
+                        'code' => 'STOCK_BATCH_MISMATCH',
+                    ]);
+                    return;
+                }
+
+                if ($delta < 0) {
+                    $remaining = -$delta;
+                    $decreaseBatch = $this->pdo->prepare(
+                        'UPDATE lo_hang
+                         SET so_luong_con = so_luong_con - ?
+                         WHERE id = ? AND so_luong_con >= ?'
+                    );
+                    foreach ($batches as $batch) {
+                        if ($remaining === 0) {
+                            break;
+                        }
+                        $available = (int) $batch['so_luong_con'];
+                        $quantity = min($remaining, $available);
+                        $decreaseBatch->execute([$quantity, (int) $batch['id'], $quantity]);
+                        if ($decreaseBatch->rowCount() !== 1) {
+                            throw new \RuntimeException('Lô hàng thay đổi trong lúc điều chỉnh tồn.');
+                        }
+                        $remaining -= $quantity;
+                    }
+                    if ($remaining !== 0) {
+                        $this->pdo->rollBack();
+                        Response::error('Không thể giảm tồn vượt số lượng các lô hiện có', 409);
+                        return;
+                    }
+                } else {
+                    $manufactureDate = $this->dateValue($input['ngay_san_xuat'] ?? null);
+                    $expiryDate = $this->dateValue($input['han_su_dung'] ?? null);
+                    $today = $this->today();
+                    $dateErrors = [];
+                    if ($manufactureDate === null) {
+                        $dateErrors['ngay_san_xuat'] = 'ngay_san_xuat là bắt buộc theo định dạng YYYY-MM-DD';
+                    } elseif ($manufactureDate > $today) {
+                        $dateErrors['ngay_san_xuat'] = 'Ngày sản xuất không được ở tương lai';
+                    }
+                    if ($expiryDate === null) {
+                        $dateErrors['han_su_dung'] = 'han_su_dung là bắt buộc theo định dạng YYYY-MM-DD';
+                    } elseif (
+                        $manufactureDate !== null
+                        && $expiryDate <= $manufactureDate
+                    ) {
+                        $dateErrors['han_su_dung'] = 'Hạn sử dụng phải sau ngày sản xuất';
+                    } elseif ($expiryDate <= $today) {
+                        $dateErrors['han_su_dung'] = 'Hạn sử dụng phải còn hiệu lực';
+                    }
+                    if ($dateErrors !== []) {
+                        $this->pdo->rollBack();
+                        Response::error('Ngày lô điều chỉnh không hợp lệ', 422, $dateErrors);
+                        return;
+                    }
+
+                    $insertBatch = $this->pdo->prepare(
+                        'INSERT INTO lo_hang
+                            (san_pham_id, chi_tiet_phieu_nhap_id, ngay_san_xuat, han_su_dung,
+                             so_luong_nhap, so_luong_con)
+                         VALUES (?, NULL, ?, ?, ?, ?)'
+                    );
+                    $insertBatch->execute([
+                        $productId,
+                        $manufactureDate,
+                        $expiryDate,
+                        $delta,
+                        $delta,
+                    ]);
+                }
+
+                $updateProduct = $this->pdo->prepare(
+                    'UPDATE san_pham
+                     SET so_luong_ton = ?
+                     WHERE id = ? AND so_luong_ton = ?'
+                );
+                $updateProduct->execute([$newQuantity, $productId, $oldQuantity]);
+                if ($updateProduct->rowCount() !== 1) {
+                    throw new \RuntimeException('Không thể cập nhật tồn kho một cách an toàn.');
+                }
+            }
+
+            $history = $this->pdo->prepare(
+                'INSERT INTO lich_su_kho
+                    (san_pham_id, loai_giao_dich, so_luong_thay_doi, ton_sau_giao_dich,
+                     tham_chieu_loai, nguoi_thuc_hien_id, ghi_chu)
+                 VALUES (?, \'DIEU_CHINH\', ?, ?, \'DIEU_CHINH\', ?, ?)'
+            );
+            $history->execute([
+                $productId,
+                $delta,
+                $newQuantity,
+                (int) Session::get('user_id'),
+                $reason,
+            ]);
+            $historyId = (int) $this->pdo->lastInsertId();
+            $this->pdo->commit();
+        } catch (Throwable $error) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $error;
+        }
+
+        $this->audit('stock.adjusted', 'product', $productId);
+        Response::success('Đã điều chỉnh tồn kho', [
+            'san_pham_id' => $productId,
+            'so_luong_truoc' => $oldQuantity,
+            'so_luong_moi' => $newQuantity,
+            'so_luong_thay_doi' => $delta,
+            'lich_su_kho_id' => $historyId,
+        ]);
     }
 
     public function stockHistory(Request $request, array $params = []): void
@@ -673,9 +893,10 @@ final class StockAdminController
     {
         $errors = [];
         $receiptDate = $this->dateValue($input['ngay_nhap'] ?? null);
+        $today = $this->today();
         if ($receiptDate === null) {
             $errors['ngay_nhap'] = 'ngay_nhap phải theo định dạng YYYY-MM-DD';
-        } elseif ($receiptDate > date('Y-m-d')) {
+        } elseif ($receiptDate > $today) {
             $errors['ngay_nhap'] = 'Ngày nhập không được ở tương lai';
         }
 
@@ -732,10 +953,20 @@ final class StockAdminController
             if ($cost === null || $cost > self::MAX_PRICE) {
                 $errors[$prefix . '.gia_nhap'] = 'gia_nhap phải là số nguyên không âm';
             }
+            $manufacture = $this->dateValue($line['ngay_san_xuat'] ?? null);
+            if ($manufacture === null) {
+                $errors[$prefix . '.ngay_san_xuat'] = 'ngay_san_xuat là bắt buộc theo định dạng YYYY-MM-DD';
+            } elseif ($manufacture > $today) {
+                $errors[$prefix . '.ngay_san_xuat'] = 'Ngày sản xuất không được ở tương lai';
+            } elseif ($receiptDate !== null && $manufacture > $receiptDate) {
+                $errors[$prefix . '.ngay_san_xuat'] = 'Ngày sản xuất không được sau ngày nhập';
+            }
             $expiry = $this->dateValue($line['han_su_dung'] ?? null);
             if ($expiry === null) {
                 $errors[$prefix . '.han_su_dung'] = 'han_su_dung phải theo định dạng YYYY-MM-DD';
-            } elseif ($expiry <= date('Y-m-d') || ($receiptDate !== null && $expiry <= $receiptDate)) {
+            } elseif ($manufacture !== null && $expiry <= $manufacture) {
+                $errors[$prefix . '.han_su_dung'] = 'Hạn sử dụng phải sau ngày sản xuất';
+            } elseif ($expiry <= $today || ($receiptDate !== null && $expiry <= $receiptDate)) {
                 $errors[$prefix . '.han_su_dung'] = 'Hạn sử dụng phải sau ngày nhập và chưa hết hạn';
             }
             $lotNumber = $line['so_lo'] ?? null;
@@ -750,6 +981,8 @@ final class StockAdminController
                 && $quantity <= self::MAX_QUANTITY
                 && $cost !== null
                 && $cost <= self::MAX_PRICE
+                && $manufacture !== null
+                && $manufacture <= $today
                 && $expiry !== null
                 && $lotNumber !== ''
                 && mb_strlen($lotNumber) <= 100
@@ -758,6 +991,7 @@ final class StockAdminController
                     'san_pham_id' => $productId,
                     'so_luong' => $quantity,
                     'gia_nhap' => $cost,
+                    'ngay_san_xuat' => $manufacture,
                     'han_su_dung' => $expiry,
                     'so_lo' => $lotNumber,
                 ];
@@ -801,6 +1035,12 @@ final class StockAdminController
             return null;
         }
         return $value;
+    }
+
+    private function today(): string
+    {
+        return (new DateTimeImmutable('now', new \DateTimeZone('Asia/Ho_Chi_Minh')))
+            ->format('Y-m-d');
     }
 
     private function positiveInteger(mixed $value): ?int

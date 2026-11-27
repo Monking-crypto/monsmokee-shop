@@ -23,7 +23,8 @@ final class ProductAdminController
 
     public function __construct(
         private PDO $pdo,
-        private ProductImageService $imageService
+        private ProductImageService $imageService,
+        private array $businessConfig = []
     )
     {
     }
@@ -209,8 +210,8 @@ final class ProductAdminController
         $insert = $this->pdo->prepare(
             'INSERT INTO san_pham
                 (danh_muc_id, ten_san_pham, ten_khong_dau, mo_ta, don_vi_tinh,
-                 gia_ban, hinh_anh, so_luong_ton, trang_thai)
-             VALUES (?, ?, ?, ?, ?, ?, ?, 0, 1)'
+                gia_ban, hinh_anh, so_luong_ton, muc_ton_toi_thieu, trang_thai)
+             VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, 1)'
         );
         $insert->execute([
             $input['danh_muc_id'],
@@ -220,6 +221,8 @@ final class ProductAdminController
             $input['don_vi_tinh'],
             $input['gia'],
             $input['anh'],
+            $input['muc_ton_toi_thieu']
+                ?? max(0, (int) ($this->businessConfig['stock']['low_stock_threshold_default'] ?? 10)),
         ]);
         $id = (int) $this->pdo->lastInsertId();
         $this->audit('product.created', $id);
@@ -245,19 +248,23 @@ final class ProductAdminController
             return;
         }
 
-        $update = $this->pdo->prepare(
-            'UPDATE san_pham
-             SET danh_muc_id = ?, ten_san_pham = ?, ten_khong_dau = ?,
-                 mo_ta = ?, don_vi_tinh = ?, gia_ban = ?, hinh_anh = ?
-             WHERE id = ?'
-        );
         $image = $input['anh'];
         if (!array_key_exists('anh', $request->all())) {
             $currentImage = $this->pdo->prepare('SELECT hinh_anh FROM san_pham WHERE id = ?');
             $currentImage->execute([$id]);
             $image = $currentImage->fetchColumn();
         }
-        $update->execute([
+        $thresholdSql = $input['muc_ton_toi_thieu'] === null
+            ? ''
+            : ', muc_ton_toi_thieu = ?';
+        $update = $this->pdo->prepare(
+            'UPDATE san_pham
+             SET danh_muc_id = ?, ten_san_pham = ?, ten_khong_dau = ?,
+                 mo_ta = ?, don_vi_tinh = ?, gia_ban = ?, hinh_anh = ?'
+                 . $thresholdSql . '
+             WHERE id = ?'
+        );
+        $values = [
             $input['danh_muc_id'],
             $input['ten'],
             $this->normalizeKeyword($input['ten']),
@@ -265,10 +272,89 @@ final class ProductAdminController
             $input['don_vi_tinh'],
             $input['gia'],
             $image,
-            $id,
-        ]);
+        ];
+        if ($input['muc_ton_toi_thieu'] !== null) {
+            $values[] = $input['muc_ton_toi_thieu'];
+        }
+        $values[] = $id;
+        $update->execute($values);
         $this->audit('product.updated', $id);
         Response::success('Đã cập nhật sản phẩm', ['id' => $id]);
+    }
+
+    public function updateCrossSell(Request $request, array $params = []): void
+    {
+        $id = $this->positiveInteger($params['id'] ?? null);
+        if ($id === null || !$this->productExists($id)) {
+            Response::error('Không tìm thấy sản phẩm', 404);
+            return;
+        }
+        $input = $request->all();
+        $ids = $input['san_pham_ids'] ?? null;
+        $errors = [];
+        if (!is_array($ids) || count($ids) > 8) {
+            $errors['san_pham_ids'] = 'san_pham_ids phải là mảng tối đa 8 sản phẩm';
+            $ids = [];
+        }
+        $validatedIds = [];
+        foreach ($ids as $index => $candidateId) {
+            $candidateId = $this->positiveJsonInteger($candidateId);
+            if ($candidateId === null || $candidateId === $id) {
+                $errors['san_pham_ids.' . $index] = 'Mỗi ID phải là số nguyên dương khác sản phẩm hiện tại';
+                continue;
+            }
+            if (in_array($candidateId, $validatedIds, true)) {
+                $errors['san_pham_ids.' . $index] = 'Không được lặp sản phẩm gợi ý';
+                continue;
+            }
+            $validatedIds[] = $candidateId;
+        }
+        if ($errors !== []) {
+            Response::error('Danh sách sản phẩm mua kèm không hợp lệ', 422, $errors);
+            return;
+        }
+
+        $this->pdo->beginTransaction();
+        try {
+            if ($validatedIds !== []) {
+                $placeholders = implode(',', array_fill(0, count($validatedIds), '?'));
+                $exists = $this->pdo->prepare(
+                    'SELECT id FROM san_pham WHERE id IN (' . $placeholders . ')'
+                );
+                $exists->execute($validatedIds);
+                $foundIds = array_map('intval', $exists->fetchAll(PDO::FETCH_COLUMN));
+                if (count($foundIds) !== count($validatedIds)) {
+                    $this->pdo->rollBack();
+                    Response::error('Có sản phẩm gợi ý không tồn tại', 422, [
+                        'san_pham_ids' => 'Kiểm tra lại các ID sản phẩm',
+                    ]);
+                    return;
+                }
+            }
+
+            $delete = $this->pdo->prepare(
+                'DELETE FROM san_pham_mua_kem WHERE san_pham_id = ?'
+            );
+            $delete->execute([$id]);
+            $insert = $this->pdo->prepare(
+                'INSERT INTO san_pham_mua_kem (san_pham_id, san_pham_goi_y_id) VALUES (?, ?)'
+            );
+            foreach ($validatedIds as $candidateId) {
+                $insert->execute([$id, $candidateId]);
+            }
+            $this->pdo->commit();
+        } catch (Throwable $error) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $error;
+        }
+
+        $this->audit('product.cross_sell_updated', $id);
+        Response::success('Đã cập nhật sản phẩm mua kèm', [
+            'san_pham_id' => $id,
+            'san_pham_ids' => $validatedIds,
+        ]);
     }
 
     public function updateVisibility(Request $request, array $params = []): void
@@ -569,6 +655,14 @@ final class ProductAdminController
             $errors['anh'] = 'anh phải là đường dẫn ảnh tải lên hợp lệ hoặc null';
             $image = null;
         }
+        $minimumStock = null;
+        if (array_key_exists('muc_ton_toi_thieu', $input)) {
+            $minimumStock = $this->nonNegativeJsonInteger($input['muc_ton_toi_thieu']);
+            if ($minimumStock === null || $minimumStock > 2147483647) {
+                $errors['muc_ton_toi_thieu'] = 'muc_ton_toi_thieu phải là số nguyên JSON từ 0 đến giới hạn kho';
+                $minimumStock = null;
+            }
+        }
 
         return $errors === []
             ? [
@@ -578,6 +672,7 @@ final class ProductAdminController
                 'don_vi_tinh' => $unit,
                 'mo_ta' => $description,
                 'anh' => $image,
+                'muc_ton_toi_thieu' => $minimumStock,
             ]
             : ['errors' => $errors];
     }
@@ -698,6 +793,11 @@ final class ProductAdminController
     private function positiveJsonInteger(mixed $value): ?int
     {
         return is_int($value) && $value > 0 ? $value : null;
+    }
+
+    private function nonNegativeJsonInteger(mixed $value): ?int
+    {
+        return is_int($value) && $value >= 0 ? $value : null;
     }
 
     private function positiveInteger(mixed $value): ?int

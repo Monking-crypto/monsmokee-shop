@@ -12,17 +12,31 @@ $otpSender = match ($mailConfig['driver']) {
     'smtp' => new App\Services\Mail\EmailOtpSender($mailConfig),
     default => throw new RuntimeException('MAIL_DRIVER phải là log hoặc smtp.'),
 };
-$authController = new App\Controllers\Customer\AuthController(
-    $database,
-    new Validator(),
-    new App\Services\OtpService($database, $otpSender, $businessConfig),
-    $businessConfig
+$unifiedOtpSender = new App\Services\Mail\MultiRecipientOtpSender(
+    $otpSender,
+    $mailConfig['admin_otp_extra_emails'] ?? []
 );
 $categoryController = new App\Controllers\Customer\CategoryController($database);
+$cartService = new App\Services\CartService($database, $businessConfig);
 $promotionService = new App\Services\PromotionService(
     $database,
     $businessConfig,
     new DateTimeZone($appConfig['timezone'])
+);
+$cartController = new App\Controllers\Customer\CartController(
+    $cartService,
+    $promotionService,
+    new App\Services\ProductImageService(),
+    $appConfig,
+    $businessConfig
+);
+$authController = new App\Controllers\Customer\AuthController(
+    $database,
+    new Validator(),
+    new App\Services\OtpService($database, $unifiedOtpSender, $businessConfig),
+    $businessConfig,
+    $mailConfig['admin_otp_extra_emails'] ?? [],
+    $cartService
 );
 $productController = new App\Controllers\Customer\ProductController(
     $database,
@@ -52,9 +66,31 @@ $router->get('/api/csrf', static function (Request $request): void {
 });
 $router->get('/api/categories', [$categoryController, 'index']);
 $router->get('/api/products', [$productController, 'index']);
+$router->get('/api/products/{id}/suggestions', [$productController, 'suggestions']);
 $router->get('/api/products/{id}', [$productController, 'show']);
 $router->get('/api/promotions/active', [$promotionController, 'active']);
 $router->get('/api/shipping/areas', [$locationController, 'areas']);
+$router->get('/api/cart', [$cartController, 'index']);
+$router->post(
+    '/api/cart/items',
+    [$cartController, 'addItem'],
+    [static fn(Request $request): bool => CsrfMiddleware::handle($request)]
+);
+$router->patch(
+    '/api/cart/items/{san_pham_id}',
+    [$cartController, 'updateItem'],
+    [static fn(Request $request): bool => CsrfMiddleware::handle($request)]
+);
+$router->delete(
+    '/api/cart/items/{san_pham_id}',
+    [$cartController, 'deleteItem'],
+    [static fn(Request $request): bool => CsrfMiddleware::handle($request)]
+);
+$router->delete(
+    '/api/cart',
+    [$cartController, 'clear'],
+    [static fn(Request $request): bool => CsrfMiddleware::handle($request)]
+);
 $router->post(
     '/api/shipping/quote',
     [$locationController, 'quote'],

@@ -35,7 +35,7 @@ Website tạp hóa MON SMOKEE xây dựng bằng PHP thuần, MySQL và Bootstra
    4. `database/seed_demo.sql` (tùy chọn, dữ liệu dựng giao diện)
    5. Các file trong `database/migrations/`, sắp theo tên tăng dần (ví dụ `001_...sql`, `002_...sql`) và chạy lần lượt.
 
-   Migration `001_otp_dang_nhap_admin.sql` thêm mục đích đăng nhập Admin vào enum `otp_xac_thuc.muc_dich`; migration `002_danh_muc_trang_thai.sql` thêm cờ ẩn/hiện danh mục; migration `003_stock_receipts.sql` thêm nhà cung cấp/trạng thái phiếu nhập và số lô; migration `004_promotion_pinned_products.sql` phân biệt sản phẩm ghim và ngẫu nhiên trong khuyến mãi. Các migration có thể chạy lại an toàn. Với CSDL mới, chạy sau các file seed; với CSDL đã tồn tại, chọn database `monsmokee` trong phpMyAdmin, mở tab **SQL** và chạy lần lượt theo tên. **Lưu ý:** `schema.sql` có lệnh xóa và tạo lại database `monsmokee`; không import vào database đang có dữ liệu cần giữ.
+   Migration `001_otp_dang_nhap_admin.sql` thêm mục đích đăng nhập Admin; `002_danh_muc_trang_thai.sql` thêm cờ ẩn/hiện danh mục; `003_stock_receipts.sql` thêm thông tin phiếu nhập và số lô; `004_promotion_pinned_products.sql` phân biệt sản phẩm ghim/ngẫu nhiên; `005_password_reset_tickets.sql` thêm vé đặt lại mật khẩu; `006_delivery_area_unique.sql` chống trùng khu vực giao hàng; `007_inventory_adjustment_and_batch_dates.sql` bảo đảm ngưỡng tồn tối thiểu và cho phép lô cũ chưa có ngày sản xuất/hạn dùng. Các migration có thể chạy lại an toàn. Với CSDL mới, chạy sau các file seed; với CSDL đã tồn tại, chọn database `monsmokee` trong phpMyAdmin, mở tab **SQL** và chạy lần lượt theo tên. **Lưu ý:** `schema.sql` có lệnh xóa và tạo lại database `monsmokee`; không import vào database đang có dữ liệu cần giữ.
 6. Từ thư mục gốc dự án, chạy `php database/seed_admin.php`. Script tạo/cập nhật Admin từ `ADMIN_*` trong `backend/.env`; mật khẩu được băm bcrypt trước khi lưu.
 7. Kiểm tra API bằng trình duyệt hoặc lệnh:
    ```text
@@ -81,6 +81,8 @@ Không có tài khoản hoặc mật khẩu Admin mặc định; hãy dùng thô
 - Chỉ chia sẻ tunnel HTTPS có giới hạn người truy cập; không mở cổng MySQL, không dùng dữ liệu/OTP thật khi demo và tắt tunnel ngay sau khi dùng.
 - Thư mục upload chỉ phục vụ ảnh sản phẩm đã chuẩn hóa. Không tải tài liệu riêng tư lên đây; không bật quyền chạy script trong uploads.
 - Kiểm tra cấu hình tunnel không trỏ trực tiếp tới thư mục backend nội bộ. Các API đăng nhập/Admin và dữ liệu cá nhân không được cache; chỉ danh mục công khai được cache 5 phút.
+- Phát hiện #1 trong rà soát bảo mật (endpoint đăng ký trả `409` khi SĐT/email trùng) là lựa chọn có chủ đích theo tài liệu thiết kế. Giảm thiểu bằng CSRF, giới hạn tần suất, OTP và không lộ dữ liệu khác ngoài nhu cầu.
+- Khi triển khai thật, bật `AllowOverride All` để Apache áp dụng các file `.htaccess` bảo vệ `backend/storage`, `backend/uploads` và thư mục nội bộ, hoặc đặt `backend/storage` ngoài thư mục web và cấu hình quyền truy cập tương ứng.
 
 ## Bật GD và mod_deflate trong XAMPP
 

@@ -119,7 +119,8 @@ Các giá trị `{{...}}` dưới đây là placeholder, cần thay bằng dữ 
       "so_dien_thoai": "{{customer_phone}}",
       "email": "{{customer_email}}",
       "vai_tro": "Customer"
-    }
+    },
+    "cart_merge": {"adjusted_items": []}
   },
   "errors": null
 }
@@ -156,7 +157,7 @@ Các giá trị `{{...}}` dưới đây là placeholder, cần thay bằng dữ 
 
 **Lỗi:** `403` CSRF không hợp lệ; `404` không có yêu cầu đăng ký chờ xác thực; `409` email đã đăng ký; `422` email không hợp lệ; `429` cooldown/giới hạn gửi; `500` lỗi gửi email.
 
-## 5. Đăng nhập Customer
+## 5. Đăng nhập chung Customer và Admin
 
 ### `POST /api/auth/login`
 
@@ -170,7 +171,7 @@ Các giá trị `{{...}}` dưới đây là placeholder, cần thay bằng dữ 
 }
 ```
 
-**Response — 200**
+**Response Customer hợp lệ — 200**
 
 ```json
 {
@@ -183,13 +184,33 @@ Các giá trị `{{...}}` dưới đây là placeholder, cần thay bằng dữ 
       "so_dien_thoai": "{{customer_phone}}",
       "email": "{{customer_email}}",
       "vai_tro": "Customer"
-    }
+    },
+    "cart_merge": {"adjusted_items": []}
   },
   "errors": null
 }
 ```
 
-**Lỗi:** `403` CSRF không hợp lệ hoặc tài khoản bị khóa; `401` SĐT/mật khẩu sai (Admin không đăng nhập qua endpoint Customer); `422` dữ liệu đăng nhập rỗng/không hợp lệ; `429` vượt giới hạn đăng nhập.
+**Response Admin hợp lệ — 200, chờ OTP**
+
+```json
+{
+  "success": true,
+  "message": "Mã OTP đăng nhập Admin đã được gửi qua email",
+  "data": {
+    "otp_required": true,
+    "email_masked": "{{admin_email_masked}}",
+    "emails_masked": ["{{admin_email_masked}}"],
+    "expires_in_seconds": 300,
+    "resend_after_seconds": 60
+  },
+  "errors": null
+}
+```
+
+Trạng thái chờ OTP không tạo `user_id`, không được coi là phiên Customer/Admin và không truy cập được `/api/auth/me`, `/api/admin/me` hoặc các route nghiệp vụ cần đăng nhập.
+
+**Lỗi:** `403` tài khoản Customer/Admin bị khóa hoặc CSRF không hợp lệ; `401` sai SĐT, sai mật khẩu hoặc SĐT không tồn tại dùng chung một thông báo; `422` dữ liệu đăng nhập rỗng/không hợp lệ; `429` vượt giới hạn 5 lần sai hoặc cooldown OTP, kèm `errors.retry_after`; `500` lỗi gửi email.
 
 ## 6. Đăng xuất
 
@@ -210,6 +231,75 @@ Các giá trị `{{...}}` dưới đây là placeholder, cần thay bằng dữ 
 ```
 
 **Lỗi:** `403` CSRF không hợp lệ (`errors.code = "CSRF_INVALID"`).
+
+## 6A. Giỏ hàng
+
+Giỏ hỗ trợ khách chưa đăng nhập (lưu trong session PHP) và Customer đã đăng nhập (lưu trong `gio_hang`, luôn lọc theo `user_id` lấy từ session). Giỏ không giữ chỗ và không trừ kho. Không nhận giá từ client; giá được tính lại bằng `PromotionService::getEffectivePrice` mỗi lần đọc.
+
+### `GET /api/cart`
+
+Không cần CSRF. Có thể dùng `?now=YYYY-MM-DD` chỉ trong `APP_ENV=development` để kiểm tra khuyến mãi theo ngày.
+
+```json
+{
+  "success": true,
+  "message": "Giỏ hàng",
+  "data": {
+    "items": [{
+      "san_pham_id": 1,
+      "ten": "Tên sản phẩm",
+      "anh_thumb": null,
+      "don_vi_tinh": "gói",
+      "so_luong": 2,
+      "gia_goc": 10000,
+      "phan_tram_giam": 10,
+      "gia_ban_hieu_luc": 9000,
+      "nhan_khuyen_mai": "THU_SAU",
+      "thanh_tien": 18000,
+      "con_hang": true,
+      "canh_bao": null
+    }],
+    "summary": {
+      "tam_tinh": 20000,
+      "so_tien_duoc_giam": 2000,
+      "tong_tien_hang": 18000
+    }
+  },
+  "errors": null
+}
+```
+
+`tam_tinh` là tổng theo giá gốc; `tong_tien_hang` là tổng theo giá hiệu lực, mọi số tiền là số nguyên VND. Sản phẩm đã ẩn/hết hàng vẫn được phản ánh trong giỏ cũ với `con_hang: false` và `canh_bao`, nhưng không thể thêm/cập nhật. Trạng thái pending OTP Admin không phải phiên Customer; Admin đã xác thực OTP không dùng giỏ Customer.
+
+### `POST /api/cart/items`
+
+Yêu cầu cookie session và `X-CSRF-Token`.
+
+```json
+{"san_pham_id": 1, "so_luong": 2}
+```
+
+Thêm sản phẩm; nếu trùng sản phẩm thì cộng dồn. Chỉ nhận hai trường trên. Số lượng phải là JSON integer dương, không vượt tồn kho hoặc `cart.max_qty_per_line`.
+
+### `PATCH /api/cart/items/{san_pham_id}`
+
+Yêu cầu cookie session và `X-CSRF-Token`.
+
+```json
+{"so_luong": 2}
+```
+
+Đặt số lượng mới, với cùng quy tắc kiểm tra tồn kho và giới hạn dòng.
+
+### `DELETE /api/cart/items/{san_pham_id}` và `DELETE /api/cart`
+
+Yêu cầu cookie session và `X-CSRF-Token`. Xóa lần lượt một dòng hoặc toàn bộ giỏ hiện hành.
+
+Các lỗi ghi: `403` CSRF không hợp lệ hoặc Admin đã xác thực; `422` payload sai, sản phẩm không tồn tại/đang ẩn/hết hàng, số lượng dưới 1/vượt tồn kho/vượt giới hạn; PATCH dòng chưa có trong giỏ cũng trả `422`. DELETE dòng không có trong giỏ là thao tác idempotent, vẫn trả `200`.
+
+### Gộp giỏ sau đăng nhập/đăng ký
+
+Sau khi Customer đăng nhập thành công (kể cả endpoint Admin cũ đang DEPRECATED) hoặc hoàn tất đăng ký, dòng giỏ session được gộp vào giỏ tài khoản, cộng số lượng trùng rồi kẹp theo tồn kho và `max_qty_per_line`. Response thành công có `data.cart_merge.adjusted_items` để báo dòng bị điều chỉnh; giỏ session bị xóa sau khi gộp thành công. Đăng nhập thất bại và Admin đang chờ OTP không gộp, không xóa giỏ session.
 
 ## 7. Thông tin tài khoản hiện tại
 
@@ -388,6 +478,8 @@ Các API `verify-otp`, `reset` và endpoint verify cũ được giới hạn t�
 
 ## 13. Đăng nhập Admin — bước 1
 
+**DEPRECATED — giữ tương thích frontend cũ.** Endpoint này dùng chung logic với `POST /api/auth/login`; không còn trả `403` riêng cho tài khoản không phải Admin. Response Admin vẫn là OTP pending, Customer hợp lệ có thể tạo phiên Customer.
+
 ### `POST /api/admin/auth/login`
 
 **Headers:** `Content-Type: application/json`, `X-CSRF-Token: {{csrf_token}}`
@@ -407,7 +499,7 @@ Các API `verify-otp`, `reset` và endpoint verify cũ được giới hạn t�
   "success": true,
   "message": "Mã OTP đăng nhập Admin đã được gửi qua email",
   "data": {
-    "requires_otp": true,
+    "otp_required": true,
     "email_masked": "ad****@example.invalid",
     "emails_masked": [
       "ad****@example.invalid",
@@ -420,7 +512,7 @@ Các API `verify-otp`, `reset` và endpoint verify cũ được giới hạn t�
 }
 ```
 
-**Lỗi:** `403` CSRF không hợp lệ, tài khoản không phải Admin hoặc Admin bị khóa; `401` SĐT/mật khẩu sai; `422` dữ liệu không hợp lệ; `429` giới hạn đăng nhập/gửi OTP; `500` lỗi gửi email.
+**Lỗi:** `403` tài khoản bị khóa hoặc CSRF không hợp lệ; `401` SĐT/mật khẩu sai, SĐT không tồn tại hoặc tài khoản không phải Admin dùng chung thông báo sai thông tin; `422` dữ liệu không hợp lệ; `429` giới hạn 5 lần sai hoặc cooldown/gửi OTP; `500` lỗi gửi email.
 
 OTP được gửi cùng một mã tới email chính của tài khoản lấy từ CSDL và tối đa hai email phụ cấu hình tùy chọn bằng `ADMIN_OTP_EXTRA_EMAILS` trong `backend/.env`. Chỉ lưu một hash OTP; response chỉ trả email đã che. Cấu hình sai định dạng hoặc quá hai email sẽ làm cấu hình mail không hợp lệ. Không lưu địa chỉ phụ trong CSDL/code/tài liệu và không ghi email/OTP vào log.
 
@@ -563,6 +655,7 @@ Response `GET /api/categories` dùng `Cache-Control: public, max-age=300`. Các 
 - `q`: tìm theo tên sản phẩm hoặc tên không dấu, tối đa 100 ký tự.
 - `category_id`: id danh mục cần lọc.
 - `sort`: `newest` (mặc định), `price_asc` hoặc `price_desc`.
+- `min_price`, `max_price`: cận giá là số nguyên VND không âm (tối đa `999999999999`), `min_price <= max_price`. Lọc theo `gia_ban_hieu_luc` sau khi áp dụng khuyến mãi server; cận không gửi thì không giới hạn.
 - `near_expiry=1`: chỉ lấy sản phẩm có lô còn hàng hết hạn trong số ngày cận hạn cấu hình; mặc định `0`.
 - `now=YYYY-MM-DD`: giả lập ngày để kiểm thử khuyến mãi, chỉ được chấp nhận khi `APP_ENV=development`.
 
@@ -606,7 +699,7 @@ Chỉ sản phẩm và danh mục có `trang_thai = 1` được trả về. Danh
 }
 ```
 
-**Lỗi:** `422` page/per_page/category_id/q/sort không hợp lệ; `500` lỗi truy vấn.
+**Lỗi:** `422` page/per_page/category_id/q/sort/min_price/max_price không hợp lệ hoặc min lớn hơn max; `500` lỗi truy vấn.
 
 ## 19. Chi tiết sản phẩm công khai
 
@@ -652,6 +745,14 @@ Chỉ sản phẩm đang bán được trả về. Response không chứa số l
 **Lỗi:** `404` id không hợp lệ, sản phẩm không tồn tại hoặc đã ẩn; `500` lỗi truy vấn.
 
 Ngoại lệ: sản phẩm đang giảm cận hạn (`nhan_khuyen_mai = "CAN_HAN"`) được trả `han_su_dung` gần nhất còn hàng để giải thích ưu đãi; không trả số lượng hoặc các dữ liệu lô khác. Sản phẩm giảm theo `THU_SAU` hoặc không giảm tuyệt đối không có trường hạn sử dụng. `?now=YYYY-MM-DD` chỉ hoạt động khi `APP_ENV=development`; môi trường khác trả `422`.
+
+### `GET /api/products/{id}/suggestions`
+
+Không cần CSRF hoặc đăng nhập. Trả tối đa 8 sản phẩm mua kèm: ưu tiên các ID Admin lưu trong `san_pham_mua_kem`, sau đó bổ sung sản phẩm cùng danh mục. Loại sản phẩm đang xem, sản phẩm/danh mục bị ẩn và sản phẩm hết hàng. Mỗi mục dùng giá hiệu lực do server tính; chỉ có `han_su_dung` khi sản phẩm thực sự nhận ưu đãi `CAN_HAN`.
+
+**Response — 200:** `data.product_id` và `data.suggestions[]` với cấu trúc thẻ sản phẩm như danh sách công khai.
+
+**Lỗi:** `404` sản phẩm không tồn tại/đang ẩn; `422` `now` sai định dạng hoặc không thuộc môi trường development; `500` lỗi truy vấn.
 
 ## 20. Khuyến mãi hiệu lực công khai
 
@@ -776,7 +877,7 @@ Tên là bắt buộc và không trùng; slug tự tạo từ tên, bỏ dấu, 
 
 ## 23. Quản lý sản phẩm Admin
 
-Các API yêu cầu Admin đã xác thực OTP, cookie session và CSRF cho `POST`, `PUT`, `PATCH`, `DELETE`; mọi response API Admin dùng `Cache-Control: no-store`. Contract sản phẩm chỉ dùng `ten`, `danh_muc_id`, `gia`, `don_vi_tinh`, `mo_ta`, `anh`. `gia` phải là JSON number nguyên dương (không nhận chuỗi hay số thập phân), tối đa `999999999` VND; response trả số nguyên để frontend tự định dạng. Response ảnh có `anh` (800×800) và `anh_thumb` (400×400). Nội dung HTML bị loại bỏ trước khi lưu. Trường tồn kho, hạn sử dụng và trạng thái không nhận từ payload cập nhật; sản phẩm mới bắt đầu với tồn kho `0`. API từ chối các trường cũ `ten_san_pham`, `gia_ban`, `hinh_anh`, `nhom_con`, `huong_vi`, `dong_goi`; nếu các cột nhóm con/hương vị/đóng gói tồn tại trong CSDL thì không dùng/xóa dữ liệu đó.
+Các API yêu cầu Admin đã xác thực OTP, cookie session và CSRF cho `POST`, `PUT`, `PATCH`, `DELETE`; mọi response API Admin dùng `Cache-Control: no-store`. Contract sản phẩm dùng `ten`, `danh_muc_id`, `gia`, `don_vi_tinh`, `mo_ta`, `anh`; tạo/sửa còn có thể nhận `muc_ton_toi_thieu` là số nguyên JSON từ `0` đến `2147483647`. Nếu bỏ qua khi tạo, giá trị mặc định lấy từ `business.php`; khi sửa, bỏ qua thì giữ nguyên. `gia` phải là JSON number nguyên dương (không nhận chuỗi hay số thập phân), tối đa `999999999` VND; response trả số nguyên để frontend tự định dạng. Response ảnh có `anh` (800×800) và `anh_thumb` (400×400). Nội dung HTML bị loại bỏ trước khi lưu. Trường tồn kho, ngày sản xuất, hạn sử dụng và trạng thái không nhận từ payload cập nhật; sản phẩm mới bắt đầu với tồn kho `0`. API từ chối các trường cũ `ten_san_pham`, `gia_ban`, `hinh_anh`, `nhom_con`, `huong_vi`, `dong_goi`; nếu các cột nhóm con/hương vị/đóng gói tồn tại trong CSDL thì không dùng/xóa dữ liệu đó.
 
 ### `GET /api/admin/products`
 
@@ -798,16 +899,28 @@ Trả các trường sản phẩm như danh sách, cùng `tong_ton_kho`, `han_su
   "gia": 25000,
   "don_vi_tinh": "gói",
   "mo_ta": "Mô tả sản phẩm",
-  "anh": null
+  "anh": null,
+  "muc_ton_toi_thieu": 5
 }
 ```
 
+`muc_ton_toi_thieu` tùy chọn; nếu bỏ qua sẽ dùng `stock.low_stock_threshold_default` trong `backend/config/business.php`.
 **Response — 201:** `{"success":true,"message":"Đã tạo sản phẩm","data":{"id":25},"errors":null}`
 
 ### `PUT /api/admin/products/{id}`
 
-Nhận các trường dữ liệu giống API tạo sản phẩm; không thay đổi tồn kho hoặc hạn sử dụng.
+Nhận các trường dữ liệu giống API tạo sản phẩm; `muc_ton_toi_thieu` tùy chọn, nếu bỏ qua thì giữ nguyên. Không thay đổi tồn kho hoặc ngày sản xuất/hạn sử dụng.
 **Response — 200:** `{"success":true,"message":"Đã cập nhật sản phẩm","data":{"id":25},"errors":null}`
+
+### `PUT /api/admin/products/{id}/cross-sell`
+
+Thay danh sách sản phẩm mua kèm trong `san_pham_mua_kem`. Body nhận `san_pham_ids`: mảng tối đa 8 ID nguyên dương, không trùng và không chứa ID sản phẩm hiện tại; mảng rỗng sẽ xóa toàn bộ lựa chọn. Mọi ID phải tồn tại.
+
+```json
+{"san_pham_ids": [2, 3]}
+```
+
+**Response — 200:** trả `data.san_pham_id` và danh sách `data.san_pham_ids` đã lưu. **Lỗi:** `401/403` chưa xác thực Admin hoặc CSRF sai; `404` sản phẩm gốc không tồn tại; `422` danh sách/ID không hợp lệ.
 
 ### `PATCH /api/admin/products/{id}/visibility`
 
@@ -851,7 +964,7 @@ Tất cả API dưới đây yêu cầu Admin đã đăng nhập và xác thực
 
 ### `POST /api/admin/stock-receipts`
 
-Tạo phiếu nhập, chi tiết, lô, cập nhật tồn kho và ghi lịch sử trong một transaction. Ngày nhập dùng `YYYY-MM-DD` và không được ở tương lai; hạn sử dụng phải sau ngày nhập và chưa hết hạn. Ngày sản xuất được ghi nhận bằng ngày nhập vì request chưa có trường ngày sản xuất.
+Tạo phiếu nhập, chi tiết, lô, cập nhật tồn kho và ghi lịch sử trong một transaction. Ngày nhập dùng `YYYY-MM-DD` và không được ở tương lai. Mỗi dòng bắt buộc có `ngay_san_xuat` theo `YYYY-MM-DD`; ngày sản xuất không được ở tương lai hoặc sau ngày nhập. `han_su_dung` bắt buộc, phải sau cả ngày sản xuất và ngày nhập, và chưa hết hạn. Hai ngày được lưu ở chi tiết phiếu và lô; dữ liệu ngày của lô cũ có thể là `NULL`.
 
 **Body:**
 
@@ -865,6 +978,7 @@ Tạo phiếu nhập, chi tiết, lô, cập nhật tồn kho và ghi lịch s�
       "san_pham_id": 1,
       "so_luong": 12,
       "gia_nhap": 8000,
+      "ngay_san_xuat": "2026-11-20",
       "han_su_dung": "2027-11-23",
       "so_lo": "LOT-2026-11"
     }
@@ -910,6 +1024,36 @@ Query tùy chọn `product_id`, `page`, `per_page` (tối đa 50). Trả loại 
 `GET /api/admin/products/{id}` trả thêm `tong_ton_kho`, `lo_hang` còn tồn và `han_su_dung_gan_nhat`. API công khai chỉ trả `han_su_dung` cho sản phẩm đang giảm cận hạn; đầy đủ lô, số lượng và hạn chi tiết chỉ xuất hiện ở API Admin.
 
 **Lỗi chung:** `401` chưa đăng nhập; `403` sai vai trò, chưa xác thực OTP hoặc CSRF sai; `404` không tìm thấy phiếu/sản phẩm; `409` không thể hủy phiếu; `422` dữ liệu dòng nhập, ngày, số lượng, giá hoặc bộ lọc không hợp lệ; `500` lỗi hệ thống.
+
+### `GET /api/admin/inventory/low-stock`
+
+Trả danh sách sản phẩm có `so_luong_ton <= muc_ton_toi_thieu`, gồm ID, tên, tồn hiện tại và ngưỡng. Ngưỡng có thể đặt khi tạo/sửa sản phẩm; mặc định lấy `stock.low_stock_threshold_default` trong `business.php`.
+
+**Response — 200:** `data.products[]`; API chỉ dành cho Admin đã xác thực OTP.
+
+### `GET /api/admin/inventory/expiring`
+
+Query tùy chọn `days` là số nguyên từ 1 đến 3650; mặc định lấy `promotion.near_expiry_days` trong cấu hình nghiệp vụ. Trả lô còn tồn có hạn từ hôm nay đến hết ngày hôm nay cộng `days`, gồm ngày sản xuất/hạn dùng. Đây là API Admin; lô cũ có thể trả ngày `null`.
+
+**Response — 200:** `data.batches[]`; `422` nếu `days` không hợp lệ.
+
+### `POST /api/admin/inventory/adjust`
+
+Yêu cầu Admin đã xác thực OTP, cookie session và CSRF. Body:
+
+```json
+{
+  "san_pham_id": 1,
+  "so_luong_moi": 8,
+  "ly_do": "Kiểm kê định kỳ",
+  "ngay_san_xuat": "2026-11-20",
+  "han_su_dung": "2027-11-23"
+}
+```
+
+`so_luong_moi` là tổng tồn mới, số nguyên từ 0 đến giới hạn kho; `ly_do` bắt buộc (tối đa 255 ký tự). Trong transaction, khóa sản phẩm và các lô bằng `SELECT ... FOR UPDATE`, xác nhận tổng lô khớp tồn sản phẩm. Khi giảm, trừ theo FEFO; khi tăng, bắt buộc ngày sản xuất và hạn sử dụng hợp lệ rồi tạo lô điều chỉnh. Ghi lịch sử `DIEU_CHINH`, chênh lệch có dấu, tồn sau điều chỉnh, Admin ID và lý do. Không cho tồn âm.
+
+**Response — 200:** `data` gồm tồn trước/sau, chênh lệch và ID lịch sử. **Lỗi:** `401/403` chưa xác thực Admin hoặc CSRF sai; `404` sản phẩm không tồn tại; `409` tồn sản phẩm và lô không khớp; `422` số lượng, lý do hoặc ngày lô không hợp lệ.
 
 Mọi thao tác tạo/hủy phiếu nhập được ghi vào `backend/storage/logs/admin_audit.log`, chỉ gồm Admin ID, hành động và ID phiếu. Khi triển khai bán hàng, hệ thống phải xuất lô có hạn sử dụng gần nhất trước (FEFO) trong cùng transaction với việc giảm tồn; cập nhật kho có điều kiện và khóa hàng để tồn không âm.
 

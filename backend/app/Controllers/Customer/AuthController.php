@@ -3,7 +3,9 @@ declare(strict_types=1);
 
 namespace App\Controllers\Customer;
 
+use App\Services\CartService;
 use App\Services\OtpService;
+use App\Services\UnifiedLoginService;
 use DateTimeImmutable;
 use Logger;
 use PDO;
@@ -15,19 +17,28 @@ use Session;
 use Throwable;
 use Validator;
 
+require_once dirname(__DIR__, 2) . '/Services/CartService.php';
+require_once dirname(__DIR__, 2) . '/Services/UnifiedLoginService.php';
+
 /**
  * Endpoint xác thực dành cho khách hàng.
  */
 final class AuthController
 {
     private const DUMMY_PASSWORD_HASH = '$2y$10$QBEKRbHMcArA1dK/DR5XOe3KZG0KzC3.d6GF1L12rptaK2vR.uN3i';
+    private UnifiedLoginService $unifiedLogin;
+    private ?CartService $cartService;
 
     public function __construct(
         private PDO $pdo,
         private Validator $validator,
         private OtpService $otpService,
-        private array $business
+        private array $business,
+        private array $extraOtpEmails = [],
+        ?CartService $cartService = null
     ) {
+        $this->unifiedLogin = new UnifiedLoginService($pdo, $business);
+        $this->cartService = $cartService;
     }
 
     /**
@@ -239,8 +250,11 @@ final class AuthController
             return;
         }
 
-        $this->startCustomerSession($result['user']);
-        Response::success('Đăng ký thành công', ['user' => $result['user']], 201);
+        $cartMerge = $this->startCustomerSession($result['user']);
+        Response::success('Đăng ký thành công', [
+            'user' => $result['user'],
+            'cart_merge' => $cartMerge,
+        ], 201);
     }
 
     public function forgotPasswordStart(Request $request, array $params = []): void
@@ -641,132 +655,8 @@ final class AuthController
             Response::error('Dữ liệu đăng nhập không hợp lệ', 422, $errors);
             return;
         }
-
-        $maxFailures = (int) ($this->business['login']['max_fail'] ?? 5);
-        $windowSeconds = (int) ($this->business['login']['lock_minutes'] ?? 15) * 60;
-        $rateKey = 'customer_login:' . hash('sha256', $request->ip() . "\0" . $phone);
-
-        $this->pdo->beginTransaction();
-        try {
-            $createRateRow = $this->pdo->prepare(
-                'INSERT IGNORE INTO rate_limit (khoa, so_lan, bat_dau, khoa_den)
-                 VALUES (?, 0, NOW(), NULL)'
-            );
-            $createRateRow->execute([$rateKey]);
-
-            $rateQuery = $this->pdo->prepare(
-                'SELECT so_lan, bat_dau, khoa_den
-                 FROM rate_limit
-                 WHERE khoa = ?
-                 FOR UPDATE'
-            );
-            $rateQuery->execute([$rateKey]);
-            $rate = $rateQuery->fetch(PDO::FETCH_ASSOC);
-            if ($rate === false) {
-                throw new RuntimeException('Không thể đọc bộ đếm đăng nhập.');
-            }
-
-            $now = new DateTimeImmutable('now');
-            $windowStart = new DateTimeImmutable((string) $rate['bat_dau']);
-            $windowEnd = $windowStart->modify('+' . $windowSeconds . ' seconds');
-            $failureCount = (int) $rate['so_lan'];
-            if ($now >= $windowEnd) {
-                $failureCount = 0;
-                $windowStart = $now;
-                $windowEnd = $windowStart->modify('+' . $windowSeconds . ' seconds');
-            }
-
-            if ($failureCount >= $maxFailures) {
-                $retryAfter = max(1, $windowEnd->getTimestamp() - $now->getTimestamp());
-                $updateLock = $this->pdo->prepare(
-                    'UPDATE rate_limit SET khoa_den = ? WHERE khoa = ?'
-                );
-                $updateLock->execute([$windowEnd->format('Y-m-d H:i:s'), $rateKey]);
-                $this->pdo->commit();
-                $outcome = ['type' => 'rate_limited', 'retry_after' => $retryAfter];
-            } else {
-                if ((int) $rate['so_lan'] !== $failureCount) {
-                    $reset = $this->pdo->prepare(
-                        'UPDATE rate_limit
-                         SET so_lan = 0, bat_dau = ?, khoa_den = NULL
-                         WHERE khoa = ?'
-                    );
-                    $reset->execute([$windowStart->format('Y-m-d H:i:s'), $rateKey]);
-                }
-
-                $userQuery = $this->pdo->prepare(
-                    'SELECT u.id, u.vai_tro_id, u.ho_ten, u.so_dien_thoai, u.email,
-                            u.mat_khau, u.trang_thai, v.ten_vai_tro
-                     FROM nguoi_dung u
-                     JOIN vai_tro v ON v.id = u.vai_tro_id
-                     WHERE u.so_dien_thoai = ?
-                     LIMIT 1
-                     FOR UPDATE'
-                );
-                $userQuery->execute([$phone]);
-                $user = $userQuery->fetch(PDO::FETCH_ASSOC);
-                $hash = $user === false
-                    ? self::DUMMY_PASSWORD_HASH
-                    : (string) $user['mat_khau'];
-                $passwordMatches = password_verify($password, $hash);
-
-                if (
-                    $user === false
-                    || $user['ten_vai_tro'] !== 'Customer'
-                    || ((int) $user['trang_thai'] === 1 && !$passwordMatches)
-                ) {
-                    $failureCount++;
-                    $lockUntil = $failureCount >= $maxFailures
-                        ? $windowEnd->format('Y-m-d H:i:s')
-                        : null;
-                    $recordFailure = $this->pdo->prepare(
-                        'UPDATE rate_limit
-                         SET so_lan = ?, bat_dau = ?, khoa_den = ?
-                         WHERE khoa = ?'
-                    );
-                    $recordFailure->execute([
-                        $failureCount,
-                        $windowStart->format('Y-m-d H:i:s'),
-                        $lockUntil,
-                        $rateKey,
-                    ]);
-                    $this->pdo->commit();
-                    $outcome = ['type' => 'invalid_credentials'];
-                } elseif ((int) $user['trang_thai'] !== 1) {
-                    $this->pdo->commit();
-                    $outcome = ['type' => 'account_locked'];
-                } else {
-                    if (password_needs_rehash((string) $user['mat_khau'], PASSWORD_BCRYPT)) {
-                        $newHash = password_hash($password, PASSWORD_BCRYPT);
-                        $updatePassword = $this->pdo->prepare(
-                            'UPDATE nguoi_dung SET mat_khau = ? WHERE id = ?'
-                        );
-                        $updatePassword->execute([$newHash, (int) $user['id']]);
-                    }
-
-                    $clearFailures = $this->pdo->prepare('DELETE FROM rate_limit WHERE khoa = ?');
-                    $clearFailures->execute([$rateKey]);
-                    $this->pdo->commit();
-                    $outcome = [
-                        'type' => 'success',
-                        'user' => [
-                            'id' => (int) $user['id'],
-                            'ho_ten' => $user['ho_ten'],
-                            'so_dien_thoai' => $user['so_dien_thoai'],
-                            'email' => $user['email'],
-                            'vai_tro' => 'Customer',
-                        ],
-                    ];
-                }
-            }
-        } catch (Throwable $error) {
-            if ($this->pdo->inTransaction()) {
-                $this->pdo->rollBack();
-            }
-            throw $error;
-        }
-
-        if ($outcome['type'] === 'rate_limited') {
+        $outcome = $this->unifiedLogin->authenticate($phone, $password, $request->ip());
+        if (($outcome['type'] ?? null) === 'rate_limited') {
             Response::error(
                 'Đã đăng nhập sai quá số lần cho phép, vui lòng thử lại sau',
                 429,
@@ -774,17 +664,25 @@ final class AuthController
             );
             return;
         }
-        if ($outcome['type'] === 'account_locked') {
+        if (($outcome['type'] ?? null) === 'account_locked') {
             Response::error('Tài khoản đã bị khóa', 403);
             return;
         }
-        if ($outcome['type'] !== 'success') {
+        if (($outcome['type'] ?? null) === 'invalid_credentials') {
             Response::error('Số điện thoại hoặc mật khẩu không đúng', 401);
             return;
         }
-
-        $this->startCustomerSession($outcome['user']);
-        Response::success('Đăng nhập thành công', ['user' => $outcome['user']]);
+        if (($outcome['type'] ?? null) === 'customer_credentials_valid') {
+            $cartMerge = $this->startCustomerSession($outcome['user']);
+            Response::success('Đăng nhập thành công', [
+                'user' => $outcome['user'],
+                'cart_merge' => $cartMerge,
+            ]);
+            return;
+        }
+        if (($outcome['type'] ?? null) === 'admin_credentials_valid') {
+            $this->startPendingAdminOtp($request, $outcome['user']);
+        }
     }
 
     /**
@@ -1122,7 +1020,7 @@ final class AuthController
         ]);
     }
 
-    private function startCustomerSession(array $user): void
+    private function startCustomerSession(array $user): array
     {
         Session::regenerate();
         Session::remove('admin_pending_user_id');
@@ -1133,6 +1031,84 @@ final class AuthController
         Session::set('user_id', $user['id']);
         Session::set('user_role', $user['vai_tro']);
         Session::set('auth_user', $user);
+        return $this->cartService?->mergeGuestCart((int) $user['id'])
+            ?? ['adjusted_items' => []];
+    }
+
+    private function startPendingAdminOtp(Request $request, array $user): void
+    {
+        Session::remove('user_id');
+        Session::remove('user_role');
+        Session::remove('auth_user');
+        Session::remove('admin_otp_verified');
+        Session::remove('admin_otp_verified_at');
+        Session::remove('admin_pending_user_id');
+        Session::remove('admin_pending_started_at');
+        Session::remove('admin_pending_expires_at');
+        Session::remove('session_expired');
+        Session::regenerate();
+        $startedAt = time();
+        $pendingTtl = max(1, (int) ($this->business['otp']['ttl_seconds'] ?? 300));
+        Session::set('admin_pending_user_id', (int) $user['id']);
+        Session::set('admin_pending_started_at', $startedAt);
+        Session::set('admin_pending_expires_at', $startedAt + $pendingTtl);
+
+        try {
+            $otp = $this->otpService->issue(
+                (string) $user['email'],
+                'DANG_NHAP_ADMIN',
+                null,
+                $request->ip()
+            );
+        } catch (RuntimeException $error) {
+            if (str_starts_with($error->getMessage(), 'OTP_RESEND_COOLDOWN:')) {
+                $remaining = (int) substr($error->getMessage(), strlen('OTP_RESEND_COOLDOWN:'));
+                Response::error(
+                    'Vui lòng chờ trước khi yêu cầu mã OTP mới',
+                    429,
+                    ['retry_after' => $remaining]
+                );
+                return;
+            }
+            if ($error->getMessage() === 'OTP_MAX_SENDS_PER_HOUR') {
+                Response::error(
+                    'Đã vượt quá số lần gửi OTP cho phép, vui lòng thử lại sau',
+                    429,
+                    ['retry_after' => 3600]
+                );
+                return;
+            }
+            if ($error->getMessage() === 'OTP_SEND_FAILED') {
+                Response::error('Không thể gửi email OTP lúc này, vui lòng thử lại sau', 500);
+                return;
+            }
+            throw $error;
+        }
+
+        $expiresAt = (new DateTimeImmutable($otp['expires_at']))->getTimestamp();
+        Session::set('admin_pending_user_id', (int) $user['id']);
+        Session::set('admin_pending_started_at', $expiresAt - (int) $otp['expires_in_seconds']);
+        Session::set('admin_pending_expires_at', $expiresAt);
+
+        Response::success('Mã OTP đăng nhập Admin đã được gửi qua email', [
+            'otp_required' => true,
+            'email_masked' => $this->maskEmail((string) $user['email']),
+            'emails_masked' => $this->maskedAdminEmails((string) $user['email']),
+            'expires_in_seconds' => (int) $otp['expires_in_seconds'],
+            'resend_after_seconds' => (int) ($this->business['otp']['resend_cooldown_seconds'] ?? 60),
+        ]);
+    }
+
+    private function maskedAdminEmails(string $primaryEmail): array
+    {
+        $emails = array_values(array_unique([
+            strtolower($primaryEmail),
+            ...array_map(
+                static fn(string $email): string => strtolower($email),
+                $this->extraOtpEmails
+            ),
+        ]));
+        return array_map(fn(string $email): string => $this->maskEmail($email), $emails);
     }
 
     private function maskEmail(string $email): string
