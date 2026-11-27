@@ -553,7 +553,7 @@ export async function handle(method, path, body = {}) {
     c[product.id] = next; store.set('cart', c);
     return ok({ count: cartData().count });
   }
-  if (/^\/cart\/items\/\d+$/.test(route) && method === 'PUT') {
+  if (/^\/cart\/items\/\d+$/.test(route) && (method === 'PUT' || method === 'PATCH')) {
     const id = Number(route.split('/').pop()), c = store.get('cart', {});
     const product = allProducts().find((item) => item.id === id), quantity = Number(body.so_luong);
     if (!product || !c[id]) return fail(404, 'Không tìm thấy sản phẩm trong giỏ hàng');

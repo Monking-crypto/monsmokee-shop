@@ -14,6 +14,7 @@ export const CONFIG = {
     promotions: true,
     store: true,
     shipping: true,
+    cart: true,
     adminInventory: true,
     adminPromotions: true,
     adminDeliveryAreas: true,

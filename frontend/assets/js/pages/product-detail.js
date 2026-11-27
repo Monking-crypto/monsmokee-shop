@@ -1,5 +1,6 @@
 // product-detail.js - thông tin chi tiết sản phẩm
 import { api, ApiError } from '../core/api.js';
+import { addCartItem } from '../core/cart.js';
 import { escapeHtml, qs, setBusy, toast } from '../core/ui.js';
 import { formatVnd } from '../core/format.js';
 import { imageUrl } from '../core/catalog.js';
@@ -114,7 +115,7 @@ async function addToCart(event) {
   const button = event.currentTarget;
   setBusy(button, true);
   try {
-    const result = await api.post('/cart/items', { san_pham_id: Number(id), so_luong: quantity });
+    const result = await addCartItem(Number(id), quantity);
     document.dispatchEvent(new CustomEvent('ms:cart', { detail: { count: result.count } }));
     toast('Đã thêm vào giỏ hàng');
   } catch (error) {

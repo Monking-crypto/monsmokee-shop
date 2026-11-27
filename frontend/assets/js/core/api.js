@@ -59,6 +59,9 @@ function useMock(path) {
   if (route === '/promotions/active') return !CONFIG.LIVE.promotions;
   if (route === '/store-info') return !CONFIG.LIVE.store;
   if (route === '/shipping/areas' || route === '/shipping/quote') return !CONFIG.LIVE.shipping;
+  if (route === '/cart' || route === '/cart/items' || /^\/cart\/items\/\d+$/.test(route)) {
+    return !CONFIG.LIVE.cart;
+  }
   if (route === '/admin/stock-receipts' || route.startsWith('/admin/stock-receipts/')
     || route === '/admin/batches' || route === '/admin/stock-history') {
     return !CONFIG.LIVE.adminInventory;

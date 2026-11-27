@@ -1,5 +1,6 @@
 // cart.js - giỏ hàng khách hàng, phí giao hàng và xác nhận thao tác xóa
 import { api, ApiError } from '../core/api.js';
+import { clearCart, getCart, removeCartItem, updateCartItem } from '../core/cart.js';
 import { CONFIG } from '../core/config.js';
 import { escapeHtml, qs, toast } from '../core/ui.js';
 import { formatVnd } from '../core/format.js';
@@ -40,10 +41,19 @@ function emptyCart() {
 
 function productRow(item) {
   const product = item.san_pham;
-  const stock = Math.max(0, Number(product.so_luong_ton) || 0);
+  const rawStock = Number(product.so_luong_ton);
+  const stock = Number.isFinite(rawStock) ? Math.max(0, rawStock) : null;
   const quantity = Number(item.so_luong) || 1;
-  const insufficient = stock < quantity;
-  const out = stock === 0;
+  const available = typeof item.con_hang === 'boolean'
+    ? item.con_hang
+    : stock === null || stock > 0;
+  const out = !available;
+  const insufficient = out || (stock !== null && stock < quantity);
+  const warning = item.canh_bao || (stock === 0
+    ? 'Sản phẩm hiện đã hết hàng.'
+    : stock !== null && stock < quantity
+      ? `Chỉ còn ${stock} sản phẩm trong kho. Vui lòng giảm số lượng.`
+      : '');
   const discounted = Number(product.phan_tram_giam) > 0;
   const href = `chi-tiet-san-pham.html?id=${encodeURIComponent(product.id)}`;
   return `<article class="cart-row${insufficient ? ' is-unavailable' : ''}" data-cart-row="${escapeHtml(product.id)}">
@@ -53,14 +63,14 @@ function productRow(item) {
       <span class="cart-row__unit">Đơn vị: ${escapeHtml(product.don_vi_tinh || '')}</span>
       <div class="shelf-tag${discounted ? ' is-sale' : ''}"><span class="shelf-tag__price">${formatVnd(item.don_gia)}</span>
         ${discounted ? `<s class="shelf-tag__old">${formatVnd(product.gia_ban)}</s>` : ''}</div>
-      <span class="cart-row__warning" ${insufficient ? '' : 'hidden'}>${out ? 'Sản phẩm hiện đã hết hàng.' : `Chỉ còn ${stock} sản phẩm trong kho. Vui lòng giảm số lượng.`}</span>
+      <span class="cart-row__warning" ${warning ? '' : 'hidden'}>${escapeHtml(warning)}</span>
     </div>
     <div class="cart-row__controls">
       <div class="qty" role="group" aria-label="Số lượng ${escapeHtml(product.ten_san_pham)}">
         <button type="button" data-action="decrease" data-id="${escapeHtml(product.id)}" aria-label="Giảm số lượng" ${quantity <= 1 || out || busy ? 'disabled' : ''}>−</button>
-        <input type="number" min="1" max="${Math.max(stock, 1)}" value="${quantity}" data-action="quantity" data-id="${escapeHtml(product.id)}"
+        <input type="number" min="1" max="${stock === null ? 99 : Math.max(stock, 1)}" value="${quantity}" data-action="quantity" data-id="${escapeHtml(product.id)}"
           aria-label="Số lượng ${escapeHtml(product.ten_san_pham)}" ${out || busy ? 'disabled' : ''}>
-        <button type="button" data-action="increase" data-id="${escapeHtml(product.id)}" aria-label="Tăng số lượng" ${quantity >= stock || out || busy ? 'disabled' : ''}>+</button>
+        <button type="button" data-action="increase" data-id="${escapeHtml(product.id)}" aria-label="Tăng số lượng" ${stock !== null && quantity >= stock || out || busy ? 'disabled' : ''}>+</button>
       </div>
       <strong class="cart-row__line-total">${formatVnd(item.thanh_tien)}</strong>
       <button type="button" class="cart-row__remove" data-action="remove" data-id="${escapeHtml(product.id)}" ${busy ? 'disabled' : ''}>Xóa</button>
@@ -80,7 +90,9 @@ function summary() {
   const addressMissing = fulfillment === 'delivery' && !Number(address?.khu_vuc_id);
   const deliveryUnavailable = fulfillment === 'delivery' && shippingQuote?.giao_duoc === false;
   const quoteMissing = fulfillment === 'delivery' && !addressMissing && !shippingQuote;
-  const inventoryMissing = cart.items.some((item) => Number(item.san_pham.so_luong_ton) < Number(item.so_luong));
+  const inventoryMissing = cart.items.some((item) => item.con_hang === false
+    || (Number.isFinite(Number(item.san_pham.so_luong_ton))
+      && Number(item.san_pham.so_luong_ton) < Number(item.so_luong)));
   const orderDisabled = busy || addressMissing || quoteMissing || shippingQuoteLoading || deliveryUnavailable || inventoryMissing;
   const orderWarning = addressMissing
     ? 'Hãy chọn khu vực giao hàng để kiểm tra khả năng phục vụ.'
@@ -137,7 +149,7 @@ function render() {
 async function loadCart() {
   renderSkeleton();
   try {
-    cart = await api.get('/cart');
+    cart = await getCart();
     await refreshShippingQuote();
     syncBadge();
     render();
@@ -173,13 +185,13 @@ async function refreshShippingQuote() {
 async function updateQuantity(id, quantity) {
   const item = cart.items.find((entry) => Number(entry.san_pham.id) === Number(id));
   if (!item) return;
-  const stock = Math.max(0, Number(item.san_pham.so_luong_ton) || 0);
+  const stock = Number(item.san_pham.so_luong_ton);
   if (!Number.isInteger(quantity) || quantity < 1) {
     toast('Số lượng tối thiểu là 1.', 'error');
     render();
     return;
   }
-  if (quantity > stock) {
+  if (Number.isFinite(stock) && quantity > stock) {
     toast(`Chỉ còn ${stock} sản phẩm trong kho.`, 'error');
     render();
     return;
@@ -187,7 +199,7 @@ async function updateQuantity(id, quantity) {
   busy = true;
   render();
   try {
-    cart = await api.put(`/cart/items/${id}`, { so_luong: quantity });
+    cart = await updateCartItem(id, quantity);
     await refreshShippingQuote();
     syncBadge();
   } catch (error) {
@@ -215,7 +227,7 @@ root.addEventListener('click', async (event) => {
     });
     if (!confirmed) return;
     busy = true;
-    try { cart = await api.del(`/cart/items/${id}`); await refreshShippingQuote(); syncBadge(); toast('Đã xóa sản phẩm khỏi giỏ hàng'); }
+    try { cart = await removeCartItem(id); await refreshShippingQuote(); syncBadge(); toast('Đã xóa sản phẩm khỏi giỏ hàng'); }
     catch (error) { if (error instanceof ApiError && error.status) toast(error.message, 'error'); }
     finally { busy = false; render(); }
   } else if (action === 'clear') {
@@ -226,7 +238,7 @@ root.addEventListener('click', async (event) => {
     });
     if (!confirmed) return;
     busy = true;
-    try { cart = await api.del('/cart'); await refreshShippingQuote(); syncBadge(); toast('Đã xóa giỏ hàng'); }
+    try { cart = await clearCart(); await refreshShippingQuote(); syncBadge(); toast('Đã xóa giỏ hàng'); }
     catch (error) { if (error instanceof ApiError && error.status) toast(error.message, 'error'); }
     finally { busy = false; render(); }
   } else if (action === 'choose-address') {

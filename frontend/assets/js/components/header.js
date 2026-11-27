@@ -1,6 +1,7 @@
 // header.js - topbar + header sticky + thanh danh mục. Dùng: mountHeader(document.getElementById('site-header'))
 import { CONFIG } from '../core/config.js';
 import { api, ApiError } from '../core/api.js';
+import { getCart } from '../core/cart.js';
 import { getProducts } from '../core/catalog.js';
 import { escapeHtml, debounce, toast } from '../core/ui.js';
 import { formatVnd } from '../core/format.js';
@@ -65,8 +66,11 @@ export function setCartCount(n) {
   document.querySelectorAll('[data-cart-badge]').forEach((b) => { b.textContent = n > 99 ? '99+' : n; b.hidden = !n; });
 }
 export async function refreshCartCount() {
-  try { setCartCount((await api.get('/cart')).count || 0); }
-  catch (error) { toast(error.message || 'Không thể cập nhật số lượng giỏ hàng.', 'error'); }
+  try { setCartCount((await getCart()).count || 0); }
+  catch (error) {
+    if (error instanceof ApiError && error.status === 403) return;
+    toast(error.message || 'Không thể cập nhật số lượng giỏ hàng.', 'error');
+  }
 }
 
 async function renderAuth(el) {

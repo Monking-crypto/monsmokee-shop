@@ -1,5 +1,6 @@
 // product-card.js - thẻ sản phẩm và xác nhận trước khi thêm vào giỏ
-import { api, ApiError } from '../core/api.js';
+import { ApiError } from '../core/api.js';
+import { addCartItem } from '../core/cart.js';
 import { escapeHtml, toast } from '../core/ui.js';
 import { formatVnd, formatDate } from '../core/format.js';
 import { daysUntilExpiry, imageUrl } from '../core/catalog.js';
@@ -103,7 +104,7 @@ export function bindProductCards(root = document) {
     });
     if (!confirmed) return;
     try {
-      const result = await api.post('/cart/items', { san_pham_id: product.id, so_luong: quantity });
+      const result = await addCartItem(product.id, quantity);
       document.dispatchEvent(new CustomEvent('ms:cart', { detail: { count: result.count } }));
       toast('Đã thêm vào giỏ hàng');
     } catch (error) {
