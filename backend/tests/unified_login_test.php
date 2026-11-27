@@ -126,6 +126,14 @@ $lockedCustomer = $service->authenticate('0900000003', 'Test-Locked-123!', '198.
 $lockedAdmin = $service->authenticate('0900000004', 'Test-Locked-123!', '198.51.100.14');
 $assert($lockedCustomer['type'] === 'account_locked' && $lockedAdmin['type'] === 'account_locked', 'Locked customer and locked admin must share outcome');
 
+$adminWrong = $service->authenticate('0900000002', 'wrong-password', '198.51.100.19');
+$assert($adminWrong['type'] === 'invalid_credentials', 'Admin wrong password must be rejected');
+$adminRateKeys = $pdo->prepare(
+    "SELECT COUNT(*) FROM rate_limit WHERE khoa LIKE 'common_login_admin:2:%'"
+);
+$adminRateKeys->execute();
+$assert((int) $adminRateKeys->fetchColumn() === 1, 'Admin login throttles must be scoped by Admin ID for recovery');
+
 for ($attempt = 1; $attempt <= 5; $attempt++) {
     $limited = $service->authenticate('0999999998', 'wrong-password', '198.51.100.15');
 }

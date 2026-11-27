@@ -161,6 +161,77 @@ final class CategoryAdminController
         ]);
     }
 
+    public function delete(Request $request, array $params = []): void
+    {
+        $id = $this->positiveInteger($params['id'] ?? null);
+        if ($id === null) {
+            Response::error('Không tìm thấy danh mục', 404);
+            return;
+        }
+
+        $this->pdo->beginTransaction();
+        try {
+            $find = $this->pdo->prepare(
+                'SELECT id FROM danh_muc WHERE id = ? FOR UPDATE'
+            );
+            $find->execute([$id]);
+            if ($find->fetchColumn() === false) {
+                $this->pdo->rollBack();
+                Response::error('Không tìm thấy danh mục', 404);
+                return;
+            }
+
+            $count = $this->productCount($id);
+            if ($count > 0) {
+                $this->pdo->rollBack();
+                $this->respondCategoryHasProducts($count);
+                return;
+            }
+
+            $delete = $this->pdo->prepare('DELETE FROM danh_muc WHERE id = ?');
+            $delete->execute([$id]);
+            $this->pdo->commit();
+        } catch (PDOException $error) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            if ($error->getCode() === '23000') {
+                $this->respondCategoryHasProducts($this->productCount($id));
+                return;
+            }
+            throw $error;
+        } catch (\Throwable $error) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $error;
+        }
+
+        $this->audit('category.deleted', $id);
+        Response::success('Đã xóa danh mục', ['id' => $id, 'deleted' => true]);
+    }
+
+    private function productCount(int $categoryId): int
+    {
+        $query = $this->pdo->prepare(
+            'SELECT COUNT(*) FROM san_pham WHERE danh_muc_id = ?'
+        );
+        $query->execute([$categoryId]);
+        return (int) $query->fetchColumn();
+    }
+
+    private function respondCategoryHasProducts(int $productCount): void
+    {
+        Response::error(
+            'Danh mục còn sản phẩm; hãy dùng chức năng Ẩn danh mục thay vì xóa',
+            409,
+            [
+                'code' => 'CATEGORY_HAS_PRODUCTS',
+                'so_san_pham' => $productCount,
+            ]
+        );
+    }
+
     private function validatedInput(array $input): array
     {
         $errors = [];

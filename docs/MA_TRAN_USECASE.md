@@ -17,8 +17,8 @@ Trạng thái bên dưới phản ánh phạm vi backend hiện tại; giao di�
 | Bước 14F / UC03/QT6 — hồ sơ và đổi mật khẩu Customer/Admin | `Customer/ProfileController.php`, `Admin/AdminProfileController.php`, `ProfileService.php`, `PasswordChangeService.php` | `GET /api/auth/me`, `PUT /api/profile`, `PATCH /api/profile/password`, `GET/PUT /api/admin/me`, `PATCH /api/admin/me/password` | Hoàn thành backend |
 | UC04/QT8-9 — thanh toán | `CheckoutController.php`, `thanh-toan.html` | `/api/checkout/*` | Chưa làm |
 | UC05/QT10-11 — đơn hàng/đánh giá | `OrderController.php`, `ReviewController.php` | `/api/orders*` | Chưa làm |
-| UC06/QT13 — quản lý danh mục | `CategoryAdminController.php` | `/api/admin/categories` | Hoàn thành backend |
-| UC07/QT13 — quản lý sản phẩm, ngưỡng tồn và mua kèm | `ProductAdminController.php` | `/api/admin/products`, `/api/admin/products/{id}/cross-sell` | Hoàn thành backend |
+| UC06/QT13 — quản lý danh mục | `CategoryAdminController.php` | `/api/admin/categories`, `DELETE /api/admin/categories/{id}` | Hoàn thành backend; chỉ xóa danh mục rỗng, danh mục còn sản phẩm trả 409 |
+| UC07/QT13 — quản lý sản phẩm, ngưỡng tồn, mua kèm và xóa an toàn | `ProductAdminController.php` | `/api/admin/products`, `/api/admin/products/{id}/cross-sell`, `DELETE /api/admin/products/{id}` | Hoàn thành backend; xóa cứng khi chưa có lịch sử, có lịch sử trả 409 và có thể ẩn riêng |
 | UC08/QT14 — quản lý đơn hàng | `OrderAdminController.php` | `/api/admin/orders` | Chưa làm |
 | Bước 11C / UC09/QT14-15 — nhập kho có ngày sản xuất, điều chỉnh FEFO, cảnh báo tồn và hạn | `StockAdminController.php`, `ProductAdminController.php` | `/api/admin/stock-receipts*`, `/api/admin/inventory/adjust`, `/api/admin/inventory/low-stock`, `/api/admin/inventory/expiring`, `/api/admin/batches`, `/api/admin/stock-history` | Hoàn thành backend |
 | UC10 — quản lý khách hàng | `CustomerAdminController.php` | `/api/admin/customers` | Chưa làm |
@@ -28,7 +28,7 @@ Giỏ hàng, thanh toán, đơn hàng, đánh giá, quản lý đơn và thống
 
 Hồ sơ dùng schema hiện có và chỉ cho đổi họ tên; SĐT/email chưa đổi được vì cần luồng OTP riêng. Đổi mật khẩu dùng chung dịch vụ cho Customer/Admin, yêu cầu mật khẩu hiện tại, mật khẩu mới tối thiểu 8 ký tự có chữ thường và số, giới hạn 5 lần sai trong 15 phút theo tài khoản, tái tạo session và vô hiệu hóa reset ticket/OTP quên mật khẩu còn hiệu lực. Admin cần hoàn tất OTP; thao tác ghi yêu cầu CSRF.
 
-Danh mục hỗ trợ tạo/sửa/ẩn/hiện; sản phẩm hỗ trợ quản lý, ẩn/hiện, xóa mềm theo lịch sử giao dịch, tải ảnh, ngưỡng tồn tối thiểu và danh sách mua kèm. Nhập kho bắt buộc ngày sản xuất cho mỗi dòng; ngày sản xuất/hạn sử dụng chỉ hiển thị trong API Admin, ngoại trừ hạn của sản phẩm đang giảm cận hạn. Điều chỉnh tồn dùng transaction và khóa sản phẩm/lô, trừ FEFO khi giảm và tạo lô khi tăng; có API cảnh báo tồn thấp và lô sắp hết hạn.
+Danh mục hỗ trợ tạo/sửa/ẩn/hiện và chỉ xóa cứng khi hoàn toàn không có sản phẩm; sản phẩm hỗ trợ quản lý, ẩn/hiện và xóa cứng có kiểm tra lịch sử (lô, phiếu/đơn hàng, giỏ hàng, lịch sử kho), tải ảnh, ngưỡng tồn tối thiểu và danh sách mua kèm. Danh mục/sản phẩm có tham chiếu hoặc lịch sử không bị xóa; API trả `409` với mã lỗi và hướng dẫn dùng chức năng Ẩn. Nhập kho bắt buộc ngày sản xuất cho mỗi dòng; ngày sản xuất/hạn sử dụng chỉ hiển thị trong API Admin, ngoại trừ hạn của sản phẩm đang giảm cận hạn. Điều chỉnh tồn dùng transaction và khóa sản phẩm/lô, trừ FEFO khi giảm và tạo lô khi tăng; có API cảnh báo tồn thấp và lô sắp hết hạn.
 
 Lọc `min_price`/`max_price` của UC01 dựa trên `gia_ban_hieu_luc` sau khuyến mãi server. Gợi ý mua kèm ưu tiên cấu hình Admin trong `san_pham_mua_kem`, sau đó bổ sung sản phẩm cùng danh mục; chỉ trả sản phẩm đang bán và còn hàng, tối đa 8.
 

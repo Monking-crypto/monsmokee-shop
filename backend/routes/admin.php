@@ -132,6 +132,11 @@ $router->patch(
     [$categoryAdminController, 'updateVisibility'],
     [$requireVerifiedAdmin, $requireAdminCsrf]
 );
+$router->delete(
+    '/api/admin/categories/{id}',
+    [$categoryAdminController, 'delete'],
+    [$requireVerifiedAdmin, $requireAdminCsrf]
+);
 
 $router->get('/api/admin/products', [$productAdminController, 'index'], [$requireVerifiedAdmin]);
 $router->get(

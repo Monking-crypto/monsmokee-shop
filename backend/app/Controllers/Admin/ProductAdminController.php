@@ -402,17 +402,12 @@ final class ProductAdminController
             }
 
             if ($this->hasHistoricalUse($id)) {
-                $hide = $this->pdo->prepare(
-                    'UPDATE san_pham SET trang_thai = 0 WHERE id = ?'
+                $this->pdo->rollBack();
+                Response::error(
+                    'Sản phẩm đã có lịch sử nên không thể xóa; hãy dùng chức năng Ẩn để ngừng bán',
+                    409,
+                    ['code' => 'PRODUCT_HAS_HISTORY']
                 );
-                $hide->execute([$id]);
-                $this->pdo->commit();
-                $this->audit('product.deleted_hidden_historical', $id);
-                Response::success('Sản phẩm đã có giao dịch nên được ẩn thay vì xóa', [
-                    'id' => $id,
-                    'deleted' => false,
-                    'trang_thai' => 0,
-                ]);
                 return;
             }
 
@@ -426,8 +421,9 @@ final class ProductAdminController
             }
             if ($error->getCode() === '23000') {
                 Response::error(
-                    'Sản phẩm có dữ liệu liên quan và không thể xóa an toàn; hãy ẩn sản phẩm',
-                    409
+                    'Sản phẩm đã có lịch sử nên không thể xóa; hãy dùng chức năng Ẩn để ngừng bán',
+                    409,
+                    ['code' => 'PRODUCT_HAS_HISTORY']
                 );
                 return;
             }
@@ -679,7 +675,13 @@ final class ProductAdminController
 
     private function hasHistoricalUse(int $id): bool
     {
-        foreach (['chi_tiet_don_hang', 'chi_tiet_phieu_nhap'] as $table) {
+        foreach ([
+            'chi_tiet_don_hang',
+            'chi_tiet_phieu_nhap',
+            'lo_hang',
+            'lich_su_kho',
+            'gio_hang',
+        ] as $table) {
             $query = $this->pdo->prepare(
                 'SELECT 1 FROM ' . $table . ' WHERE san_pham_id = ? LIMIT 1'
             );

@@ -872,8 +872,31 @@ Tên là bắt buộc và không trùng; slug tự tạo từ tên, bỏ dấu, 
 
 ### `PATCH /api/admin/categories/{id}/visibility`
 
-**Body:** `{"trang_thai": 0}` để ẩn, `{"trang_thai": 1}` để hiện. Không có API xóa danh mục; danh mục có sản phẩm chỉ được ẩn.
+**Body:** `{"trang_thai": 0}` để ẩn, `{"trang_thai": 1}` để hiện. Danh mục còn sản phẩm chỉ có thể ẩn, không thể xóa.
 **Response — 200:** `{"success":true,"message":"Đã cập nhật trạng thái danh mục","data":{"id":12,"trang_thai":0},"errors":null}`
+
+### `DELETE /api/admin/categories/{id}`
+
+Chỉ Admin đã hoàn tất OTP và gửi CSRF hợp lệ. Danh mục chỉ bị xóa hẳn khi không còn bất kỳ sản phẩm nào thuộc danh mục, kể cả sản phẩm ẩn hoặc hết hàng; thứ tự `thu_tu` của danh mục khác không bị thay đổi.
+
+- **200:** xóa danh mục rỗng; `data` gồm `id` và `deleted: true`.
+- **404:** ID không hợp lệ hoặc danh mục không tồn tại (bao gồm lần xóa lặp lại).
+- **409:** danh mục còn sản phẩm; không xóa và gợi ý dùng chức năng Ẩn. `errors.code` là `CATEGORY_HAS_PRODUCTS`, `errors.so_san_pham` là tổng số sản phẩm.
+- **401/403:** chưa đăng nhập / sai vai trò hoặc chưa xác thực OTP / CSRF không hợp lệ.
+
+Ví dụ lỗi `409`:
+
+```json
+{
+  "success": false,
+  "message": "Danh mục còn sản phẩm; hãy dùng chức năng Ẩn danh mục thay vì xóa",
+  "data": null,
+  "errors": {
+    "code": "CATEGORY_HAS_PRODUCTS",
+    "so_san_pham": 2
+  }
+}
+```
 
 ## 23. Quản lý sản phẩm Admin
 
@@ -929,7 +952,9 @@ Thay danh sách sản phẩm mua kèm trong `san_pham_mua_kem`. Body nhận `san
 
 ### `DELETE /api/admin/products/{id}`
 
-Nếu sản phẩm xuất hiện trong chi tiết đơn hàng hoặc phiếu nhập, sản phẩm được ẩn và response `200` có `data.deleted = false`. Nếu chưa có giao dịch đó, sản phẩm được xóa thật và response `200` có `data.deleted = true`. Nếu còn liên kết dữ liệu khác khiến xóa không an toàn, trả `409`.
+Sản phẩm chỉ được xóa cứng khi chưa có lô hàng, đơn hàng, chi tiết giỏ hàng hoặc lịch sử kho. Khi xóa cứng thành công (`200`), các liên kết không phải lịch sử được dọn và file ảnh cùng thumbnail thuộc `uploads/products/` được xóa. Nếu có lịch sử hoặc đang được tham chiếu trong giỏ, không xóa và trả `409` với `errors.code = PRODUCT_HAS_HISTORY`; response gợi ý dùng `PATCH /api/admin/products/{id}/visibility` với `{"trang_thai":0}` để ngừng bán. Lệnh xóa không tự ẩn sản phẩm. ID không tồn tại trả `404`; Admin cần xác thực OTP và CSRF hợp lệ.
+
+**Lỗi quyền:** `401` chưa đăng nhập; `403` sai vai trò, chưa xác thực OTP hoặc CSRF không hợp lệ.
 
 ### `POST /api/admin/products/{id}/image`
 
