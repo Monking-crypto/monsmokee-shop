@@ -2,7 +2,7 @@
 import './admin-shell.js';
 import { requireAdmin } from '../core/guard.js';
 import { api } from '../core/api.js';
-import { escapeHtml, qs, toast } from '../core/ui.js';
+import { escapeHtml, qs, setBusy, toast } from '../core/ui.js';
 
 const shell = window.MSAdminShell;
 const page = shell?.page || document.body.dataset.page || 'overview';
@@ -11,6 +11,19 @@ const content = qs('#admin-page-content');
 const adminUser = await requireAdmin();
 
 if (adminUser) {
+  const logoutButton = qs('#admin-logout');
+  logoutButton?.addEventListener('click', async () => {
+    setBusy(logoutButton, true);
+    try {
+      await api.post('/admin/auth/logout');
+      toast('Đã đăng xuất');
+      location.replace('../dang-nhap.html');
+    } catch (error) {
+      setBusy(logoutButton, false);
+      toast(error?.message || 'Không thể đăng xuất. Vui lòng thử lại.', 'error');
+    }
+  });
+
   if (typeof adminUser === 'object' && adminUser.ho_ten) {
     qs('#admin-role-name').textContent = adminUser.ho_ten;
   }
