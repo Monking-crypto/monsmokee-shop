@@ -17,8 +17,12 @@ let stopSaleCountdown;
 
 const currentUrl = new URL(location.href);
 if (currentUrl.searchParams.get('access_denied') === '1') {
-  toast('Bạn không có quyền truy cập', 'error');
+  const message = currentUrl.searchParams.get('logged_out') === '1'
+    ? 'Bạn không có quyền truy cập. Phiên khách đã được đăng xuất.'
+    : 'Bạn không có quyền truy cập';
+  toast(message, 'error');
   currentUrl.searchParams.delete('access_denied');
+  currentUrl.searchParams.delete('logged_out');
   history.replaceState(null, '', `${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`);
 }
 

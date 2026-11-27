@@ -136,7 +136,8 @@ function handleExpiredSession(path) {
     : '';
   const destination = currentPath.startsWith('admin/')
     ? `${currentPath}${location.search}`
-    : new URLSearchParams(location.search).get('redirect');
+    : new URLSearchParams(location.search).get('redirect')
+      || new URLSearchParams(location.search).get('redirect_to');
   const redirect = destination
     ? `?${new URLSearchParams({
       redirect: destination,

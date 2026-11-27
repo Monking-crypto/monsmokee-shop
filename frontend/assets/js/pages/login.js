@@ -9,7 +9,8 @@ import { mountOtp } from '../components/otp-input.js';
 const form = qs('#login-form'), alertBox = qs('#login-alert');
 const phone = qs('#phone'), pass = qs('#password');
 const otpStep = qs('#login-otp-step');
-const requestedRedirect = safeRedirect(new URLSearchParams(location.search).get('redirect'));
+const searchParams = new URLSearchParams(location.search);
+const requestedRedirect = safeRedirect(searchParams.get('redirect') || searchParams.get('redirect_to'));
 const redirectPath = requestedRedirect.split('?')[0];
 const redirect = requestedRedirect.startsWith('/')
   || redirectPath.split('/').some((part) => part === '.' || part === '..')
@@ -35,12 +36,33 @@ function isCustomer(user) {
   return String(user?.vai_tro || '').toLowerCase() === 'customer';
 }
 
-function goToCustomerPage() {
-  location.replace(adminRedirect ? 'index.html?access_denied=1' : redirect);
+function goToCustomerPage(cartMerge, loggedOut = false) {
+  const destination = new URL(adminRedirect ? 'index.html?access_denied=1' : redirect, location.href);
+  const adjustedItems = cartMerge?.adjusted_items;
+  if (Array.isArray(adjustedItems) && adjustedItems.length) {
+    destination.searchParams.set('cart_merge_adjusted', String(adjustedItems.length));
+  }
+  if (adminRedirect && loggedOut) destination.searchParams.set('logged_out', '1');
+  location.replace(destination.href);
+}
+
+async function denyCustomerAdminAccess(cartMerge) {
+  let loggedOut = false;
+  try {
+    await api.get('/admin/me');
+  } catch (error) {
+    if (!(error instanceof ApiError) || (error.status !== 401 && error.status !== 403)) throw error;
+    loggedOut = true;
+  }
+  goToCustomerPage(cartMerge, loggedOut);
 }
 
 function goToAdminPage() {
   location.replace(adminRedirect ? redirect : 'admin/index.html');
+}
+
+function adminOtpRequired(data) {
+  return data?.otp_required === true || data?.requires_otp === true;
 }
 
 async function redirectIfAuthenticated() {
@@ -48,7 +70,8 @@ async function redirectIfAuthenticated() {
     const { user } = await api.get('/auth/me');
     if (!user) return;
     if (isCustomer(user)) {
-      goToCustomerPage();
+      if (adminRedirect) await denyCustomerAdminAccess();
+      else goToCustomerPage();
       return;
     }
     if (!isAdmin(user)) {
@@ -161,17 +184,31 @@ form.addEventListener('submit', async (e) => {
       so_dien_thoai: phone.value.trim(),
       mat_khau: pass.value,
     });
-    if (data?.otp_required === true || data?.requires_otp === true) {
+    if (adminOtpRequired(data)) {
       showAlert(alertBox, '');
       showOtpStep(data);
       return;
     }
-    if (!data?.user || !isCustomer(data.user)) {
+    if (isAdmin(data?.user)) {
+      const admin = await api.get('/admin/me');
+      if (!isAdmin(admin?.user)) {
+        showAlert(alertBox, 'Máy chủ chưa xác nhận đúng trạng thái đăng nhập. Vui lòng thử lại.');
+        return;
+      }
+      toast('Đăng nhập quản trị thành công');
+      setTimeout(goToAdminPage, 400);
+      return;
+    }
+    if (!isCustomer(data?.user)) {
       showAlert(alertBox, 'Máy chủ chưa xác nhận đúng trạng thái đăng nhập. Vui lòng thử lại.');
       return;
     }
+    if (adminRedirect) {
+      await denyCustomerAdminAccess(data.cart_merge);
+      return;
+    }
     toast('Đăng nhập thành công');
-    goToCustomerPage();
+    setTimeout(() => goToCustomerPage(data.cart_merge), 400);
   } catch (error) {
     if (error instanceof ApiError) {
       let shownFieldError = false;
@@ -182,9 +219,7 @@ form.addEventListener('submit', async (e) => {
           shownFieldError = true;
         }
       });
-      if (error.status === 401) {
-        showAlert(alertBox, 'Số điện thoại hoặc mật khẩu không đúng');
-      } else if (!shownFieldError || error.status !== 422) {
+      if (!shownFieldError || error.status !== 422) {
         showAlert(alertBox, error.message);
       }
       if (error.status === 429) retryAfter = error.retryAfterSeconds || 60;
@@ -204,7 +239,13 @@ async function verifyAdminOtp(code) {
   const errorElement = qs('#login-otp-error');
   errorElement.textContent = '';
   try {
-    await api.post('/admin/auth/verify-otp', { otp: code });
+    const result = await api.post('/admin/auth/verify-otp', { otp: code });
+    if (adminOtpRequired(result)) {
+      errorElement.textContent = 'Mã OTP vẫn cần được xác thực. Vui lòng thử lại.';
+      otp.clear();
+      otp.setDisabled(false);
+      return;
+    }
     const data = await api.get('/admin/me');
     if (!isAdmin(data?.user)) {
       throw new Error('Phiên đã xác thực nhưng máy chủ chưa xác nhận quyền Admin.');
@@ -252,6 +293,14 @@ qs('#login-otp-resend').addEventListener('click', async (event) => {
   button.disabled = true;
   try {
     const data = await api.post('/admin/auth/otp/resend');
+    if (isAdmin(data?.user) && !adminOtpRequired(data)) {
+      const admin = await api.get('/admin/me');
+      if (isAdmin(admin?.user)) {
+        stopTimers();
+        goToAdminPage();
+        return;
+      }
+    }
     const emails = Array.isArray(data.emails_masked) ? data.emails_masked.filter(Boolean) : [];
     qs('#login-otp-email').textContent = emails.join(', ') || data.email_masked || '';
     qs('#login-otp-error').textContent = '';

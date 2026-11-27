@@ -47,6 +47,14 @@ export async function mountHeader(host) {
   setupSearch(host.querySelector('.search'));
   document.addEventListener('ms:cart', (e) => setCartCount(e.detail.count));
   await Promise.all([renderAuth(host.querySelector('#hdr-auth')), refreshCartCount()]);
+  const currentUrl = new URL(location.href);
+  if (!currentUrl.searchParams.has('cart_merge_adjusted')) return;
+  const adjustedCount = Number(currentUrl.searchParams.get('cart_merge_adjusted'));
+  currentUrl.searchParams.delete('cart_merge_adjusted');
+  if (adjustedCount > 0) {
+    toast(`Đã điều chỉnh giỏ hàng cho ${adjustedCount} sản phẩm theo tồn kho.`, 'info');
+  }
+  history.replaceState(null, '', `${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`);
 }
 
 export function setCartCount(n) {

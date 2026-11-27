@@ -24,32 +24,10 @@ export async function requireAdmin() {
     return false;
   };
 
-  let auth;
-  try {
-    auth = await api.get('/auth/me');
-  } catch (error) {
-    if (!(error instanceof ApiError)) throw error;
-    if (error.status === 401) {
-      await setMockAdminAuthenticated(false);
-      return redirectToLogin();
-    }
-    return showError(error.message);
-  }
-
-  const user = auth?.user;
-  if (!user || typeof user !== 'object') {
-    return showError('Máy chủ chưa trả về thông tin tài khoản hợp lệ.');
-  }
-  if (String(user.vai_tro || '').toLowerCase() !== 'admin') {
-    await setMockAdminAuthenticated(false);
-    location.replace('../index.html?access_denied=1');
-    return false;
-  }
-
   try {
     const data = await api.get('/admin/me');
     if (String(data?.user?.vai_tro || '').toLowerCase() !== 'admin') {
-      return showError('Phiên đăng nhập chưa được xác thực OTP hoặc tài khoản không có quyền quản trị.');
+      return showError('Máy chủ chưa xác nhận đúng quyền quản trị.');
     }
     await setMockAdminAuthenticated(true);
     return data.user;
@@ -60,7 +38,9 @@ export async function requireAdmin() {
       return redirectToLogin();
     }
     if (error.status === 403) {
-      return showError('Bạn không có quyền truy cập khu vực quản trị. Hãy đăng nhập bằng tài khoản Admin đã xác thực OTP.');
+      await setMockAdminAuthenticated(false);
+      location.replace('../index.html?access_denied=1&logged_out=1');
+      return false;
     }
     return showError(error.message);
   }
