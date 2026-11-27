@@ -1,4 +1,5 @@
 // register.js - đăng ký 2 bước: thông tin → OTP email
+import { CONFIG } from '../core/config.js';
 import { api, ApiError } from '../core/api.js';
 import { getStoreInfo } from '../core/store-info.js';
 import { rules } from '../core/validators.js';
@@ -14,22 +15,24 @@ if (storeInfo) {
   storeInfo.textContent = `${name}${address ? ` · ${address}` : ''} · Giờ mở cửa ${hours}`;
 }
 const form = qs('#reg-form'), stepInfo = qs('#step-info'), stepOtp = qs('#step-otp'), alertBox = qs('#reg-alert');
-const f = Object.fromEntries(['ho_ten', 'so_dien_thoai', 'email', 'mat_khau', 'nhap_lai'].map((k) => [k, qs(`[name=${k}]`)]));
+const f = Object.fromEntries(['ho_ten', 'so_dien_thoai', 'email', 'mat_khau', 'nhap_lai_mat_khau'].map((k) => [k, qs(`[name=${k}]`)]));
 const fieldOf = (input) => input.closest('.field');
 attachPasswordToggle(f.mat_khau);
-attachPasswordToggle(f.nhap_lai);
+attachPasswordToggle(f.nhap_lai_mat_khau);
 mountPasswordMeter(f.mat_khau, qs('#pwm'));
 
 const validators = {
   ...rules,
-  nhap_lai: (v) => (!v ? 'Vui lòng nhập lại mật khẩu' : v === f.mat_khau.value ? '' : 'Mật khẩu nhập lại chưa khớp'),
+  nhap_lai_mat_khau: (v) => (!v ? 'Vui lòng nhập lại mật khẩu' : v === f.mat_khau.value ? '' : 'Mật khẩu nhập lại chưa khớp'),
 };
 const touched = new Set();
 Object.entries(f).forEach(([key, input]) => {
   input.addEventListener('blur', () => { touched.add(key); setFieldError(fieldOf(input), validators[key](input.value)); });
   input.addEventListener('input', () => {
     if (touched.has(key)) setFieldError(fieldOf(input), validators[key](input.value));
-    if (key === 'mat_khau' && touched.has('nhap_lai')) setFieldError(fieldOf(f.nhap_lai), validators.nhap_lai(f.nhap_lai.value));
+    if (key === 'mat_khau' && touched.has('nhap_lai_mat_khau')) {
+      setFieldError(fieldOf(f.nhap_lai_mat_khau), validators.nhap_lai_mat_khau(f.nhap_lai_mat_khau.value));
+    }
   });
 });
 
@@ -73,7 +76,7 @@ form.addEventListener('submit', async (event) => {
       so_dien_thoai: f.so_dien_thoai.value.trim(),
       email: f.email.value.trim(),
       mat_khau: f.mat_khau.value,
-      nhap_lai_mat_khau: f.nhap_lai.value,
+      nhap_lai_mat_khau: f.nhap_lai_mat_khau.value,
     });
     showAlert(alertBox, '');
     goOtp(data);
@@ -182,7 +185,9 @@ async function verify(code) {
     } else {
       otpErr.textContent = error.status === 422 && Number.isFinite(remaining)
         ? `${error.message} (còn ${remaining} lần thử)`
-        : error.message;
+        : error.status === 429
+          ? `${error.message} Vui lòng chờ ${error.retryAfterSeconds || CONFIG.OTP_RESEND_SECONDS} giây rồi thử lại.`
+          : error.message;
       otp.clear();
     }
   } finally {
