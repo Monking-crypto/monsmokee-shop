@@ -74,6 +74,18 @@ Lệnh kiểm tra gửi thư chỉ xác nhận cấu hình SMTP; nó không tạ
 
 Không có tài khoản hoặc mật khẩu Admin mặc định; hãy dùng thông tin riêng và không tái sử dụng mật khẩu cá nhân.
 
+## Khôi phục tài khoản Admin
+
+Chỉ chạy công cụ này trực tiếp trên máy chủ hoặc máy có quyền truy cập CSDL; script từ chối mọi request web. Từ thư mục gốc dự án, chạy:
+
+```text
+php backend/scripts/admin_recovery.php
+```
+
+Chọn thao tác trong menu, rồi nhập ID Admin lấy từ mục liệt kê. Công cụ hỗ trợ đặt lại mật khẩu, đổi email, đổi SĐT, mở khóa và liệt kê Admin. Mật khẩu được hỏi kín trong terminal (không truyền mật khẩu qua tham số lệnh), phải có tối thiểu 8 ký tự gồm chữ thường và chữ số, và được băm bcrypt trước khi lưu. SĐT phải có 10 chữ số, bắt đầu bằng `0`; email/SĐT trùng tài khoản khác sẽ bị từ chối. Mở khóa đồng thời xóa giới hạn đăng nhập thuộc ID Admin đó và vô hiệu hóa OTP còn hiệu lực. Sự kiện được ghi vào `backend/storage/logs/admin_recovery.log`, không ghi mật khẩu hoặc hash.
+
+Chỉ người vận hành được ủy quyền mới dùng script; xác minh yêu cầu và quyền sở hữu email/SĐT mới trước khi đổi. Hạn chế quyền truy cập máy chủ, CSDL và log; không chụp/chia sẻ terminal hoặc file log. Không chạy bằng web server, không đưa mật khẩu vào command line, ticket, log hay tài liệu; sau khi khôi phục, Admin nên đăng nhập qua OTP và đổi thông tin theo quy trình phù hợp.
+
 ## Bảo mật trước khi chia sẻ qua tunnel
 
 - Dùng `APP_ENV=production` và `APP_DEBUG=false`; ngoài môi trường development, API luôn trả lỗi chung và chỉ ghi chi tiết vào log.

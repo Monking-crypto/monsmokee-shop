@@ -22,10 +22,25 @@ final class UnifiedLoginService
     {
         $maxFailures = (int) ($this->business['login']['max_fail'] ?? 5);
         $windowSeconds = (int) ($this->business['login']['lock_minutes'] ?? 15) * 60;
-        $rateKey = 'common_login:' . hash('sha256', $ip . "\0" . $phone);
+        $ipPhoneHash = hash('sha256', $ip . "\0" . $phone);
 
         $this->pdo->beginTransaction();
         try {
+            $userQuery = $this->pdo->prepare(
+                'SELECT u.id, u.vai_tro_id, u.ho_ten, u.so_dien_thoai, u.email,
+                        u.mat_khau, u.trang_thai, v.ten_vai_tro
+                 FROM nguoi_dung u
+                 JOIN vai_tro v ON v.id = u.vai_tro_id
+                 WHERE u.so_dien_thoai = ?
+                 LIMIT 1
+                 FOR UPDATE'
+            );
+            $userQuery->execute([$phone]);
+            $user = $userQuery->fetch(PDO::FETCH_ASSOC);
+            $rateKey = $user !== false && $user['ten_vai_tro'] === 'Admin'
+                ? 'common_login_admin:' . (int) $user['id'] . ':' . $ipPhoneHash
+                : 'common_login:' . $ipPhoneHash;
+
             $createRateRow = $this->pdo->prepare(
                 'INSERT IGNORE INTO rate_limit (khoa, so_lan, bat_dau, khoa_den)
                  VALUES (?, 0, NOW(), NULL)'
@@ -66,17 +81,6 @@ final class UnifiedLoginService
                 return ['type' => 'rate_limited', 'retry_after' => $retryAfter];
             }
 
-            $userQuery = $this->pdo->prepare(
-                'SELECT u.id, u.vai_tro_id, u.ho_ten, u.so_dien_thoai, u.email,
-                        u.mat_khau, u.trang_thai, v.ten_vai_tro
-                 FROM nguoi_dung u
-                 JOIN vai_tro v ON v.id = u.vai_tro_id
-                 WHERE u.so_dien_thoai = ?
-                 LIMIT 1
-                 FOR UPDATE'
-            );
-            $userQuery->execute([$phone]);
-            $user = $userQuery->fetch(PDO::FETCH_ASSOC);
             $hash = $user === false
                 ? self::DUMMY_PASSWORD_HASH
                 : (string) $user['mat_khau'];

@@ -1,25 +1,19 @@
-### Giá trị cá nhân/test: điền cục bộ, không commit thông tin thật
+# Send theo thứ tự: GET /api/csrf → đăng nhập → verify-otp (Admin) → thao tác Admin.
+# Với mỗi POST/PUT/PATCH/DELETE, lấy CSRF mới bằng GET /api/csrf ngay trước khi gửi
+# và dùng token mới nhất cùng cookie session hiện hành. Chỉ ca kiểm thử CSRF cũ
+# bên dưới cố ý dùng token đã lưu để xác nhận request bị từ chối.
+# Các giá trị nhạy cảm được hỏi bằng # @prompt ngay trước request cần chúng.
+### Giá trị cá nhân/test: chỉ giá trị không nhạy cảm; không điền thông tin thật
 @customerName = Test Customer
+@adminName = Admin Test
 @customerPhone =
 @customerEmail =
-@customerPassword =
 @unknownCustomerPhone =
-@wrongPassword =
 @limitedPhone =
-@customerOtp =
-@wrongResetOtp =
-@resetOtp =
-@resetTicket =
-@expiredResetTicket =
-@newPassword =
 @otherCustomerEmail =
 @unknownCustomerEmail =
 @adminEmail =
 @adminPhone =
-@adminPassword =
-@adminOtp =
-@wrongAdminOtp = not-a-code
-@oldCsrfToken =
 @categoryId = 1
 @productId = 1
 @cartProductId =
@@ -176,6 +170,7 @@ X-CSRF-Token: {{csrf.response.body.data.csrf_token}}
 GET http://localhost/monsmokee/backend/public/api/admin/me
 
 ### 3. Bắt đầu đăng ký Customer
+# @prompt customerPassword Nhập mật khẩu Customer để đăng ký
 POST http://localhost/monsmokee/backend/public/api/auth/register/start
 Content-Type: application/json
 X-CSRF-Token: {{csrf.response.body.data.csrf_token}}
@@ -198,6 +193,7 @@ X-CSRF-Token: {{csrf.response.body.data.csrf_token}}
 }
 
 ### 5. Xác nhận đăng ký; thành công trả 201 và đăng nhập Customer
+# @prompt customerOtp Nhập OTP đăng ký vừa nhận
 POST http://localhost/monsmokee/backend/public/api/auth/register/verify
 Content-Type: application/json
 X-CSRF-Token: {{csrf.response.body.data.csrf_token}}
@@ -226,6 +222,8 @@ X-CSRF-Token: {{csrf.response.body.data.csrf_token}}
 }
 
 ### Reset trước khi xác thực OTP - phải trả 422
+# @prompt resetTicket Nhập reset ticket kiểm thử (có thể để trống)
+# @prompt newPassword Nhập mật khẩu mới dùng cho test
 POST http://localhost/monsmokee/backend/public/api/auth/forgot-password/reset
 Content-Type: application/json
 X-CSRF-Token: {{csrf.response.body.data.csrf_token}}
@@ -238,6 +236,7 @@ X-CSRF-Token: {{csrf.response.body.data.csrf_token}}
 }
 
 ### OTP sai - phải trả 422 chung và remaining_attempts cho Customer hợp lệ
+# @prompt wrongResetOtp Nhập OTP sai để kiểm tra validation
 POST http://localhost/monsmokee/backend/public/api/auth/forgot-password/verify-otp
 Content-Type: application/json
 X-CSRF-Token: {{csrf.response.body.data.csrf_token}}
@@ -249,6 +248,7 @@ X-CSRF-Token: {{csrf.response.body.data.csrf_token}}
 
 ### Xác thực OTP đúng - trả reset_ticket, chưa đổi mật khẩu
 # @name verifyForgotPasswordOtp
+# @prompt resetOtp Nhập OTP quên mật khẩu vừa nhận
 POST http://localhost/monsmokee/backend/public/api/auth/forgot-password/verify-otp
 Content-Type: application/json
 X-CSRF-Token: {{csrf.response.body.data.csrf_token}}
@@ -259,6 +259,7 @@ X-CSRF-Token: {{csrf.response.body.data.csrf_token}}
 }
 
 ### Email khác không thể dùng ticket - phải trả lỗi chung 422
+# @prompt newPassword Nhập mật khẩu mới dùng cho test
 POST http://localhost/monsmokee/backend/public/api/auth/forgot-password/reset
 Content-Type: application/json
 X-CSRF-Token: {{csrf.response.body.data.csrf_token}}
@@ -271,6 +272,7 @@ X-CSRF-Token: {{csrf.response.body.data.csrf_token}}
 }
 
 ### Đổi mật khẩu bằng reset ticket; thành công không tự đăng nhập
+# @prompt newPassword Nhập mật khẩu mới dùng cho test
 POST http://localhost/monsmokee/backend/public/api/auth/forgot-password/reset
 Content-Type: application/json
 X-CSRF-Token: {{csrf.response.body.data.csrf_token}}
@@ -287,6 +289,7 @@ X-CSRF-Token: {{csrf.response.body.data.csrf_token}}
 GET http://localhost/monsmokee/backend/public/api/csrf
 
 ### Dùng lại ticket đã tiêu thụ - phải trả 422
+# @prompt newPassword Nhập mật khẩu mới dùng cho test
 POST http://localhost/monsmokee/backend/public/api/auth/forgot-password/reset
 Content-Type: application/json
 X-CSRF-Token: {{csrfAfterPasswordReset.response.body.data.csrf_token}}
@@ -299,6 +302,8 @@ X-CSRF-Token: {{csrfAfterPasswordReset.response.body.data.csrf_token}}
 }
 
 ### Ticket hết hạn hoặc sai - phải trả cùng lỗi 422
+# @prompt expiredResetTicket Nhập reset ticket hết hạn/không hợp lệ
+# @prompt newPassword Nhập mật khẩu mới dùng cho test
 POST http://localhost/monsmokee/backend/public/api/auth/forgot-password/reset
 Content-Type: application/json
 X-CSRF-Token: {{csrfAfterPasswordReset.response.body.data.csrf_token}}
@@ -311,6 +316,7 @@ X-CSRF-Token: {{csrfAfterPasswordReset.response.body.data.csrf_token}}
 }
 
 ### Email không tồn tại: xác minh OTP cũng phải trả lỗi chung 422, không ticket
+# @prompt resetOtp Nhập OTP kiểm thử
 POST http://localhost/monsmokee/backend/public/api/auth/forgot-password/verify-otp
 Content-Type: application/json
 X-CSRF-Token: {{csrfAfterPasswordReset.response.body.data.csrf_token}}
@@ -321,6 +327,7 @@ X-CSRF-Token: {{csrfAfterPasswordReset.response.body.data.csrf_token}}
 }
 
 ### Email Admin: xác minh OTP phải trả lỗi chung 422, không ticket
+# @prompt resetOtp Nhập OTP kiểm thử
 POST http://localhost/monsmokee/backend/public/api/auth/forgot-password/verify-otp
 Content-Type: application/json
 X-CSRF-Token: {{csrfAfterPasswordReset.response.body.data.csrf_token}}
@@ -338,6 +345,7 @@ GET http://localhost/monsmokee/backend/public/api/auth/me
 GET http://localhost/monsmokee/backend/public/api/csrf
 
 ### Đăng nhập bằng mật khẩu mới - phải trả 200
+# @prompt newPassword Nhập mật khẩu mới của Customer
 POST http://localhost/monsmokee/backend/public/api/auth/login
 Content-Type: application/json
 X-CSRF-Token: {{csrfForCustomerLogin.response.body.data.csrf_token}}
@@ -348,6 +356,7 @@ X-CSRF-Token: {{csrfForCustomerLogin.response.body.data.csrf_token}}
 }
 
 ### Đăng nhập bằng mật khẩu cũ - phải trả 401
+# @prompt customerPassword Nhập mật khẩu cũ của Customer
 POST http://localhost/monsmokee/backend/public/api/auth/login
 Content-Type: application/json
 X-CSRF-Token: {{csrfForCustomerLogin.response.body.data.csrf_token}}
@@ -358,6 +367,7 @@ X-CSRF-Token: {{csrfForCustomerLogin.response.body.data.csrf_token}}
 }
 
 ### Bước 14E: SĐT không tồn tại - phải trả cùng 401
+# @prompt wrongPassword Nhập mật khẩu sai để kiểm thử
 POST http://localhost/monsmokee/backend/public/api/auth/login
 Content-Type: application/json
 X-CSRF-Token: {{csrfForCustomerLogin.response.body.data.csrf_token}}
@@ -367,17 +377,8 @@ X-CSRF-Token: {{csrfForCustomerLogin.response.body.data.csrf_token}}
   "mat_khau": "{{wrongPassword}}"
 }
 
-### Bước 14E: Số điện thoại/khách dùng endpoint Admin cũ sai mật khẩu - cùng 401
-POST http://localhost/monsmokee/backend/public/api/admin/auth/login
-Content-Type: application/json
-X-CSRF-Token: {{csrfForCustomerLogin.response.body.data.csrf_token}}
-
-{
-  "so_dien_thoai": "{{customerPhone}}",
-  "mat_khau": "{{wrongPassword}}"
-}
-
 ### Bước 14E: 5 lần sai theo cùng IP+SĐT - lần thứ 5 trả 429
+# @prompt wrongPassword Nhập mật khẩu sai để kiểm thử
 POST http://localhost/monsmokee/backend/public/api/auth/login
 Content-Type: application/json
 X-CSRF-Token: {{csrfForCustomerLogin.response.body.data.csrf_token}}
@@ -400,6 +401,8 @@ X-CSRF-Token: {{csrfForCustomerLogin.response.body.data.csrf_token}}
 }
 
 ### Customer đổi mật khẩu (mật khẩu chỉ lấy từ biến cục bộ)
+# @prompt currentPassword Nhập mật khẩu hiện tại của Customer
+# @prompt newPassword Nhập mật khẩu mới của Customer
 PATCH http://localhost/monsmokee/backend/public/api/profile/password
 Content-Type: application/json
 X-CSRF-Token: {{csrfForCustomerLogin.response.body.data.csrf_token}}
@@ -421,17 +424,8 @@ X-CSRF-Token: {{csrfForCustomerLogin.response.body.data.csrf_token}}
 # @name csrfForAdmin
 GET http://localhost/monsmokee/backend/public/api/csrf
 
-### 10. Admin đăng nhập bước 1; cùng OTP gửi tới email chính và các địa chỉ phụ cấu hình
-POST http://localhost/monsmokee/backend/public/api/admin/auth/login
-Content-Type: application/json
-X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
-
-{
-  "so_dien_thoai": "{{adminPhone}}",
-  "mat_khau": "{{adminPassword}}"
-}
-
 ### Bước 14E: Admin đăng nhập chung bước 1 - phải otp_required, không tạo phiên đầy đủ
+# @prompt adminPassword Nhập mật khẩu Admin
 POST http://localhost/monsmokee/backend/public/api/auth/login
 Content-Type: application/json
 X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
@@ -455,6 +449,7 @@ X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
 {}
 
 ### OTP sai - 422, response có remaining_attempts
+# @prompt wrongAdminOtp Nhập OTP sai để kiểm tra validation
 POST http://localhost/monsmokee/backend/public/api/admin/auth/verify-otp
 Content-Type: application/json
 X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
@@ -464,6 +459,7 @@ X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
 }
 
 ### OTP đúng - 200, nhập mã mới nhất từ email/outbox
+# @prompt adminOtp Nhập OTP Admin vừa nhận
 POST http://localhost/monsmokee/backend/public/api/admin/auth/verify-otp
 Content-Type: application/json
 X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
@@ -482,6 +478,8 @@ X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
 }
 
 ### Admin đổi mật khẩu (mật khẩu chỉ lấy từ biến cục bộ)
+# @prompt currentPassword Nhập mật khẩu hiện tại của Admin
+# @prompt newPassword Nhập mật khẩu mới của Admin
 PATCH http://localhost/monsmokee/backend/public/api/admin/me/password
 Content-Type: application/json
 X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
@@ -549,6 +547,14 @@ X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
   "muc_ton_toi_thieu": 10
 }
 
+### Xóa danh mục khi còn sản phẩm đang bán - phải trả 409 CATEGORY_HAS_PRODUCTS
+# @name csrfBeforeActiveCategoryDelete
+GET http://localhost/monsmokee/backend/public/api/csrf
+
+###
+DELETE http://localhost/monsmokee/backend/public/api/admin/categories/{{createAdminCategory.response.body.data.id}}
+X-CSRF-Token: {{csrfBeforeActiveCategoryDelete.response.body.data.csrf_token}}
+
 ### Admin: tìm và lọc sản phẩm
 GET http://localhost/monsmokee/backend/public/api/admin/products?q={{newProductName}}&category_id={{createAdminCategory.response.body.data.id}}&trang_thai=1&page=1&per_page=20
 
@@ -598,6 +604,14 @@ X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
 
 {"trang_thai": 0}
 
+### Xóa danh mục khi chỉ còn sản phẩm đang ẩn - vẫn phải trả 409
+# @name csrfBeforeHiddenCategoryDelete
+GET http://localhost/monsmokee/backend/public/api/csrf
+
+###
+DELETE http://localhost/monsmokee/backend/public/api/admin/categories/{{createAdminCategory.response.body.data.id}}
+X-CSRF-Token: {{csrfBeforeHiddenCategoryDelete.response.body.data.csrf_token}}
+
 ###
 GET http://localhost/monsmokee/backend/public/api/products/{{createAdminProduct.response.body.data.id}}
 
@@ -620,16 +634,29 @@ Content-Type: image/webp
 < {{adminImagePath}}
 ------SmokeBoundary--
 
-### Admin: xóa cứng sản phẩm kiểm thử chưa có đơn hàng/phiếu nhập
+### Admin: xóa cứng sản phẩm kiểm thử chưa có lịch sử
+# @name csrfBeforeCleanProductDelete
+GET http://localhost/monsmokee/backend/public/api/csrf
+
+###
 DELETE http://localhost/monsmokee/backend/public/api/admin/products/{{createAdminProduct.response.body.data.id}}
-X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
+X-CSRF-Token: {{csrfBeforeCleanProductDelete.response.body.data.csrf_token}}
 
-### Admin: ẩn danh mục kiểm thử sau khi xóa sản phẩm
-PATCH http://localhost/monsmokee/backend/public/api/admin/categories/{{createAdminCategory.response.body.data.id}}/visibility
-Content-Type: application/json
-X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
+### Danh mục đã rỗng sau khi xóa sản phẩm - trả 200
+# @name csrfBeforeEmptyCategoryDelete
+GET http://localhost/monsmokee/backend/public/api/csrf
 
-{"trang_thai": 0}
+###
+DELETE http://localhost/monsmokee/backend/public/api/admin/categories/{{createAdminCategory.response.body.data.id}}
+X-CSRF-Token: {{csrfBeforeEmptyCategoryDelete.response.body.data.csrf_token}}
+
+### Xóa danh mục lần hai - trả 404
+# @name csrfBeforeRepeatedCategoryDelete
+GET http://localhost/monsmokee/backend/public/api/csrf
+
+###
+DELETE http://localhost/monsmokee/backend/public/api/admin/categories/{{createAdminCategory.response.body.data.id}}
+X-CSRF-Token: {{csrfBeforeRepeatedCategoryDelete.response.body.data.csrf_token}}
 
 ### Admin: nhập kho một lô (điền stockProductId/ngày nhập/ngày sản xuất/hạn dùng)
 # @name createStockReceipt
@@ -652,6 +679,14 @@ X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
     }
   ]
 }
+
+### Không xóa sản phẩm đã có lô nhập/lịch sử - trả 409 PRODUCT_HAS_HISTORY
+# @name csrfBeforeHistoricalProductDelete
+GET http://localhost/monsmokee/backend/public/api/csrf
+
+###
+DELETE http://localhost/monsmokee/backend/public/api/admin/products/{{stockProductId}}
+X-CSRF-Token: {{csrfBeforeHistoricalProductDelete.response.body.data.csrf_token}}
 
 ### Admin: danh sách phiếu nhập theo ngày
 GET http://localhost/monsmokee/backend/public/api/admin/stock-receipts?from_date={{stockReceiptDate}}&to_date={{stockReceiptDate}}&page=1&per_page=20
@@ -757,6 +792,7 @@ DELETE http://localhost/monsmokee/backend/public/api/admin/promotions/{{createFr
 X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
 
 ### Dùng lại OTP sau khi pending bị xóa - 401
+# @prompt adminOtp Nhập OTP cũ để kiểm tra bị từ chối
 POST http://localhost/monsmokee/backend/public/api/admin/auth/verify-otp
 Content-Type: application/json
 X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
@@ -778,12 +814,12 @@ GET http://localhost/monsmokee/backend/public/api/admin/me
 
 ### Logout với CSRF cũ - phải trả 403, errors.code=CSRF_INVALID
 POST http://localhost/monsmokee/backend/public/api/admin/auth/logout
-X-CSRF-Token: {{oldCsrfToken}}
+X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
 
 ### Logout với phiên Admin hết hạn sau 30 phút không hoạt động - 401 SESSION_EXPIRED
 # Dùng cookie session đã hết hạn; endpoint xóa cookie và buộc đăng nhập lại.
 POST http://localhost/monsmokee/backend/public/api/admin/auth/logout
-X-CSRF-Token: {{oldCsrfToken}}
+X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
 
 ### Resend khi không có pending - 401
 POST http://localhost/monsmokee/backend/public/api/admin/auth/otp/resend

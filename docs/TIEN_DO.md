@@ -18,6 +18,8 @@ Cập nhật: 27/11/2026
 - Bước 13B: lọc sản phẩm theo khoảng giá hiệu lực, gợi ý mua kèm ưu tiên cấu hình Admin rồi bổ sung cùng danh mục; quản trị danh sách mua kèm.
 - Bước 11C: nhập kho bắt buộc ngày sản xuất từng dòng; lô cũ cho phép ngày null; điều chỉnh tồn trong transaction với khóa lô, FEFO khi giảm và tạo lô khi tăng; ngưỡng tồn tối thiểu cùng API cảnh báo tồn thấp/lô sắp hết hạn.
 - Bước 14F: hồ sơ Customer/Admin chỉ sửa họ tên; đổi mật khẩu qua dịch vụ dùng chung, yêu cầu mật khẩu hiện tại, giới hạn sai theo tài khoản, tái tạo session và vô hiệu hóa reset ticket/OTP còn hiệu lực.
+- Bước 14G: script CLI khôi phục tài khoản Admin để đặt lại mật khẩu, đổi email/SĐT, mở khóa và liệt kê; có xác thực đầu vào và audit log không chứa mật khẩu.
+- Bước 14H: xóa danh mục chỉ khi không còn sản phẩm; rà soát xóa sản phẩm theo lô/đơn hàng/giỏ hàng/lịch sử kho, trả 409 khi còn tham chiếu lịch sử và giữ chức năng ẩn riêng.
 
 ## Còn lại
 
