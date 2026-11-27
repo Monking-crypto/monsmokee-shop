@@ -27,6 +27,10 @@ $adminAuthController = new App\Controllers\Admin\AdminAuthController(
     $adminMailConfig['admin_otp_extra_emails'] ?? [],
     $adminCartService
 );
+$adminProfileController = new App\Controllers\Admin\AdminProfileController(
+    new App\Services\ProfileService($adminDatabase),
+    new App\Services\PasswordChangeService($adminDatabase, $adminBusinessConfig)
+);
 $categoryAdminController = new App\Controllers\Admin\CategoryAdminController($adminDatabase);
 $productAdminController = new App\Controllers\Admin\ProductAdminController(
     $adminDatabase,
@@ -81,6 +85,16 @@ $router->get(
     '/api/admin/me',
     [$adminAuthController, 'me'],
     [$requireVerifiedAdmin]
+);
+$router->put(
+    '/api/admin/me',
+    [$adminProfileController, 'update'],
+    [$requireVerifiedAdmin, $requireAdminCsrf]
+);
+$router->patch(
+    '/api/admin/me/password',
+    [$adminProfileController, 'changePassword'],
+    [$requireVerifiedAdmin, $requireAdminCsrf]
 );
 $router->get('/api/admin/categories', [$categoryAdminController, 'index'], [$requireVerifiedAdmin]);
 $router->get(

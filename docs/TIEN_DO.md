@@ -17,6 +17,7 @@ Cập nhật: 27/11/2026
 - Bước 16A: giỏ session cho guest, giỏ CSDL cho Customer, kiểm tra tồn/giới hạn, tính giá bằng PromotionService và gộp giỏ sau đăng nhập/đăng ký.
 - Bước 13B: lọc sản phẩm theo khoảng giá hiệu lực, gợi ý mua kèm ưu tiên cấu hình Admin rồi bổ sung cùng danh mục; quản trị danh sách mua kèm.
 - Bước 11C: nhập kho bắt buộc ngày sản xuất từng dòng; lô cũ cho phép ngày null; điều chỉnh tồn trong transaction với khóa lô, FEFO khi giảm và tạo lô khi tăng; ngưỡng tồn tối thiểu cùng API cảnh báo tồn thấp/lô sắp hết hạn.
+- Bước 14F: hồ sơ Customer/Admin chỉ sửa họ tên; đổi mật khẩu qua dịch vụ dùng chung, yêu cầu mật khẩu hiện tại, giới hạn sai theo tài khoản, tái tạo session và vô hiệu hóa reset ticket/OTP còn hiệu lực.
 
 ## Còn lại
 
@@ -26,6 +27,5 @@ Cập nhật: 27/11/2026
 - Admin xử lý đơn: xác nhận, giao hàng, hoàn thành, hủy và trừ kho.
 - Cron: tự hủy Click & Collect quá hạn và quét giảm cận hạn.
 - Thống kê: doanh thu, đơn hàng, tồn kho và sản phẩm bán chạy.
-- Hồ sơ cá nhân và đổi mật khẩu.
 - Đánh giá sản phẩm sau đơn hàng.
 - Quản lý khách hàng cho Admin.

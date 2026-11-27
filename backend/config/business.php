@@ -19,6 +19,7 @@ return [
     'max_sends_per_hour' => 5,
   ],
   'password' => ['min_length' => 8],
+  'password_change' => ['max_fail' => 5, 'lock_minutes' => 15],
   'password_reset_ticket' => ['ttl_seconds' => 600],
   'login' => ['max_fail' => 5, 'lock_minutes' => 15],
   'shipping' => [

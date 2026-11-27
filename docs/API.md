@@ -1189,3 +1189,45 @@ Body `{"ho_tro": 0}` để tắt hoặc `{"ho_tro": 1}` để bật khu vực. T
 
 Thao tác tạo, sửa và bật/tắt được ghi vào `backend/storage/logs/admin_audit.log` với Admin ID, hành động và ID khu vực.
 Lỗi chung: `401` chưa đăng nhập; `403` sai vai trò, chưa xác thực OTP hoặc CSRF sai; `404` không tìm thấy khu vực; `409` địa chỉ trùng; `422` dữ liệu không hợp lệ; `500` lỗi hệ thống.
+
+## 27. Hồ sơ và đổi mật khẩu
+
+Hồ sơ hiện lưu `ho_ten`; schema chưa có ngày sinh hoặc giới tính. Không cho phép đổi số điện thoại/email qua các endpoint này; thay đổi các thông tin đó cần được bổ sung sau bằng luồng OTP riêng. Khi cập nhật tên, server trim khoảng trắng, loại bỏ thẻ HTML và chỉ chấp nhận từ 2 đến 100 ký tự. Những trường khác gửi kèm bị bỏ qua.
+
+Customer xem hồ sơ bằng `GET /api/auth/me`; Admin dùng `GET /api/admin/me`. Response update có cùng cấu trúc `data.user` như endpoint GET tương ứng.
+
+### `PUT /api/profile`
+
+Yêu cầu session Customer đang hoạt động, CSRF header và `Content-Type: application/json`.
+
+```json
+{"ho_ten": "{{customer_name}}"}
+```
+
+**Response — 200:** `data.user` gồm `id`, `ho_ten`, `so_dien_thoai`, `email`, `vai_tro`. `422` nếu tên không hợp lệ với `errors.ho_ten`; `401` nếu chưa đăng nhập/phiên hết hạn; `403` nếu CSRF sai hoặc vai trò không phải Customer.
+
+### `PUT /api/admin/me`
+
+Yêu cầu Admin đã hoàn thành OTP, CSRF header và `Content-Type: application/json`. Chỉ `ho_ten` được cập nhật. Nếu client gửi kèm `email`, `so_dien_thoai`, `vai_tro` hoặc trường khác, API chấp nhận request và bỏ qua im lặng các trường đó; response vẫn `200` khi `ho_ten` hợp lệ, các giá trị trong CSDL không thay đổi. Đổi email hoặc SĐT cần luồng OTP riêng và sẽ làm sau.
+
+```json
+{"ho_ten": "{{admin_name}}"}
+```
+
+**Response — 200:** cùng cấu trúc `data.user` với `GET /api/admin/me`. `422` tên không hợp lệ với `errors.ho_ten`; trường email/SĐT/vai trò gửi kèm không gây `422`; `401` chưa đăng nhập hoặc Admin chưa xác thực OTP; `403` Customer/role khác hoặc CSRF sai.
+
+### `PATCH /api/profile/password` và `PATCH /api/admin/me/password`
+
+Yêu cầu đúng vai trò đang đăng nhập; Admin phải hoàn thành OTP. Cần CSRF header và `Content-Type: application/json`.
+
+```json
+{
+  "mat_khau_hien_tai": "{{current_password}}",
+  "mat_khau_moi": "{{new_password}}",
+  "xac_nhan_mat_khau_moi": "{{new_password}}"
+}
+```
+
+Mật khẩu mới phải có ít nhất 8 ký tự, gồm chữ thường và chữ số; phải khác mật khẩu hiện tại và khớp xác nhận. Body dùng `mat_khau_hien_tai`, `mat_khau_moi`, `xac_nhan_mat_khau_moi`. Mỗi lỗi validation trả trong `errors` theo đúng tên ô: `mat_khau_hien_tai` cho thiếu/sai mật khẩu hiện tại; `mat_khau_moi` cho mật khẩu yếu hoặc trùng mật khẩu hiện tại; `xac_nhan_mat_khau_moi` cho thiếu hoặc xác nhận không khớp. Có thể trả nhiều lỗi trường cùng lúc. Mật khẩu hiện tại sai trả `422` (không phải `401`). Sau tối đa 5 lần nhập sai trong 15 phút theo tài khoản, lần tiếp theo trả `429` và `errors.retry_after`. Đổi thành công trả `200`, `data: null`; server băm mật khẩu, tái tạo session ID và vô hiệu hóa reset ticket/OTP quên mật khẩu còn hiệu lực. Response không chứa mật khẩu hoặc hash.
+
+Lỗi chung: `422` dữ liệu/mật khẩu không hợp lệ; `401` chưa đăng nhập hoặc Admin đang chờ OTP; `403` Customer gọi route Admin hoặc CSRF sai; `429` vượt giới hạn mật khẩu hiện tại.

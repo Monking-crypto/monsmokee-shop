@@ -14,7 +14,7 @@ Trạng thái bên dưới phản ánh phạm vi backend hiện tại; giao di�
 | UC12/QT13 — quản lý khuyến mãi và giá hiệu lực | `PromotionAdminController.php`, `PromotionController.php`, `PromotionService.php` | `/api/admin/promotions*`, `/api/promotions/active` | Hoàn thành backend |
 | Bước 15 — khu vực giao hàng, phí ship và thông tin cửa hàng | `DeliveryAreaAdminController.php`, `LocationController.php`, `ShippingService.php` | `/api/shipping/areas`, `/api/shipping/quote`, `/api/store-info`, `/api/admin/delivery-areas*` | Hoàn thành backend |
 | Bước 16A / UC02/QT2-3 — giỏ hàng Customer/guest, giá hiệu lực và gộp sau đăng nhập | `CartController.php`, `CartService.php`, `PromotionService.php` | `GET /api/cart`, `/api/cart/items*` | Hoàn thành backend |
-| UC03/QT6 — hồ sơ | `ProfileController.php`, `tai-khoan.html` | `/api/auth/profile` | Chưa làm |
+| Bước 14F / UC03/QT6 — hồ sơ và đổi mật khẩu Customer/Admin | `Customer/ProfileController.php`, `Admin/AdminProfileController.php`, `ProfileService.php`, `PasswordChangeService.php` | `GET /api/auth/me`, `PUT /api/profile`, `PATCH /api/profile/password`, `GET/PUT /api/admin/me`, `PATCH /api/admin/me/password` | Hoàn thành backend |
 | UC04/QT8-9 — thanh toán | `CheckoutController.php`, `thanh-toan.html` | `/api/checkout/*` | Chưa làm |
 | UC05/QT10-11 — đơn hàng/đánh giá | `OrderController.php`, `ReviewController.php` | `/api/orders*` | Chưa làm |
 | UC06/QT13 — quản lý danh mục | `CategoryAdminController.php` | `/api/admin/categories` | Hoàn thành backend |
@@ -25,6 +25,8 @@ Trạng thái bên dưới phản ánh phạm vi backend hiện tại; giao di�
 | UC11/QT15 — thống kê | `StatisticsController.php` | `/api/admin/statistics` | Chưa làm |
 
 Giỏ hàng, thanh toán, đơn hàng, đánh giá, quản lý đơn và thống kê vẫn chưa làm; giao diện frontend vẫn là phạm vi riêng.
+
+Hồ sơ dùng schema hiện có và chỉ cho đổi họ tên; SĐT/email chưa đổi được vì cần luồng OTP riêng. Đổi mật khẩu dùng chung dịch vụ cho Customer/Admin, yêu cầu mật khẩu hiện tại, mật khẩu mới tối thiểu 8 ký tự có chữ thường và số, giới hạn 5 lần sai trong 15 phút theo tài khoản, tái tạo session và vô hiệu hóa reset ticket/OTP quên mật khẩu còn hiệu lực. Admin cần hoàn tất OTP; thao tác ghi yêu cầu CSRF.
 
 Danh mục hỗ trợ tạo/sửa/ẩn/hiện; sản phẩm hỗ trợ quản lý, ẩn/hiện, xóa mềm theo lịch sử giao dịch, tải ảnh, ngưỡng tồn tối thiểu và danh sách mua kèm. Nhập kho bắt buộc ngày sản xuất cho mỗi dòng; ngày sản xuất/hạn sử dụng chỉ hiển thị trong API Admin, ngoại trừ hạn của sản phẩm đang giảm cận hạn. Điều chỉnh tồn dùng transaction và khóa sản phẩm/lô, trừ FEFO khi giảm và tạo lô khi tăng; có API cảnh báo tồn thấp và lô sắp hết hạn.
 
