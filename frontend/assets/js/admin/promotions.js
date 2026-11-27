@@ -1,6 +1,7 @@
 import { api, ApiError, serverNow } from '../core/api.js';
 import { escapeHtml, qs, toast } from '../core/ui.js';
-import { formatVnd, normalizeKeyword } from '../core/format.js';
+import { formatPromotionDate, formatVnd, normalizeKeyword } from '../core/format.js';
+import { displayDateFromIso, formatDateInput, isoDateFromDisplay } from '../core/date-input.js';
 import { confirmDialog } from '../components/confirm-dialog.js';
 
 const root = qs('#admin-page-content');
@@ -33,7 +34,12 @@ function productPrice(product) {
   return Number(product.gia_ban ?? product.gia) || 0;
 }
 
-function payloadFromForm() {
+function promotionInputDate(value, fallback) {
+  const formatted = formatPromotionDate(value);
+  return formatted ? formatted.split(' ')[0] : displayDateFromIso(fallback);
+}
+
+function payloadFromForm(startDate, endDate) {
   const data = new FormData(qs('#promotion-form'));
   return {
     ma_khuyen_mai: String(data.get('ma_khuyen_mai') || '').trim(),
@@ -42,8 +48,8 @@ function payloadFromForm() {
     phan_tram_giam: 10,
     so_san_pham: 10,
     so_tien_giam_toi_da: null,
-    ngay_bat_dau: String(data.get('ngay_bat_dau') || ''),
-    ngay_ket_thuc: String(data.get('ngay_ket_thuc') || ''),
+    ngay_bat_dau: startDate,
+    ngay_ket_thuc: endDate,
     trang_thai: qs('#promotion-enabled').checked ? 1 : 0,
     san_pham_ids: selectedIds,
   };
@@ -61,6 +67,8 @@ function render() {
     ngay_ket_thuc: date,
     trang_thai: 0,
   };
+  const startDisplay = promotionInputDate(current.ngay_bat_dau, date);
+  const endDisplay = promotionInputDate(current.ngay_ket_thuc, date);
   const selected = new Set(selectedIds);
   root.innerHTML = `<div class="admin-breadcrumb">Quản trị <span>/</span> Khuyến mãi</div>
     <section class="admin-promo-card"><div class="admin-promo-head"><div><p class="admin-eyebrow">CHƯƠNG TRÌNH THỨ SÁU</p>
@@ -71,8 +79,8 @@ function render() {
       <form id="promotion-form" class="admin-form-grid">
         <label class="admin-field">Mã khuyến mãi<input name="ma_khuyen_mai" maxlength="30" value="${escapeHtml(current.ma_khuyen_mai || '')}" required></label>
         <label class="admin-field">Tên chương trình<input name="ten_chuong_trinh" maxlength="150" value="${escapeHtml(current.ten_chuong_trinh || '')}" required></label>
-        <label class="admin-field">Ngày bắt đầu<input name="ngay_bat_dau" type="date" value="${escapeHtml(String(current.ngay_bat_dau || date).slice(0, 10))}" required></label>
-        <label class="admin-field">Ngày kết thúc<input name="ngay_ket_thuc" type="date" value="${escapeHtml(String(current.ngay_ket_thuc || date).slice(0, 10))}" required></label>
+        <label class="admin-field">Ngày bắt đầu<div class="admin-date-input"><input name="ngay_bat_dau" type="text" inputmode="numeric" autocomplete="off" placeholder="dd/mm/yyyy" pattern="[0-9]{2}/[0-9]{2}/[0-9]{4}" maxlength="10" value="${escapeHtml(startDisplay)}" required><span class="admin-date-input__icon" aria-hidden="true"><i class="bi bi-calendar3"></i></span><input class="admin-date-input__picker" type="date" data-date-picker="ngay_bat_dau" aria-label="Chọn ngày bắt đầu" tabindex="-1"></div><small data-error="ngay_bat_dau"></small></label>
+        <label class="admin-field">Ngày kết thúc<div class="admin-date-input"><input name="ngay_ket_thuc" type="text" inputmode="numeric" autocomplete="off" placeholder="dd/mm/yyyy" pattern="[0-9]{2}/[0-9]{2}/[0-9]{4}" maxlength="10" value="${escapeHtml(endDisplay)}" required><span class="admin-date-input__icon" aria-hidden="true"><i class="bi bi-calendar3"></i></span><input class="admin-date-input__picker" type="date" data-date-picker="ngay_ket_thuc" aria-label="Chọn ngày kết thúc" tabindex="-1"></div><small data-error="ngay_ket_thuc"></small></label>
         <div class="admin-promo-actions admin-field--wide"><button id="promotion-random" class="admin-button" type="button">Chọn ngẫu nhiên 10</button>
           <button id="promotion-save" class="ms-btn ms-btn--green" type="submit">Lưu chương trình</button>
           <span id="promotion-selected-count">${selected.size}/10 sản phẩm ghim</span>
@@ -83,6 +91,7 @@ function render() {
         <td>${escapeHtml(productName(product))}</td><td>${escapeHtml(product.ten_danh_muc || '')}</td><td>${formatVnd(productPrice(product))}</td><td>${Number(product.so_luong_ton) || 0}</td></tr>`).join('')}</tbody></table></div>
     </section>`;
   root.querySelectorAll('[data-promotion-product]').forEach((box) => box.addEventListener('change', updateSelection));
+  bindPromotionDateInputs();
   qs('#promotion-random').addEventListener('click', chooseRandom);
   qs('#promotion-save').form.addEventListener('submit', save);
   qs('#promotion-search').addEventListener('input', (event) => {
@@ -91,6 +100,37 @@ function render() {
       row.hidden = !normalizeKeyword(row.textContent).includes(query);
     });
   });
+}
+
+function bindPromotionDateInputs() {
+  const form = qs('#promotion-form');
+  const names = ['ngay_bat_dau', 'ngay_ket_thuc'];
+  const clearError = (name) => {
+    form.querySelector(`[data-error="${name}"]`).textContent = '';
+    form.elements[name].removeAttribute('aria-invalid');
+  };
+
+  names.forEach((name) => {
+    const input = form.elements[name];
+    const picker = form.querySelector(`[data-date-picker="${name}"]`);
+    input.addEventListener('input', (event) => {
+      formatDateInput(event);
+      picker.value = isoDateFromDisplay(input.value);
+      clearError(name);
+    });
+    picker.addEventListener('change', () => {
+      input.value = displayDateFromIso(picker.value);
+      clearError(name);
+    });
+  });
+}
+
+function showDateError(name, message) {
+  const form = qs('#promotion-form');
+  const input = form.elements[name];
+  form.querySelector(`[data-error="${name}"]`).textContent = message;
+  input.setAttribute('aria-invalid', 'true');
+  input.focus();
 }
 
 function updateSelection(event) {
@@ -149,8 +189,27 @@ async function chooseRandom() {
 async function save(event) {
   event.preventDefault();
   if (saving) return;
+  const form = qs('#promotion-form');
+  form.querySelectorAll('[data-error]').forEach((node) => { node.textContent = ''; });
+  ['ngay_bat_dau', 'ngay_ket_thuc'].forEach((name) => {
+    form.elements[name].removeAttribute('aria-invalid');
+  });
+  const startDate = isoDateFromDisplay(form.elements.ngay_bat_dau.value);
+  const endDate = isoDateFromDisplay(form.elements.ngay_ket_thuc.value);
+  if (!startDate) {
+    showDateError('ngay_bat_dau', 'Vui lòng nhập ngày bắt đầu hợp lệ theo dd/mm/yyyy.');
+    return;
+  }
+  if (!endDate) {
+    showDateError('ngay_ket_thuc', 'Vui lòng nhập ngày kết thúc hợp lệ theo dd/mm/yyyy.');
+    return;
+  }
+  if (endDate < startDate) {
+    showDateError('ngay_ket_thuc', 'Ngày kết thúc phải bằng hoặc sau ngày bắt đầu.');
+    return;
+  }
   const button = qs('#promotion-save');
-  const payload = payloadFromForm();
+  const payload = payloadFromForm(startDate, endDate);
   const enabling = payload.trang_thai === 1 && Number(promotion?.trang_thai) !== 1;
   if (enabling) {
     const { confirmed } = await confirmDialog({
@@ -176,6 +235,9 @@ async function save(event) {
     await load();
   } catch (error) {
     if (error instanceof ApiError && error.errors) {
+      ['ngay_bat_dau', 'ngay_ket_thuc'].forEach((field) => {
+        if (typeof error.errors[field] === 'string') showDateError(field, error.errors[field]);
+      });
       const messages = Object.values(error.errors).filter((value) => typeof value === 'string');
       if (messages.length) toast(messages.join(' '), 'error');
       else toast(error.message, 'error');

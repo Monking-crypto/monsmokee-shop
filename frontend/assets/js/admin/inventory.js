@@ -1,6 +1,7 @@
 import { api, ApiError } from '../core/api.js';
 import { escapeHtml, qs, toast } from '../core/ui.js';
 import { formatDate, formatVnd, normalizeKeyword } from '../core/format.js';
+import { displayDateFromIso, formatDateInput, isoDateFromDisplay } from '../core/date-input.js';
 
 const root = qs('#admin-page-content');
 const page = document.body.dataset.page;
@@ -15,24 +16,6 @@ function todayValue() {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }
 
-function displayDate(value) {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  return match ? `${match[3]}/${match[2]}/${match[1]}` : '';
-}
-
-function apiDate(value) {
-  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value.trim());
-  if (!match) return '';
-  const [, day, month, year] = match;
-  const iso = `${year}-${month}-${day}`;
-  const date = new Date(`${iso}T00:00:00Z`);
-  return date.getUTCFullYear() === Number(year)
-    && date.getUTCMonth() + 1 === Number(month)
-    && date.getUTCDate() === Number(day)
-    ? iso
-    : '';
-}
-
 function validIsoDate(value) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
   if (!match) return false;
@@ -40,27 +23,6 @@ function validIsoDate(value) {
   return date.getUTCFullYear() === Number(match[1])
     && date.getUTCMonth() + 1 === Number(match[2])
     && date.getUTCDate() === Number(match[3]);
-}
-
-function formatDateInput(event) {
-  const input = event.currentTarget;
-  const oldValue = input.value;
-  const oldCaret = input.selectionStart ?? oldValue.length;
-  const digitsBeforeCaret = oldValue.slice(0, oldCaret).replace(/\D/g, '').length;
-  const digits = oldValue.replace(/\D/g, '').slice(0, 8);
-  let value = digits;
-  if (digits.length > 2) value = `${digits.slice(0, 2)}/${digits.slice(2)}`;
-  if (digits.length > 4) value = `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
-  input.value = value;
-
-  let caret = 0;
-  let counted = 0;
-  while (caret < value.length && counted < digitsBeforeCaret) {
-    if (/\d/.test(value[caret])) counted += 1;
-    caret += 1;
-  }
-  if (value[caret] === '/' && (digitsBeforeCaret === 2 || digitsBeforeCaret === 4)) caret += 1;
-  input.setSelectionRange(caret, caret);
 }
 
 function formatMoneyInput(event) {
@@ -88,7 +50,7 @@ async function loadProducts() {
 
 function renderStockIn(products) {
   const today = todayValue();
-  const todayDisplay = displayDate(today);
+  const todayDisplay = displayDateFromIso(today);
   root.innerHTML = `<div class="admin-breadcrumb">Quản trị <span>/</span> Kho <span>/</span> Nhập hàng</div>
     <section class="admin-panel admin-stock-in">
       <div class="admin-panel__head"><div><h2>Tạo phiếu nhập hàng</h2><p class="admin-muted">Phiếu nhập sẽ cập nhật tồn kho và lưu thông tin lô hàng.</p></div></div>
@@ -118,14 +80,14 @@ function renderStockIn(products) {
     const picker = form.querySelector(`[data-date-picker="${name}"]`);
     input.addEventListener('input', (event) => {
       formatDateInput(event);
-      picker.value = apiDate(input.value);
+      picker.value = isoDateFromDisplay(input.value);
       if (name === 'ngay_nhap') {
-        const receiptDate = apiDate(input.value);
+        const receiptDate = isoDateFromDisplay(input.value);
         form.querySelector('[data-date-picker="ngay_san_xuat"]').max = receiptDate && receiptDate < today ? receiptDate : today;
       }
     });
     picker.addEventListener('change', () => {
-      input.value = displayDate(picker.value);
+      input.value = displayDateFromIso(picker.value);
       if (name === 'ngay_nhap') {
         form.querySelector('[data-date-picker="ngay_san_xuat"]').max = picker.value && picker.value < today ? picker.value : today;
       }
@@ -135,9 +97,9 @@ function renderStockIn(products) {
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     const data = new FormData(form);
-    const receiptDate = apiDate(String(data.get('ngay_nhap') || ''));
-    const expiryDate = apiDate(String(data.get('han_su_dung') || ''));
-    const manufactureDate = apiDate(String(data.get('ngay_san_xuat') || ''));
+    const receiptDate = isoDateFromDisplay(String(data.get('ngay_nhap') || ''));
+    const expiryDate = isoDateFromDisplay(String(data.get('han_su_dung') || ''));
+    const manufactureDate = isoDateFromDisplay(String(data.get('ngay_san_xuat') || ''));
     const productId = Number(data.get('san_pham_id'));
     const quantity = Number(data.get('so_luong'));
     const rawCost = String(data.get('gia_nhap') || '').replace(/\D/g, '');

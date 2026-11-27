@@ -3,7 +3,7 @@ import { serverNow } from '../core/api.js';
 import { CONFIG } from '../core/config.js';
 import { getProducts } from '../core/catalog.js';
 import { escapeHtml, qs } from '../core/ui.js';
-import { formatVnd } from '../core/format.js';
+import { formatPromotionDate, formatVnd } from '../core/format.js';
 import { mountHeader } from '../components/header.js';
 import { mountFooter } from '../components/footer.js';
 import { mountBottomNav } from '../components/bottom-nav.js';
@@ -72,9 +72,14 @@ function renderHero(state, data) {
       ? 'Hẹn gặp bạn ở đợt Siêu sale Thứ 6 tuần tới.'
       : 'Mỗi Thứ 6: tối đa 10 sản phẩm, giảm 10%.';
   const badge = active ? '<p class="flash-hero__live">ĐANG MỞ BÁN</p>' : '';
+  const start = formatPromotionDate(data.starts_at);
+  const end = formatPromotionDate(data.ends_at);
+  const schedule = start && end
+    ? `<p class="flash-hero__date">Thời gian khuyến mãi: ${escapeHtml(start)} – ${escapeHtml(end)}</p>`
+    : '';
   return `<section class="flash-hero" aria-labelledby="flash-title">
     <div class="flash-hero__copy">${badge}<p class="flash-hero__eyebrow"><i class="bi bi-shop-window" aria-hidden="true"></i> MON SMOKEE · ƯU ĐÃI THỨ 6</p>
-      <h1 id="flash-title">${headline}</h1><p class="flash-hero__sub">${sub}</p>${clockMarkup()}</div>
+      <h1 id="flash-title">${headline}</h1><p class="flash-hero__sub">${sub}</p>${schedule}${clockMarkup()}</div>
     <div class="flash-hero__ticket" aria-label="Giảm tối đa ${Number(data.discount_percent) || 10} phần trăm">
       <span>Tem giá thứ 6</span><strong>-${Number(data.discount_percent) || 10}%</strong><i class="bi bi-tag-fill" aria-hidden="true"></i>
     </div>

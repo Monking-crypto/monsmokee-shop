@@ -8,6 +8,38 @@ export function formatDate(value, withTime = false) {
   const date = `${p2(d.getDate())}/${p2(d.getMonth() + 1)}/${d.getFullYear()}`;
   return withTime ? `${date} ${p2(d.getHours())}:${p2(d.getMinutes())}` : date;
 }
+export function formatPromotionDate(value) {
+  if (value === null || value === undefined || value === '') return '';
+  const raw = value instanceof Date ? value.toISOString() : String(value).trim();
+  const localMatch = /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::\d{2})?)?$/.exec(raw);
+  if (localMatch) {
+    const [, year, month, day, hour, minute] = localMatch;
+    const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+    if (date.getUTCFullYear() !== Number(year)
+      || date.getUTCMonth() + 1 !== Number(month)
+      || date.getUTCDate() !== Number(day)
+      || (hour !== undefined && (Number(hour) > 23 || Number(minute) > 59))) return '';
+    const formattedDate = `${day}/${month}/${year}`;
+    return hour === undefined ? formattedDate : `${formattedDate} ${hour}:${minute}`;
+  }
+
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return '';
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date).filter((part) => part.type !== 'literal')
+    .map((part) => [part.type, part.value]));
+  const formattedDate = `${parts.day}/${parts.month}/${parts.year}`;
+  return /[T ]\d{2}:\d{2}/.test(raw)
+    ? `${formattedDate} ${parts.hour}:${parts.minute}`
+    : formattedDate;
+}
 export function removeAccents(s) {
   return String(s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D');
 }

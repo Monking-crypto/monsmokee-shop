@@ -4,6 +4,7 @@ import { daysUntilExpiry, getCategories, getProducts } from '../core/catalog.js'
 import { CONFIG } from '../core/config.js';
 import { serverNow } from '../core/api.js';
 import { escapeHtml, qs, toast } from '../core/ui.js';
+import { formatPromotionDate } from '../core/format.js';
 import { mountHeader } from '../components/header.js';
 import { mountFooter } from '../components/footer.js';
 import { mountBottomNav } from '../components/bottom-nav.js';
@@ -38,6 +39,7 @@ function saleSection() {
   return `<section class="ms-section home-friday" id="sale-thu-6" data-lazy-section="sale" aria-busy="true">
     <div class="home-friday__lead"><span class="home-friday__tag" aria-hidden="true">-10%</span><div>
       <h2>Ưu đãi Thứ 6</h2><p>Đang kiểm tra chương trình khuyến mãi.</p>
+      <p data-promotion-dates hidden></p>
     </div></div>
     <div class="home-friday__action"><span class="countdown" id="sale-timer" role="timer" aria-live="off"></span>
       <a class="ms-btn ms-btn--primary" href="sieu-sale-thu-6.html">Xem chương trình</a></div>
@@ -115,6 +117,13 @@ function renderSale(data) {
   target.querySelector('.home-friday__lead p').textContent = active
     ? 'Giá ưu đãi áp dụng trong thời gian chương trình.'
     : 'Danh sách sản phẩm sẽ xuất hiện khi chương trình bắt đầu.';
+  const dateRange = [promotion?.ngay_bat_dau, promotion?.ngay_ket_thuc]
+    .map(formatPromotionDate);
+  const dateElement = target.querySelector('[data-promotion-dates]');
+  dateElement.textContent = dateRange.every(Boolean)
+    ? `Thời gian: ${dateRange[0]} – ${dateRange[1]}`
+    : '';
+  dateElement.hidden = !active || !dateRange.every(Boolean);
   target.querySelector('.home-friday__action .ms-btn').textContent = active ? 'Xem sản phẩm sale' : 'Xem chương trình';
   target.querySelector('.home-friday__action .countdown').setAttribute('aria-label', active ? 'Thời gian còn lại của đợt sale' : 'Thời gian tới đợt sale');
   stopSaleCountdown?.();
