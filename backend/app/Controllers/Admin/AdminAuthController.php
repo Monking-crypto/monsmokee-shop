@@ -3,7 +3,9 @@ declare(strict_types=1);
 
 namespace App\Controllers\Admin;
 
+use App\Services\CartService;
 use App\Services\OtpService;
+use App\Services\UnifiedLoginService;
 use DateTimeImmutable;
 use PDO;
 use Request;
@@ -13,20 +15,28 @@ use Session;
 use Throwable;
 use Validator;
 
+require_once dirname(__DIR__, 2) . '/Services/CartService.php';
+require_once dirname(__DIR__, 2) . '/Services/UnifiedLoginService.php';
+
 /**
  * Đăng nhập bước một cho tài khoản Admin; phiên Admin chỉ hình thành sau OTP.
  */
 final class AdminAuthController
 {
     private const DUMMY_PASSWORD_HASH = '$2y$10$QBEKRbHMcArA1dK/DR5XOe3KZG0KzC3.d6GF1L12rptaK2vR.uN3i';
+    private UnifiedLoginService $unifiedLogin;
+    private ?CartService $cartService;
 
     public function __construct(
         private PDO $pdo,
         private Validator $validator,
         private OtpService $otpService,
         private array $business,
-        private array $extraOtpEmails = []
+        private array $extraOtpEmails = [],
+        ?CartService $cartService = null
     ) {
+        $this->unifiedLogin = new UnifiedLoginService($pdo, $business);
+        $this->cartService = $cartService;
     }
 
     public function login(Request $request, array $params = []): void
@@ -46,6 +56,38 @@ final class AdminAuthController
             Response::error('Dữ liệu đăng nhập không hợp lệ', 422, $errors);
             return;
         }
+
+        $outcome = $this->unifiedLogin->authenticate($phone, $password, $request->ip());
+        if (($outcome['type'] ?? null) === 'rate_limited') {
+            Response::error(
+                'Đã đăng nhập sai quá số lần cho phép, vui lòng thử lại sau',
+                429,
+                ['retry_after' => $outcome['retry_after']]
+            );
+            return;
+        }
+        if (($outcome['type'] ?? null) === 'account_locked') {
+            Response::error('Tài khoản đã bị khóa', 403);
+            return;
+        }
+        if (($outcome['type'] ?? null) === 'invalid_credentials') {
+            Response::error('Số điện thoại hoặc mật khẩu không đúng', 401);
+            return;
+        }
+        if (($outcome['type'] ?? null) === 'customer_credentials_valid') {
+            $cartMerge = $this->startCustomerSession($outcome['user']);
+            Response::success('Đăng nhập thành công', [
+                'user' => $outcome['user'],
+                'cart_merge' => $cartMerge,
+            ]);
+            return;
+        }
+        if (($outcome['type'] ?? null) === 'admin_credentials_valid') {
+            $this->startPendingAdminOtp($request, $outcome['user']);
+            return;
+        }
+        Response::error('Số điện thoại hoặc mật khẩu không đúng', 401);
+        return;
 
         $maxFailures = (int) ($this->business['login']['max_fail'] ?? 5);
         $windowSeconds = (int) ($this->business['login']['lock_minutes'] ?? 15) * 60;
@@ -240,6 +282,85 @@ final class AdminAuthController
             'emails_masked' => $this->maskedAdminEmails((string) $outcome['user']['email']),
             'expires_in_seconds' => $otp['expires_in_seconds'],
             'resend_after_seconds' => (int) $this->business['otp']['resend_cooldown_seconds'],
+        ]);
+    }
+
+    private function startCustomerSession(array $user): array
+    {
+        Session::regenerate();
+        Session::remove('admin_pending_user_id');
+        Session::remove('admin_pending_started_at');
+        Session::remove('admin_pending_expires_at');
+        Session::remove('admin_otp_verified');
+        Session::remove('admin_otp_verified_at');
+        Session::set('user_id', (int) $user['id']);
+        Session::set('user_role', (string) $user['vai_tro']);
+        Session::set('auth_user', $user);
+        return $this->cartService?->mergeGuestCart((int) $user['id'])
+            ?? ['adjusted_items' => []];
+    }
+
+    private function startPendingAdminOtp(Request $request, array $user): void
+    {
+        Session::remove('user_id');
+        Session::remove('user_role');
+        Session::remove('auth_user');
+        Session::remove('admin_otp_verified');
+        Session::remove('admin_otp_verified_at');
+        Session::remove('admin_pending_user_id');
+        Session::remove('admin_pending_started_at');
+        Session::remove('admin_pending_expires_at');
+        Session::remove('session_expired');
+        Session::regenerate();
+        $startedAt = time();
+        $pendingTtl = max(1, (int) ($this->business['otp']['ttl_seconds'] ?? 300));
+        Session::set('admin_pending_user_id', (int) $user['id']);
+        Session::set('admin_pending_started_at', $startedAt);
+        Session::set('admin_pending_expires_at', $startedAt + $pendingTtl);
+
+        try {
+            $otp = $this->otpService->issue(
+                (string) $user['email'],
+                'DANG_NHAP_ADMIN',
+                null,
+                $request->ip()
+            );
+        } catch (RuntimeException $error) {
+            if (str_starts_with($error->getMessage(), 'OTP_RESEND_COOLDOWN:')) {
+                $remaining = (int) substr($error->getMessage(), strlen('OTP_RESEND_COOLDOWN:'));
+                Response::error(
+                    'Vui lòng chờ trước khi yêu cầu mã OTP mới',
+                    429,
+                    ['retry_after' => $remaining]
+                );
+                return;
+            }
+            if ($error->getMessage() === 'OTP_MAX_SENDS_PER_HOUR') {
+                Response::error(
+                    'Đã vượt quá số lần gửi OTP cho phép, vui lòng thử lại sau',
+                    429,
+                    ['retry_after' => 3600]
+                );
+                return;
+            }
+            if ($error->getMessage() === 'OTP_SEND_FAILED') {
+                Response::error('Không thể gửi email OTP lúc này, vui lòng thử lại sau', 500);
+                return;
+            }
+            throw $error;
+        }
+
+        $expiresAt = (new DateTimeImmutable($otp['expires_at']))->getTimestamp();
+        Session::set('admin_pending_user_id', (int) $user['id']);
+        Session::set('admin_pending_started_at', $expiresAt - (int) $otp['expires_in_seconds']);
+        Session::set('admin_pending_expires_at', $expiresAt);
+
+        Response::success('Mã OTP đăng nhập Admin đã được gửi qua email', [
+            'otp_required' => true,
+            'email_masked' => $this->maskEmail((string) $user['email']),
+            'emails_masked' => $this->maskedAdminEmails((string) $user['email']),
+            'expires_in_seconds' => (int) $otp['expires_in_seconds'],
+            'resend_after_seconds' => (int) ($this->business['otp']['resend_cooldown_seconds'] ?? 60),
         ]);
     }
 

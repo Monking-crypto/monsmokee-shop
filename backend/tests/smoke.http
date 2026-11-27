@@ -3,6 +3,9 @@
 @customerPhone =
 @customerEmail =
 @customerPassword =
+@unknownCustomerPhone =
+@wrongPassword =
+@limitedPhone =
 @customerOtp =
 @wrongResetOtp =
 @resetOtp =
@@ -19,6 +22,9 @@
 @oldCsrfToken =
 @categoryId = 1
 @productId = 1
+@cartProductId =
+@cartQuantity = 1
+@cartUpdatedQuantity = 2
 @nearExpiryProductId =
 @searchTerm = sua
 @newCategoryName =
@@ -26,6 +32,14 @@
 @adminImagePath =
 @stockProductId =
 @stockReceiptDate =
+@manufactureDate =
+@expiryDate =
+@minPrice =
+@maxPrice =
+@suggestionProductId =
+@expiringDays =
+@adjustNewStock =
+@adjustReason =
 @promotionCode =
 @promotionTitle =
 @deliveryAreaId = 1
@@ -43,8 +57,14 @@ GET http://localhost/monsmokee/backend/public/api/products?page=1&sort=newest
 ### Public catalog: tìm kiếm, lọc danh mục và sắp xếp giá tăng dần
 GET http://localhost/monsmokee/backend/public/api/products?q={{searchTerm}}&category_id={{categoryId}}&sort=price_asc&page=1&per_page=10
 
+### Public catalog: lọc giá hiệu lực (điền minPrice/maxPrice; có thể bỏ một cận)
+GET http://localhost/monsmokee/backend/public/api/products?min_price={{minPrice}}&max_price={{maxPrice}}
+
 ### Public catalog: chi tiết sản phẩm (không trả hạn sử dụng)
 GET http://localhost/monsmokee/backend/public/api/products/{{productId}}
+
+### Public catalog: gợi ý mua kèm, tối đa 8 sản phẩm (không lộ HSD trừ CAN_HAN)
+GET http://localhost/monsmokee/backend/public/api/products/{{suggestionProductId}}/suggestions
 
 ### Public catalog: lọc sản phẩm cận hạn; chỉ nhãn CAN_HAN được trả hạn gần nhất
 GET http://localhost/monsmokee/backend/public/api/products?near_expiry=1
@@ -73,6 +93,36 @@ GET http://localhost/monsmokee/backend/public/api/store-info
 ### 1. Lấy CSRF token; REST Client cần giữ cookie session
 # @name csrf
 GET http://localhost/monsmokee/backend/public/api/csrf
+
+### Giỏ hàng guest: đọc, kiểm tra giá và tổng tiền (now chỉ trong development)
+GET http://localhost/monsmokee/backend/public/api/cart?now=2026-03-06
+
+### Thêm sản phẩm vào giỏ (cùng endpoint dùng guest hoặc Customer session)
+POST http://localhost/monsmokee/backend/public/api/cart/items
+Content-Type: application/json
+X-CSRF-Token: {{csrf.response.body.data.csrf_token}}
+
+{
+  "san_pham_id": {{cartProductId}},
+  "so_luong": {{cartQuantity}}
+}
+
+### Sửa số lượng dòng giỏ
+PATCH http://localhost/monsmokee/backend/public/api/cart/items/{{cartProductId}}
+Content-Type: application/json
+X-CSRF-Token: {{csrf.response.body.data.csrf_token}}
+
+{
+  "so_luong": {{cartUpdatedQuantity}}
+}
+
+### Xóa một sản phẩm khỏi giỏ
+DELETE http://localhost/monsmokee/backend/public/api/cart/items/{{cartProductId}}
+X-CSRF-Token: {{csrf.response.body.data.csrf_token}}
+
+### Xóa toàn bộ giỏ hiện hành
+DELETE http://localhost/monsmokee/backend/public/api/cart
+X-CSRF-Token: {{csrf.response.body.data.csrf_token}}
 
 ### Báo phí ship tạm tính; tiền hàng VND sau giảm
 POST http://localhost/monsmokee/backend/public/api/shipping/quote
@@ -307,6 +357,36 @@ X-CSRF-Token: {{csrfForCustomerLogin.response.body.data.csrf_token}}
   "mat_khau": "{{customerPassword}}"
 }
 
+### Bước 14E: SĐT không tồn tại - phải trả cùng 401
+POST http://localhost/monsmokee/backend/public/api/auth/login
+Content-Type: application/json
+X-CSRF-Token: {{csrfForCustomerLogin.response.body.data.csrf_token}}
+
+{
+  "so_dien_thoai": "{{unknownCustomerPhone}}",
+  "mat_khau": "{{wrongPassword}}"
+}
+
+### Bước 14E: Số điện thoại/khách dùng endpoint Admin cũ sai mật khẩu - cùng 401
+POST http://localhost/monsmokee/backend/public/api/admin/auth/login
+Content-Type: application/json
+X-CSRF-Token: {{csrfForCustomerLogin.response.body.data.csrf_token}}
+
+{
+  "so_dien_thoai": "{{customerPhone}}",
+  "mat_khau": "{{wrongPassword}}"
+}
+
+### Bước 14E: 5 lần sai theo cùng IP+SĐT - lần thứ 5 trả 429
+POST http://localhost/monsmokee/backend/public/api/auth/login
+Content-Type: application/json
+X-CSRF-Token: {{csrfForCustomerLogin.response.body.data.csrf_token}}
+
+{
+  "so_dien_thoai": "{{limitedPhone}}",
+  "mat_khau": "{{wrongPassword}}"
+}
+
 ### Customer không được vào Admin - 403
 GET http://localhost/monsmokee/backend/public/api/admin/me
 
@@ -320,6 +400,16 @@ GET http://localhost/monsmokee/backend/public/api/csrf
 
 ### 10. Admin đăng nhập bước 1; cùng OTP gửi tới email chính và các địa chỉ phụ cấu hình
 POST http://localhost/monsmokee/backend/public/api/admin/auth/login
+Content-Type: application/json
+X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
+
+{
+  "so_dien_thoai": "{{adminPhone}}",
+  "mat_khau": "{{adminPassword}}"
+}
+
+### Bước 14E: Admin đăng nhập chung bước 1 - phải otp_required, không tạo phiên đầy đủ
+POST http://localhost/monsmokee/backend/public/api/auth/login
 Content-Type: application/json
 X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
 
@@ -412,7 +502,8 @@ X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
   "gia": 25000,
   "don_vi_tinh": "gói",
   "mo_ta": "Sản phẩm dùng để kiểm thử quản trị",
-  "anh": null
+  "anh": null,
+  "muc_ton_toi_thieu": 10
 }
 
 ### Admin: tìm và lọc sản phẩm
@@ -432,8 +523,16 @@ X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
   "gia": 26000,
   "don_vi_tinh": "gói",
   "mo_ta": "Mô tả đã cập nhật",
-  "anh": null
+  "anh": null,
+  "muc_ton_toi_thieu": 5
 }
+
+### Admin: thay danh sách sản phẩm mua kèm (tối đa 8)
+PUT http://localhost/monsmokee/backend/public/api/admin/products/{{createAdminProduct.response.body.data.id}}/cross-sell
+Content-Type: application/json
+X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
+
+{"san_pham_ids": [{{productId}}]}
 
 ### Giá dạng chuỗi/decimal bị từ chối - 422
 POST http://localhost/monsmokee/backend/public/api/admin/products
@@ -489,7 +588,7 @@ X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
 
 {"trang_thai": 0}
 
-### Admin: nhập kho một lô (điền stockProductId và ngày nhập hôm nay)
+### Admin: nhập kho một lô (điền stockProductId/ngày nhập/ngày sản xuất/hạn dùng)
 # @name createStockReceipt
 POST http://localhost/monsmokee/backend/public/api/admin/stock-receipts
 Content-Type: application/json
@@ -504,7 +603,8 @@ X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
       "san_pham_id": {{stockProductId}},
       "so_luong": 12,
       "gia_nhap": 8000,
-      "han_su_dung": "2030-12-31",
+      "ngay_san_xuat": "{{manufactureDate}}",
+      "han_su_dung": "{{expiryDate}}",
       "so_lo": "SMOKE-LOT-01"
     }
   ]
@@ -524,6 +624,25 @@ GET http://localhost/monsmokee/backend/public/api/admin/batches?product_id={{sto
 
 ### Admin: lịch sử kho theo sản phẩm
 GET http://localhost/monsmokee/backend/public/api/admin/stock-history?product_id={{stockProductId}}&page=1&per_page=20
+
+### Admin: sản phẩm có tồn không quá ngưỡng tối thiểu
+GET http://localhost/monsmokee/backend/public/api/admin/inventory/low-stock
+
+### Admin: lô còn hàng hết hạn trong N ngày (mặc định lấy cấu hình nghiệp vụ)
+GET http://localhost/monsmokee/backend/public/api/admin/inventory/expiring?days={{expiringDays}}
+
+### Admin: điều chỉnh tồn tuyệt đối; khi tăng phải có ngày sản xuất và hạn sử dụng
+POST http://localhost/monsmokee/backend/public/api/admin/inventory/adjust
+Content-Type: application/json
+X-CSRF-Token: {{csrfForAdmin.response.body.data.csrf_token}}
+
+{
+  "san_pham_id": {{stockProductId}},
+  "so_luong_moi": {{adjustNewStock}},
+  "ly_do": "{{adjustReason}}",
+  "ngay_san_xuat": "{{manufactureDate}}",
+  "han_su_dung": "{{expiryDate}}"
+}
 
 ### Admin: chi tiết sản phẩm gồm tồn tổng và hạn gần nhất
 GET http://localhost/monsmokee/backend/public/api/admin/products/{{stockProductId}}

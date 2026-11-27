@@ -15,6 +15,7 @@ final class ProductController
 {
     private const DEFAULT_PER_PAGE = 12;
     private const MAX_PER_PAGE = 50;
+    private const MAX_PRICE = 999999999999;
 
     public function __construct(
         private PDO $pdo,
@@ -59,6 +60,17 @@ final class ProductController
             if (mb_strlen($search) > 100) {
                 $errors['q'] = 'q không được vượt quá 100 ký tự';
             }
+        }
+        $minPrice = $this->optionalNonNegativeInteger($query['min_price'] ?? null);
+        $maxPrice = $this->optionalNonNegativeInteger($query['max_price'] ?? null);
+        if (array_key_exists('min_price', $query) && ($minPrice === null || $minPrice > self::MAX_PRICE)) {
+            $errors['min_price'] = 'min_price phải là số nguyên từ 0 đến 999999999999';
+        }
+        if (array_key_exists('max_price', $query) && ($maxPrice === null || $maxPrice > self::MAX_PRICE)) {
+            $errors['max_price'] = 'max_price phải là số nguyên từ 0 đến 999999999999';
+        }
+        if ($minPrice !== null && $maxPrice !== null && $minPrice > $maxPrice) {
+            $errors['min_price'] = 'min_price không được lớn hơn max_price';
         }
 
         $sort = $query['sort'] ?? 'newest';
@@ -109,38 +121,96 @@ final class ProductController
         }
         $where = implode(' AND ', $conditions);
 
-        $count = $this->pdo->prepare(
-            'SELECT COUNT(*)
-             FROM san_pham s
-             JOIN danh_muc d ON d.id = s.danh_muc_id
-             WHERE ' . $where
-        );
-        $count->execute($values);
+        $usePriceRange = $minPrice !== null || $maxPrice !== null;
+        $rangeConditions = [];
+        $rangeValues = [];
+        if ($minPrice !== null) {
+            $rangeConditions[] = 'filtered.gia_ban_hieu_luc >= ?';
+            $rangeValues[] = $minPrice;
+        }
+        if ($maxPrice !== null) {
+            $rangeConditions[] = 'filtered.gia_ban_hieu_luc <= ?';
+            $rangeValues[] = $maxPrice;
+        }
+        $priceExpression = '';
+        $priceExpressionValues = [];
+        if ($usePriceRange) {
+            [$priceExpression, $priceExpressionValues] = $this->effectivePriceExpression($now);
+            $count = $this->pdo->prepare(
+                'SELECT COUNT(*) FROM (
+                    SELECT ' . $priceExpression . ' AS gia_ban_hieu_luc
+                    FROM san_pham s
+                    JOIN danh_muc d ON d.id = s.danh_muc_id
+                    WHERE ' . $where . '
+                 ) filtered
+                 WHERE ' . implode(' AND ', $rangeConditions)
+            );
+            $this->executeTyped($count, array_merge($priceExpressionValues, $values, $rangeValues));
+        } else {
+            $count = $this->pdo->prepare(
+                'SELECT COUNT(*)
+                 FROM san_pham s
+                 JOIN danh_muc d ON d.id = s.danh_muc_id
+                 WHERE ' . $where
+            );
+            $this->executeTyped($count, $values);
+        }
         $total = (int) $count->fetchColumn();
 
         $totalPages = (int) ceil($total / $perPage);
         $products = [];
         if ($page <= $totalPages) {
             $offset = ($page - 1) * $perPage;
-            $productsQuery = $this->pdo->prepare(
-                'SELECT s.id, s.ten_san_pham, s.gia_ban, s.hinh_anh,
-                        s.so_luong_ton > 0 AS con_hang,
-                        d.id AS danh_muc_id, d.ten_danh_muc, d.slug AS danh_muc_slug
-                 FROM san_pham s
-                 JOIN danh_muc d ON d.id = s.danh_muc_id
-                 WHERE ' . $where . '
-                 ORDER BY ' . $sortOrders[$sort] . '
-                 LIMIT ? OFFSET ?'
-            );
-            foreach ($values as $index => $value) {
-                $productsQuery->bindValue($index + 1, $value);
+            if ($usePriceRange) {
+                $productsQuery = $this->pdo->prepare(
+                    'SELECT filtered.*
+                     FROM (
+                        SELECT s.id, s.ten_san_pham, s.gia_ban, s.hinh_anh,
+                               s.ngay_tao,
+                               s.so_luong_ton > 0 AS con_hang,
+                               d.id AS danh_muc_id, d.ten_danh_muc, d.slug AS danh_muc_slug,
+                               ' . $priceExpression . ' AS gia_ban_hieu_luc
+                        FROM san_pham s
+                        JOIN danh_muc d ON d.id = s.danh_muc_id
+                        WHERE ' . $where . '
+                     ) filtered
+                     WHERE ' . implode(' AND ', $rangeConditions) . '
+                     ORDER BY ' . str_replace('s.', 'filtered.', $sortOrders[$sort]) . '
+                     LIMIT ? OFFSET ?'
+                );
+                $queryValues = array_merge(
+                    $priceExpressionValues,
+                    $values,
+                    $rangeValues,
+                    [$perPage, $offset]
+                );
+            } else {
+                $productsQuery = $this->pdo->prepare(
+                    'SELECT s.id, s.ten_san_pham, s.gia_ban, s.hinh_anh,
+                            s.so_luong_ton > 0 AS con_hang,
+                            d.id AS danh_muc_id, d.ten_danh_muc, d.slug AS danh_muc_slug
+                     FROM san_pham s
+                     JOIN danh_muc d ON d.id = s.danh_muc_id
+                     WHERE ' . $where . '
+                     ORDER BY ' . $sortOrders[$sort] . '
+                     LIMIT ? OFFSET ?'
+                );
+                $queryValues = array_merge($values, [$perPage, $offset]);
             }
-            $productsQuery->bindValue(count($values) + 1, $perPage, PDO::PARAM_INT);
-            $productsQuery->bindValue(count($values) + 2, $offset, PDO::PARAM_INT);
+            foreach ($queryValues as $index => $value) {
+                $productsQuery->bindValue(
+                    $index + 1,
+                    $value,
+                    is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR
+                );
+            }
             $productsQuery->execute();
 
             $products = array_map(
-                fn(array $row): array => $this->formatProduct($row, $now),
+                function (array $row) use ($now): array {
+                    unset($row['gia_ban_hieu_luc']);
+                    return $this->formatProduct($row, $now);
+                },
                 $productsQuery->fetchAll(PDO::FETCH_ASSOC)
             );
         }
@@ -185,6 +255,148 @@ final class ProductController
         }
 
         Response::success('Chi tiết sản phẩm', ['product' => $this->formatProduct($row, $now, true)]);
+    }
+
+    public function suggestions(Request $request, array $params = []): void
+    {
+        $now = $this->requestTime($request->query['now'] ?? null);
+        if ($now === null) {
+            return;
+        }
+        $id = $this->positiveInteger($params['id'] ?? null);
+        if ($id === null) {
+            Response::error('Không tìm thấy sản phẩm', 404);
+            return;
+        }
+        $current = $this->pdo->prepare(
+            'SELECT s.id, s.danh_muc_id
+             FROM san_pham s
+             JOIN danh_muc d ON d.id = s.danh_muc_id
+             WHERE s.id = ? AND s.trang_thai = 1 AND d.trang_thai = 1'
+        );
+        $current->execute([$id]);
+        $currentProduct = $current->fetch(PDO::FETCH_ASSOC);
+        if ($currentProduct === false) {
+            Response::error('Không tìm thấy sản phẩm', 404);
+            return;
+        }
+
+        $select = 'SELECT s.id, s.ten_san_pham, s.mo_ta, s.hinh_anh, s.don_vi_tinh,
+                          s.gia_ban, s.so_luong_ton > 0 AS con_hang,
+                          d.id AS danh_muc_id, d.ten_danh_muc, d.slug AS danh_muc_slug
+                   FROM san_pham s
+                   JOIN danh_muc d ON d.id = s.danh_muc_id
+                   WHERE s.id <> ? AND s.trang_thai = 1 AND d.trang_thai = 1
+                     AND s.so_luong_ton > 0';
+        $curated = $this->pdo->prepare(
+            'SELECT s.id, s.ten_san_pham, s.mo_ta, s.hinh_anh, s.don_vi_tinh,
+                    s.gia_ban, s.so_luong_ton > 0 AS con_hang,
+                    d.id AS danh_muc_id, d.ten_danh_muc, d.slug AS danh_muc_slug
+             FROM san_pham_mua_kem x
+             JOIN san_pham s ON s.id = x.san_pham_goi_y_id
+             JOIN danh_muc d ON d.id = s.danh_muc_id
+             WHERE x.san_pham_id = ? AND s.id <> ?
+               AND s.trang_thai = 1 AND d.trang_thai = 1 AND s.so_luong_ton > 0
+             ORDER BY s.id ASC
+             LIMIT 8'
+        );
+        $curated->execute([$id, $id]);
+        $rows = $curated->fetchAll(PDO::FETCH_ASSOC);
+        $seen = [$id => true];
+        foreach ($rows as $row) {
+            $seen[(int) $row['id']] = true;
+        }
+        if (count($rows) < 8) {
+            $fallback = $this->pdo->prepare(
+                $select . '
+                   AND s.danh_muc_id = ?
+                 ORDER BY s.luot_ban DESC, s.id ASC
+                 LIMIT 8'
+            );
+            $fallback->execute([$id, (int) $currentProduct['danh_muc_id']]);
+            foreach ($fallback->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $candidateId = (int) $row['id'];
+                if (!isset($seen[$candidateId])) {
+                    $rows[] = $row;
+                    $seen[$candidateId] = true;
+                    if (count($rows) === 8) {
+                        break;
+                    }
+                }
+            }
+        }
+
+        $suggestions = array_map(
+            fn(array $row): array => $this->formatProduct($row, $now),
+            array_slice($rows, 0, 8)
+        );
+        Response::success('Sản phẩm gợi ý mua kèm', [
+            'product_id' => $id,
+            'suggestions' => $suggestions,
+        ]);
+    }
+
+    private function effectivePriceExpression(DateTimeImmutable $now): array
+    {
+        $fridaySql = '0';
+        $fridayValues = [];
+        if ((int) $now->format('N') === (int) ($this->businessConfig['promotion']['friday_iso_weekday'] ?? 5)) {
+            $expectedCount = max(
+                1,
+                (int) ($this->businessConfig['promotion']['friday_product_count'] ?? 10)
+            );
+            $fridaySql = '(SELECT COALESCE(MAX(p.phan_tram_giam), 0)
+                FROM khuyen_mai p
+                JOIN khuyen_mai_san_pham ps ON ps.khuyen_mai_id = p.id
+                WHERE ps.san_pham_id = s.id
+                  AND p.loai = \'THU_SAU\'
+                  AND p.trang_thai = 1
+                  AND p.so_san_pham = ?
+                  AND p.ngay_bat_dau <= ?
+                  AND p.ngay_ket_thuc >= ?
+                  AND (
+                      SELECT COUNT(*)
+                      FROM khuyen_mai_san_pham kps
+                      WHERE kps.khuyen_mai_id = p.id
+                  ) = ?)';
+            $nowValue = $now->format('Y-m-d H:i:s');
+            $fridayValues = [$expectedCount, $nowValue, $nowValue, $expectedCount];
+        }
+        $nearExpiryPercent = max(
+            0,
+            min(100, (int) ($this->businessConfig['promotion']['near_expiry_percent'] ?? 50))
+        );
+        $cutoff = $now
+            ->setTime(0, 0)
+            ->modify('+' . max(0, (int) ($this->businessConfig['promotion']['near_expiry_days'] ?? 10)) . ' days')
+            ->format('Y-m-d');
+        $nearExpirySql = 'EXISTS (
+            SELECT 1 FROM lo_hang b
+            WHERE b.san_pham_id = s.id
+              AND b.so_luong_con > 0
+              AND b.han_su_dung <= ?
+        )';
+        $expression = 'CASE
+            WHEN ' . $nearExpirySql . ' AND ' . $nearExpiryPercent . ' > ' . $fridaySql . '
+                THEN ROUND(s.gia_ban * (100 - ' . $nearExpiryPercent . ') / 100, 0)
+            ELSE ROUND(s.gia_ban * (100 - ' . $fridaySql . ') / 100, 0)
+        END';
+        return [
+            $expression,
+            array_merge([$cutoff], $fridayValues, $fridayValues),
+        ];
+    }
+
+    private function executeTyped(\PDOStatement $statement, array $values): void
+    {
+        foreach ($values as $index => $value) {
+            $statement->bindValue(
+                $index + 1,
+                $value,
+                is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR
+            );
+        }
+        $statement->execute();
     }
 
     private function formatProduct(array $row, DateTimeImmutable $now, bool $includeDescription = false): array
@@ -292,5 +504,17 @@ final class ProductController
 
         $integer = filter_var($value, FILTER_VALIDATE_INT);
         return is_int($integer) && $integer > 0 ? $integer : null;
+    }
+
+    private function optionalNonNegativeInteger(mixed $value): ?int
+    {
+        if (is_int($value)) {
+            return $value >= 0 ? $value : null;
+        }
+        if (!is_string($value) || $value === '' || !ctype_digit($value)) {
+            return null;
+        }
+        $integer = filter_var($value, FILTER_VALIDATE_INT);
+        return is_int($integer) && $integer >= 0 ? $integer : null;
     }
 }
